@@ -1,0 +1,53 @@
+# Locuvi — private, single-user deployment.
+# Published only on 127.0.0.1: put Tailscale (`tailscale serve`) or another
+# authenticated private gateway in front. Never expose this port publicly.
+name: locuvi
+
+services:
+  locuvi:
+    build: .
+    image: locuvi:0.1.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LOCUVI_PORT:-8000}:8000"
+    environment:
+      APP_ENV: production
+      TZ: Europe/London
+      LOCUVI_AUTH_MODE: ${LOCUVI_AUTH_MODE:-password}
+      LOCUVI_PASSWORD_FILE: /run/secrets/locuvi_password
+      # Keep "true" when served over HTTPS (e.g. tailscale serve). Set "false"
+      # only for plain-http access on the same machine.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # Optional: private Nextcloud targets (Tailscale/LAN), comma-separated
+      # hostnames or CIDRs. Leave empty to allow only public HTTPS endpoints.
+      WEBDAV_ALLOWED_PRIVATE_HOSTS: ${WEBDAV_ALLOWED_PRIVATE_HOSTS:-}
+      WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED: ${WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - locuvi_password
+    volumes:
+      - locuvi-data:/data
+      - locuvi-keys:/keys
+      - ${LOCUVI_BACKUP_DIR:-./backups}:/backups
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    pids_limit: 200
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+secrets:
+  locuvi_password:
+    file: ./secrets/locuvi_password.txt
+
+volumes:
+  locuvi-data:
+  locuvi-keys:

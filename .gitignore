@@ -17,6 +17,7 @@ coverage/
 /data/
 /keys/
 /secrets/
+/backups/
 *.db
 *.db-wal
 *.db-shm
