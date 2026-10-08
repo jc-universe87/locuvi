@@ -4,7 +4,8 @@ Personal, single-user GP locum management app (v1.0): diary, invoicing, payments
 pension A/B worksheets, reports, Nextcloud archive. Design principle: Apple-style "it just
 works" — minimal fields, smart defaults, autosave, undo instead of confirm (ADR 0005). The original brief is in `docs/handover/` (read `docs/handover/CLAUDE.md` first);
 interpretations are in `docs/decisions/`; the plan is `docs/ROADMAP.md` (update it when a
-roadmap item ships). Do not expand scope beyond the roadmap without the owner asking;
+roadmap item ships); the AI/agent spec is `docs/specs/AI_AND_AGENTS.md` (AI optional, proposes
+only, never in calculations, owner approves every consequential action). Do not expand scope beyond the roadmap without the owner asking;
 never submit pension forms or send email without an explicit owner tap.
 
 ## Layout

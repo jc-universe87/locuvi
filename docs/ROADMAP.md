@@ -2,7 +2,8 @@
 
 Living plan for Locuvi. **v0.1 = GP Locum Invoicing** (done). **v1.0 = GP Locum Management**
 (done, 8 Oct 2026): diary, payments, email, pension worksheets, reports and the "it just works"
-redesign (ADR 0005). Further work is driven by real use.
+redesign (ADR 0005). Next: polish from real use, then the groundwork for the optional AI
+assistant (Part 4, spec in `docs/specs/AI_AND_AGENTS.md`).
 
 Sources: the original handover (`docs/handover/` — especially `implementation/BUILD_PLAN.md`,
 `specs/PRODUCT.md` "Explicit exclusions" and `engineering/ARCHITECTURE.md` "Future
@@ -80,20 +81,96 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
 - 🧭 Each April: add the new employer rate and check your employee tier (Settings → Pension).
 
 ### Later ideas — 💭
-- Automatic payment reminders (owner-approved text, still one tap to send).
-- Bank statement import (CSV/OFX) to suggest payment matches — owner confirms each match;
-  no live bank connection by default.
-- Assistant/agent actions (the handover's "AI agent/Bevro actions"): drafts and
-  suggestions only, every action confirmed by the owner, never issuing or sending alone.
 - VAT-registered invoices, only if the owner becomes VAT registered and an accountant
   confirms the treatment (currently blocked by design).
 - PostgreSQL migration path if SQLite ever becomes a limit (unlikely for one user).
+- Installable phone app (PWA) with offline read-only view of the Diary and invoices.
 
 ### Out of scope — ⛔
 Multi-user/team accounts, SaaS/public hosting, OOH/SOLO/salaried GP payroll, tax
 calculation/self-assessment filing, analytics/tracking, patient or medical data of any kind.
 
 ---
+
+---
+
+## Part 4 — AI assistant and agents
+
+Specification: [`docs/specs/AI_AND_AGENTS.md`](specs/AI_AND_AGENTS.md) (owner, 8 Oct 2026).
+**The application manages the records; the AI helps manage the work.** AI is optional and
+off by default. Calculations, numbering, deadlines and pension figures stay deterministic.
+The AI proposes and the owner approves. It never issues, sends, pays, submits or changes bank
+details on its own, and every proposal and tool call is audit-logged.
+
+### Phase 1 — Foundation without AI — ✅ (v1.0)
+Structured sessions, deterministic invoice engine, payments, pension figures, Nextcloud archive.
+The Today overview already gives rule-based monitoring for uninvoiced months, overdue invoices
+and pension months. Service functions (`services/*.py`) are the future tool layer.
+
+### v1.5 — Groundwork the assistant needs (no AI yet) — 🧭 next after real-use polish
+Each item is useful on its own and gives the AI something reliable to work with.
+- 🧭 **Checks engine**: deterministic rules that produce *findings* (severity, explanation,
+  linked records, suggested action), e.g. uninvoiced sessions, due/overdue invoices,
+  sessions with no rate, duplicate or overlapping bookings, Form A not returned, Form B missing,
+  payments not matched. Today shows the findings; a scheduler re-runs them daily. (Spec E)
+- 🧭 **Document inbox**: upload or forward booking emails, PDFs and statements. Documents
+  are stored locally and linked to sessions, invoices or payments. Only documents the owner
+  added or authorised are readable later. (Spec A, 4 `read_authorised_document`)
+- 🧭 **Bank statement CSV import** with deterministic matching first: exact amount plus
+  invoice number in the reference. Unmatched lines go to a review list. (Spec D)
+- 🧭 **Form A tracking**: per practice-month status (prepared → sent to practice → signed →
+  submitted), with dates and owner-recorded evidence. **PCSE statement import** to compare
+  expected and recorded contributions. (Spec C)
+- 🧭 **Correspondence log**: emails sent and received about an invoice or session, linked to
+  it, so drafts can use context the owner has authorised. (Spec F)
+- 🧭 **Audit log for proposals**: a generic "proposed change → approved/rejected" record, used
+  first by rules and later by the AI.
+- 🧭 **Notifications**: optional weekly email digest of findings ("2 sessions not invoiced,
+  1 invoice overdue").
+
+### Phase 2 — AI invoice assistant — 💭 (v2.0)
+- 💭 Provider-agnostic LLM interface (Claude API first; local model option later). The API key
+  is stored as a secret; the feature is off by default.
+- 💭 **Paste or forward a booking** → extracted sessions (practice, dates, AM/PM/hours, fee),
+  shown as proposals to confirm. Changes, cancellations and duplicates are flagged against the
+  Diary. Missing details are asked for, not guessed. (A)
+- 💭 "Prepare all outstanding invoices for September" → drafts made by the deterministic
+  engine from confirmed sessions; inconsistent rates are flagged. (B)
+- 💭 Draft invoice emails and polite reminders in the right tone; always reviewed and sent with
+  one tap by the owner. (B, F)
+- 💭 Structured outputs validated by backend schemas; every proposal is audit-logged.
+
+### Phase 3 — Administrative agent — 💭 (v2.x)
+- 💭 Tool-calling agent over controlled service functions: `list_sessions`,
+  `find_uninvoiced_sessions`, `get_invoice`, `create_invoice_draft`, `list_outstanding_invoices`,
+  `compare_payments`, `audit_pension_records`, `read_authorised_document`,
+  `draft_followup_email`, `generate_financial_summary`. Read-only by default; writes need
+  approval.
+- 💭 "Check all outstanding administrative work" → multi-step investigation over the checks
+  engine's findings, documents and correspondence, separating confirmed facts from assumptions,
+  ranked by urgency, with prepared drafts. (Spec 3)
+- 💭 Payment reconciliation help: inconsistent references, combined and partial payments,
+  deductions explained. (D)
+- 💭 Pension audit: work with no Form A, Form A not approved, missing Form B, deadlines,
+  PCSE comparison. Never claims a submission was accepted. (C)
+- 💭 Questions in plain language over your records ("Which practices still owe me money?").
+  Figures come from the database, never from AI estimates. (G)
+
+### Phase 4 — Extended integration — 💭 (v3)
+- 💭 Scheduled multi-step reviews (e.g. a Monday-morning admin brief).
+- 💭 Email (IMAP) and calendar connectors with narrowly scoped access.
+- 💭 Better document processing (scanned PDFs and photos of rota sheets).
+- 💭 **Bevro integration**: expose Locuvi's tools to authorised external agents, e.g. as
+  an MCP server with per-tool scopes and the same approval rules.
+- 💭 Optional local models for maximum privacy.
+- 💭 Controlled execution of workflows the owner has approved in advance.
+
+### Privacy guardrails (binding for every AI item)
+Explicit opt-in. Minimum data per request. Never send secrets (bank, WebDAV, SMTP, API keys) or
+patient-identifiable information. Narrowly scoped integrations. No LLM in any calculation.
+Issued invoices stay immutable. AI suggestions are visibly marked as suggestions. Every proposal
+can be rejected. A full audit trail. Check the AI provider's data-processing terms (UK GDPR)
+before enabling a cloud model.
 
 ## How to use this file
 - Before starting work, pick the next 🔜 item with the owner; move it to ✅ when merged,
