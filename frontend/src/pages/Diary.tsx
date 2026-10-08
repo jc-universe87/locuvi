@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Dialog, ErrorAlert, Field, Icon, Segmented, Toggle, useToast } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
@@ -54,7 +54,9 @@ export default function DiaryPage() {
   const toast = useToast();
   const nav = useNavigate();
   const today = todayLondon();
-  const [month, setMonth] = useState(today.slice(0, 7));
+  const [params] = useSearchParams();
+  const initialMonth = /^\d{4}-\d{2}$/.test(params.get("month") ?? "") ? params.get("month")! : today.slice(0, 7);
+  const [month, setMonth] = useState(initialMonth);
   const [practices, setPractices] = useState<Practice[] | null>(null);
   const [practiceId, setPracticeId] = useState<string | null>(remember("locuvi.diary.practice"));
   const [unit, setUnit] = useState<Unit>((remember("locuvi.diary.unit") as Unit) || "am");
@@ -403,6 +405,9 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
     default_payment_terms_days: practice?.default_payment_terms_days?.toString() ?? "",
     practice_code: practice?.practice_code ?? "",
     is_archived: practice?.is_archived ?? false,
+    po_required: practice?.po_required ?? false,
+    invoice_instructions: practice?.invoice_instructions ?? "",
+    form_a_signatory: practice?.form_a_signatory ?? "",
   });
   const [more, setMore] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -458,6 +463,16 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
                 <input id="ps-code" type="text" value={p.practice_code} onChange={(e) => setP({ ...p, practice_code: e.target.value.toUpperCase() })} />
               </Field>
             </div>
+            <div className="toggle-row">
+              <span className="text">{t("practices.po_required")}<br /><span className="hint">{t("practices.po_required_help")}</span></span>
+              <Toggle checked={p.po_required} onChange={(v) => setP({ ...p, po_required: v })} label={t("practices.po_required")} />
+            </div>
+            <Field id="ps-instr" label={t("practices.instructions")} optional hint={t("practices.instructions_hint")}>
+              <textarea id="ps-instr" rows={2} value={p.invoice_instructions} onChange={(e) => setP({ ...p, invoice_instructions: e.target.value })} />
+            </Field>
+            <Field id="ps-signatory" label={t("practices.form_a_signatory")} optional>
+              <input id="ps-signatory" type="text" value={p.form_a_signatory} onChange={(e) => setP({ ...p, form_a_signatory: e.target.value })} />
+            </Field>
             <div className="toggle-row">
               <span className="text">{t("practices.rate_includes_pension")}<br /><span className="hint">{t("practices.rate_includes_pension_help")}</span></span>
               <Toggle checked={p.rate_includes_pension} onChange={(v) => setP({ ...p, rate_includes_pension: v })} label={t("practices.rate_includes_pension")} />

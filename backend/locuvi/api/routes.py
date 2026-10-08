@@ -123,6 +123,8 @@ def _profile_out(p: Any) -> dict[str, Any]:
         pension_ref=p.pension_ref,
         employee_rate=str(p.employee_rate) if p.employee_rate is not None else None,
         setup_completed=p.setup_completed,
+        digest_enabled=p.digest_enabled,
+        last_digest_sent_at=p.last_digest_sent_at.isoformat() if p.last_digest_sent_at else None,
     ).model_dump()
 
 
@@ -140,7 +142,7 @@ def put_profile(body: S.ProfileIn, s: DB) -> dict[str, Any]:
     acct = data.pop("bank_account_number", None)
     nullable = {"trading_name", "phone", "professional_number", "pension_ref"}
     for k, v in data.items():
-        if k == "setup_completed" and v is None:
+        if k in {"setup_completed", "digest_enabled"} and v is None:
             continue
         if k == "employee_rate":
             v = Decimal(v) if v not in (None, "") else None
@@ -278,6 +280,9 @@ def _practice_out(p: Practice) -> dict[str, Any]:
         default_payment_terms_days=p.default_payment_terms_days,
         is_archived=p.is_archived,
         practice_code=p.practice_code,
+        po_required=p.po_required,
+        invoice_instructions=p.invoice_instructions,
+        form_a_signatory=p.form_a_signatory,
     ).model_dump()
 
 
@@ -289,8 +294,23 @@ def _apply_practice(p: Practice, data: dict[str, Any]) -> None:
             v = Decimal(v) if v not in (None, "") else None
         elif isinstance(v, str):
             v = v.strip()
-            if k in {"billing_email", "contact_name", "reference", "practice_code"}:
+            if k in {
+                "billing_email",
+                "contact_name",
+                "reference",
+                "practice_code",
+                "invoice_instructions",
+                "form_a_signatory",
+            }:
                 v = v or None
+        if v is None and k in {
+            "po_required",
+            "is_archived",
+            "default_pensionable",
+            "rate_includes_pension",
+            "default_unit",
+        }:
+            continue
         setattr(p, k, v)
 
 
@@ -443,6 +463,7 @@ def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
             pension_enabled=inv.pension_enabled,
             practice=inv.practice,
             for_issue=True,
+            reference=inv.reference,
         )
         out["analysis"] = _analysis_out(a)
     else:
@@ -532,7 +553,13 @@ def calculate(body: S.CalculateIn, s: DB) -> dict[str, Any]:
     for i, ln in enumerate(lines):
         svc.validate_line(ln, i)
     practice = s.get(Practice, body.practice_id) if body.practice_id else None
-    a = svc.analyse(s, lines=lines, pension_enabled=body.pension_enabled, practice=practice)
+    a = svc.analyse(
+        s,
+        lines=lines,
+        pension_enabled=body.pension_enabled,
+        practice=practice,
+        reference=body.reference,
+    )
     return _analysis_out(a)
 
 
@@ -692,6 +719,7 @@ def system_info(request: Request) -> dict[str, Any]:
         "integrity": state(request).integrity,
         "webdav_private_allowlist": bool(st.webdav_allowlist.hosts or st.webdav_allowlist.networks),
         "webdav_password_from_secret_file": st.webdav_password_override is not None,
+        "automatic_backups": st.backup_dir is not None,
     }
 
 
@@ -699,8 +727,63 @@ def system_info(request: Request) -> dict[str, Any]:
 
 
 @api.get("/overview")
-def overview(s: DB) -> dict[str, Any]:
-    return reports.today_overview(s)
+def overview(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import checks
+
+    out = reports.today_overview(s)
+    # Today already lists these kinds in its own sections; the rest go under "Needs attention".
+    shown = {
+        "uninvoiced_month",
+        "uninvoiced_current",
+        "invoice_overdue",
+        "invoice_due_soon",
+        "invoice_awaiting",
+        "pension_due",
+    }
+    out["findings"] = [
+        f.as_dict() for f in checks.run_checks(s, state(request).settings) if f.kind not in shown
+    ]
+    return out
+
+
+# ----------------------------------------------------------------------- checks
+
+
+@api.get("/checks")
+def list_checks(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import checks
+
+    found = checks.run_checks(s, state(request).settings)
+    return {"findings": [f.as_dict() for f in found], "counts": checks.summary_counts(found)}
+
+
+@api.post("/checks/dismiss")
+def dismiss_check(body: S.DismissIn, request: Request, s: DB, key: str) -> dict[str, bool]:
+    from locuvi.services import checks
+
+    if len(key) > 200:
+        raise DomainError("checks.bad_key", "Unknown finding.")
+    checks.dismiss(s, key, body.days)
+    return {"ok": True}
+
+
+@api.post("/system/backup")
+def system_backup(request: Request) -> dict[str, Any]:
+    from locuvi.services import backups
+
+    return backups.backup_now(state(request).settings)
+
+
+@api.post("/digest/send")
+def digest_send(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import digest
+
+    return digest.send_now(
+        s,
+        state(request).settings,
+        state(request).secrets,
+        smtp_factory=getattr(state(request), "smtp_factory", None),
+    )
 
 
 # ------------------------------------------------------------------------ diary

@@ -157,6 +157,27 @@ def send_invoice(
     return {"sent_to": recipients, "sent_at": inv.last_emailed_at.isoformat()}
 
 
+def send_to_self(
+    s: Session,
+    settings: Settings,
+    box: SecretBox,
+    subject: str,
+    body: str,
+    smtp_factory: Any = None,
+) -> str:
+    """Plain email to the owner's own address (digests, notifications). Returns the address."""
+    cfg = get_config(s)
+    if not cfg.enabled:
+        raise DomainError("email.not_configured", "Set up email in Settings first.")
+    msg = EmailMessage()
+    msg["From"] = formataddr((cfg.from_name or "Locuvi", cfg.from_address))
+    msg["To"] = cfg.from_address
+    msg["Subject"] = subject[:200]
+    msg.set_content(body[:20000])
+    _deliver(settings, box, cfg, msg, [cfg.from_address], smtp_factory)
+    return cfg.from_address
+
+
 def send_test(s: Session, settings: Settings, box: SecretBox, smtp_factory: Any = None) -> None:
     cfg = get_config(s)
     if not (cfg.host and cfg.from_address and cfg.password_ciphertext):

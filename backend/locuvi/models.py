@@ -129,6 +129,8 @@ class OwnerProfile(TimestampMixin, Base):
     pension_ref: Mapped[str | None] = mapped_column(String(40), nullable=True)
     employee_rate: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
     setup_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    digest_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_digest_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class InvoiceSequence(TimestampMixin, Base):
@@ -171,6 +173,10 @@ class Practice(TimestampMixin, Base):
     default_payment_terms_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     practice_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Practice-specific invoicing instructions (structured, so rules and the assistant can use them)
+    po_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    invoice_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    form_a_signatory: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class Invoice(TimestampMixin, Base):
@@ -378,4 +384,14 @@ class PensionSubmission(Base):
     month: Mapped[str] = mapped_column(String(7))  # YYYY-MM
     submitted_on: Mapped[date] = mapped_column(Date)
     figures_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class FindingDismissal(Base):
+    """Owner chose to hide a finding until a date (findings reappear if still true)."""
+
+    __tablename__ = "finding_dismissal"
+
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    until: Mapped[date] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

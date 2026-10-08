@@ -101,6 +101,7 @@ function useProfile() {
   const save = useAutosave(p, async (v) => {
     if (!v) return;
     const body: Record<string, unknown> = { ...v };
+    delete body.last_digest_sent_at; // read-only
     if (!v.bank_account_number) delete body.bank_account_number;
     const digits = String(v.bank_sort_code ?? "").replace(/\D/g, "");
     if (digits.length !== 0 && digits.length !== 6) delete body.bank_sort_code;
@@ -354,6 +355,39 @@ function EmailSection() {
         <button className="btn" onClick={() => save(true)}>{cfg.enabled ? t("common.save") : t("email.turn_on")}</button>
         <button className="btn secondary" onClick={test} disabled={!cfg.host || !cfg.from_address}>{t("email.send_test")}</button>
         {cfg.enabled && <button className="btn ghost" onClick={() => save(false)}>{t("email.turn_off")}</button>}
+      </div>
+      {cfg.enabled && <DigestSetting />}
+    </>
+  );
+}
+
+function DigestSetting() {
+  const { t } = useT();
+  const { p, setP, save } = useProfile();
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  if (!p) return null;
+  const sendNow = async () => {
+    setError(null);
+    try {
+      const r = await api.post<{ sent: boolean }>("/digest/send");
+      setMsg(r.sent ? t("digest.sent") : t("digest.nothing"));
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <>
+      <h3>{t("digest.title")}</h3>
+      <ErrorAlert error={error ?? save.error} />
+      {msg && <div className="alert ok" role="status">{msg}</div>}
+      <div className="form-list">
+        <SwitchRow label={t("digest.toggle")} hint={t("digest.hint")} checked={p.digest_enabled}
+          onChange={(v) => setP({ ...p, digest_enabled: v })} />
+      </div>
+      <div className="actions" style={{ marginTop: "0.5rem" }}>
+        <button className="btn secondary small" onClick={sendNow}>{t("digest.send_now")}</button>
+        <SavedIndicator state={save.state} />
       </div>
     </>
   );

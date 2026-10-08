@@ -5,6 +5,13 @@ import { api, downloadBlob } from "../lib/api";
 import { gbp, gbpRound, monthLabel, monthShort } from "../lib/format";
 
 interface Summary {
+  self_assessment: {
+    fees: string;
+    employer_contributions: string;
+    pensionable_pay: string;
+    employee_rate: string | null;
+    employee_contributions_estimate: string | null;
+  };
   tax_year: number;
   label: string;
   available_years: number[];
@@ -104,6 +111,18 @@ export default function ReportsPage() {
           </ul>
         </section>
       )}
+
+      <section className="card" aria-labelledby="h-sa">
+        <h2 id="h-sa">{t("reports.sa_title")}</h2>
+        <dl className="kv">
+          <dt>{t("reports.sa_fees")}</dt><dd className="money">{gbp(s.self_assessment.fees)}</dd>
+          <dt>{t("reports.sa_employer")}</dt><dd className="money">{gbp(s.self_assessment.employer_contributions)}</dd>
+          <dt>{t("reports.sa_pay")}</dt><dd className="money">{gbp(s.self_assessment.pensionable_pay)}</dd>
+          <dt>{t("reports.sa_employee")}</dt>
+          <dd className="money">{s.self_assessment.employee_contributions_estimate ? gbp(s.self_assessment.employee_contributions_estimate) : t("common.none")}</dd>
+        </dl>
+        <p className="hint" style={{ marginBottom: 0 }}>{t("reports.sa_note")}</p>
+      </section>
 
       <section className="card">
         <h2>{t("reports.export")}</h2>

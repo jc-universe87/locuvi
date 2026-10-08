@@ -154,6 +154,17 @@ await page.locator(".stat", { hasText: "Invoiced" }).getByText("£2,033").waitFo
 await page.locator(".stat", { hasText: "Received" }).getByText("£2,033").waitFor();
 await shot("10-reports");
 
+step("today shows findings (backup reminder after first invoice)");
+await page.getByRole("link", { name: "Today" }).first().click();
+await page.getByRole("heading", { name: "Needs attention" }).waitFor();
+await page.getByText(/No backup yet/).waitFor();
+await shot("10b-today-findings");
+if (await page.getByRole("button", { name: "Back up now" }).isVisible()) {
+  await page.getByRole("button", { name: "Back up now" }).click();
+  await page.getByText("Backup saved").waitFor();
+  await page.getByText(/No backup yet/).waitFor({ state: "detached" });
+}
+
 step("settings hub and sections");
 await page.getByRole("link", { name: "Settings" }).click();
 await page.getByRole("link", { name: /Bank details/ }).click();

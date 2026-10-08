@@ -19,6 +19,7 @@ from locuvi.errors import DomainError
 from locuvi.migrate import upgrade
 from locuvi.secrets_store import SecretBox, ensure_dir_private
 from locuvi.services import core
+from locuvi.services.digest import DigestScheduler
 from locuvi.webdav.archive import ArchiveContext, ArchiveWorker
 
 log = logging.getLogger("locuvi")
@@ -68,9 +69,12 @@ def create_app(
             hours=settings.session_hours,
         )
         app.state.worker = None
+        app.state.digest = None
         if settings.worker_enabled:
             app.state.worker = ArchiveWorker(app.state.archive_ctx)
             app.state.worker.start()
+            app.state.digest = DigestScheduler(settings, secrets)
+            app.state.digest.start()
         log.info(
             "Locuvi %s started (auth=%s, env=%s)", __version__, settings.auth_mode, settings.app_env
         )
@@ -79,6 +83,8 @@ def create_app(
         finally:
             if app.state.worker is not None:
                 app.state.worker.stop()
+            if app.state.digest is not None:
+                app.state.digest.stop()
             engine.dispose()
 
     app = FastAPI(

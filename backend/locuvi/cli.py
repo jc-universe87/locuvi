@@ -71,6 +71,9 @@ def backup(settings: Settings, dest: Path) -> dict:
                 tar.add(settings.data_dir / rel, arcname=rel)
         partial.chmod(0o600)
         partial.replace(dest)
+    from locuvi.services.checks import record_backup
+
+    record_backup(settings)
     return manifest
 
 

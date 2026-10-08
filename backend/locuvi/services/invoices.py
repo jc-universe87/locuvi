@@ -120,6 +120,7 @@ def analyse(
     pension_enabled: bool,
     practice: Practice | None,
     for_issue: bool = False,
+    reference: str | None = None,
 ) -> Analysis:
     blocking: list[Issue] = []
     warnings: list[Issue] = []
@@ -187,6 +188,22 @@ def analyse(
                 "invoice.practice_rate_inclusive",
                 "This practice's agreed rate is recorded as inclusive of the employer pension "
                 "contribution. Check you are not adding it twice.",
+            )
+        )
+    if practice is not None and practice.po_required and not reference:
+        warnings.append(
+            Issue(
+                "invoice.po_required",
+                "This practice needs a purchase order number on its invoices.",
+                {"practice": practice.name},
+            )
+        )
+    if practice is not None and practice.invoice_instructions:
+        warnings.append(
+            Issue(
+                "invoice.practice_instructions",
+                practice.invoice_instructions,
+                {"text": practice.invoice_instructions},
             )
         )
     if pension_enabled and inputs and not any(ln.pensionable for ln in inputs):
@@ -291,7 +308,13 @@ def _set_lines(inv: Invoice, lines: Sequence[LineData]) -> None:
 
 
 def _refresh_draft_cache(s: Session, inv: Invoice) -> Analysis:
-    a = analyse(s, lines=inv.lines, pension_enabled=inv.pension_enabled, practice=inv.practice)
+    a = analyse(
+        s,
+        lines=inv.lines,
+        pension_enabled=inv.pension_enabled,
+        practice=inv.practice,
+        reference=inv.reference,
+    )
     for ln, amount in zip(inv.lines, a.totals.line_amounts, strict=True):
         ln.amount = amount
     inv.fee_subtotal = a.totals.fee_subtotal
@@ -563,7 +586,13 @@ def format_sort_code(raw: str) -> str:
 
 
 def preview_pdf(s: Session, inv: Invoice) -> bytes:
-    a = analyse(s, lines=inv.lines, pension_enabled=inv.pension_enabled, practice=inv.practice)
+    a = analyse(
+        s,
+        lines=inv.lines,
+        pension_enabled=inv.pension_enabled,
+        practice=inv.practice,
+        reference=inv.reference,
+    )
     if inv.status != InvoiceStatus.draft:
         raise Conflict("invoice.not_draft", "Use the issued PDF for issued invoices.")
     profile = core.get_profile(s)
@@ -632,6 +661,7 @@ def issue(
             pension_enabled=inv.pension_enabled,
             practice=inv.practice,
             for_issue=True,
+            reference=inv.reference,
         )
         if a.blocking:
             raise ValidationFailed([p.as_dict() for p in a.blocking])

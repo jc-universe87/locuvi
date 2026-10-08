@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ErrorAlert, Icon, useToast } from "../components/ui";
-import { useT } from "../i18n";
+import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
 import { gbp, gbpRound, monthLabel, period, weekdayDate } from "../lib/format";
-import type { InvoiceDetail, Overview } from "../lib/types";
+import type { Finding, InvoiceDetail, Overview } from "../lib/types";
 
 function greetingKey(): MessageKey {
   const h = new Date().getHours();
@@ -81,8 +81,9 @@ export default function TodayPage() {
   };
 
   const name = firstName(ov.greeting_name);
+  const attention = ov.findings.filter((f) => f.kind !== "draft_stale" && f.severity !== "info");
   const tasks =
-    ov.ready_to_invoice.length + ov.drafts.length + ov.unpaid.length + ov.pension_due.length;
+    ov.ready_to_invoice.length + ov.drafts.length + ov.unpaid.length + ov.pension_due.length + attention.length;
 
   return (
     <>
@@ -122,7 +123,7 @@ export default function TodayPage() {
           <h2 style={{ margin: "0.25rem 0" }}>{t("today.caught_up")}</h2>
           <p className="muted" style={{ margin: 0 }}>{t("today.caught_up_sub")}</p>
         </div>
-      ) : (
+      ) : tasks === attention.length ? null : (
         <section className="card flush" aria-labelledby="h-todo">
           <h2 id="h-todo" className="sr-only">{t("today.todo")}</h2>
           {ov.ready_to_invoice.map((g) => (
@@ -178,6 +179,8 @@ export default function TodayPage() {
         </section>
       )}
 
+      <Attention findings={ov.findings} onDismissed={load} />
+
       <section className="card flush" aria-labelledby="h-upcoming">
         <div className="row" style={{ padding: "0.9rem 1.15rem 0.25rem" }}>
           <h2 id="h-upcoming" style={{ margin: 0 }}>{t("today.coming_up")}</h2>
@@ -204,5 +207,96 @@ export default function TodayPage() {
         <Icon name="plus" size={26} />
       </Link>
     </>
+  );
+}
+
+const SEVERITY_ICON: Record<Finding["severity"], { icon: string; cls: string }> = {
+  urgent: { icon: "alert", cls: "warn" },
+  warn: { icon: "alert", cls: "" },
+  info: { icon: "check", cls: "ok" },
+};
+
+function findingParams(f: Finding): Record<string, string | number> {
+  const p: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(f.params)) {
+    if (v === null || v === undefined) continue;
+    if (k === "month" && typeof v === "string") p.month = monthLabel(v);
+    else if (k === "date" && typeof v === "string") p.date = weekdayDate(v);
+    else if (["total", "outstanding", "pay"].includes(k)) p[k] = gbp(String(v));
+    else if (k === "unit") p.unit = String(v).toUpperCase();
+    else p[k] = v;
+  }
+  return p;
+}
+
+export function findingHref(f: Finding): string | null {
+  const a = f.action;
+  if (!a) return null;
+  switch (a.type) {
+    case "open_draft":
+      return `/invoices/${a.invoice_id}/edit`;
+    case "open_invoice":
+      return `/invoices/${a.invoice_id}`;
+    case "open_diary":
+      return `/diary?month=${a.date.slice(0, 7)}`;
+    case "open_pension":
+      return "/pension";
+    case "open_settings":
+      return `/settings/${a.section}`;
+    default:
+      return null;
+  }
+}
+
+function Attention({ findings, onDismissed }: { findings: Finding[]; onDismissed: () => void }) {
+  const { t } = useT();
+  const toast = useToast();
+  const list = findings.filter((f) => f.kind !== "draft_stale");
+  if (list.length === 0) return null;
+  const backup = async () => {
+    try {
+      await api.post("/system/backup");
+      toast({ text: t("finding.backup_done") });
+      onDismissed();
+    } catch {
+      toast({ text: t("finding.backup_failed") });
+    }
+  };
+  const hide = async (f: Finding) => {
+    try {
+      await api.post(`/checks/dismiss?key=${encodeURIComponent(f.key)}`, { days: 7 });
+      toast({ text: t("finding.hidden") });
+      onDismissed();
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <section className="card flush" aria-labelledby="h-attention">
+      <h2 id="h-attention" style={{ padding: "0.9rem 1.15rem 0.2rem", margin: 0 }}>{t("finding.title")}</h2>
+      {list.map((f) => {
+        const href = findingHref(f);
+        const sev = SEVERITY_ICON[f.severity];
+        const key = `finding.${f.kind}`;
+        return (
+          <div key={f.key} className="task">
+            <span className={`task-icon ${sev.cls}`}><Icon name={sev.icon} /></span>
+            <span className="list-main">
+              <span className="list-title">{hasKey(key) ? t(key as MessageKey, findingParams(f)) : f.kind}</span>
+              {f.severity === "urgent" && <span className="list-sub">{t("finding.urgent")}</span>}
+            </span>
+            {href && <Link to={href} className="btn small secondary">{t("finding.open")}</Link>}
+            {f.action?.type === "backup_now" && (
+              <button className="btn small secondary" onClick={backup}>{t("finding.backup_now")}</button>
+            )}
+            {f.dismissible && (
+              <button className="btn ghost small" onClick={() => hide(f)} aria-label={t("finding.hide_label")}>
+                {t("finding.hide")}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </section>
   );
 }

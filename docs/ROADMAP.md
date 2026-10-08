@@ -43,7 +43,8 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Item | Status | Notes |
 | --- | --- | --- |
 | Owner setup: sender/bank, numbering, pension rate check, practices, first test invoice | 🔜 | In the app; verify 14.38% / 90% against current NHSBSA guidance |
-| Nightly backup via cron + off-server encrypted copy | 🔜 | README §5; `locuvi.cli backup` |
+| Nightly backup | ✅ | Automatic after 02:00 into `/backups` (30 days kept), "Back up now" on Today |
+| Off-server encrypted copy of `backups/` | 🔜 | README §5 |
 | Restore drill on the real server (once) | 🔜 | `locuvi.cli restore` into a scratch volume, then `verify` |
 | Merge working branch into `main`; deploy from `main` | 🔜 | Owner to approve PR |
 | HTTPS on the intranet (Caddy internal CA or Tailscale serve) | 🧭 | Plain http on LAN is readable by others on that network |
@@ -119,9 +120,9 @@ Structured sessions, deterministic invoice engine, payments, pension figures, Ne
 The Today overview already gives rule-based monitoring for uninvoiced months, overdue invoices
 and pension months. Service functions (`services/*.py`) are the future tool layer.
 
-### v1.5 — Groundwork the assistant needs (no AI yet) — 🧭 next after real-use polish
+### v1.5 — Groundwork the assistant needs (no AI yet) — 🔜 in progress
 Each item is useful on its own and gives the AI something reliable to work with.
-- 🧭 **Checks engine**: deterministic rules that produce *findings* (severity, explanation,
+- ✅ **Checks engine** (`services/checks.py`): deterministic rules that produce *findings* (severity, explanation,
   linked records, suggested action), e.g. uninvoiced sessions, due/overdue invoices,
   sessions with no rate, duplicate or overlapping bookings, Form A not returned, Form B missing,
   payments not matched. Today shows the findings; a scheduler re-runs them daily. (Spec E)
@@ -137,11 +138,11 @@ Each item is useful on its own and gives the AI something reliable to work with.
   it, so drafts can use context the owner has authorised. (Spec F)
 - 🧭 **Audit log for proposals**: a generic "proposed change → approved/rejected" record, used
   first by rules and later by the AI.
-- 🧭 **Notifications**: optional weekly email digest of findings ("2 sessions not invoiced,
+- ✅ **Notifications**: optional weekly email digest of findings ("2 sessions not invoiced,
   1 invoice overdue").
-- 🧭 **Practice instructions** as structured fields: PO number required, invoice address/email,
+- ✅ **Practice instructions** as structured fields: PO number required, invoice address/email,
   portal upload, who signs Form A. Useful now, and reliable context for the AI later.
-- 🧭 **Self-assessment figures** in the tax-year pack: income totals and employee pension
+- ✅ **Self-assessment figures** in the tax-year pack: income totals and employee pension
   contributions, as figures only, not tax advice.
 
 ### Phase 2 — AI invoice assistant — 💭 (v2.0)

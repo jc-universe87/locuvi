@@ -23,6 +23,9 @@ services:
       WEBDAV_ALLOWED_PRIVATE_HOSTS: ${WEBDAV_ALLOWED_PRIVATE_HOSTS:-}
       WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED: ${WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Automatic nightly backup (after 02:00) into the /backups volume; 30 days kept.
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
     secrets:
       - locuvi_password
     volumes:

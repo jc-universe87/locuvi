@@ -48,7 +48,14 @@ def summary(s: Session, year: int) -> dict[str, Any]:
     invs = _issued_in(s, start, end)
     by_month: dict[str, Decimal] = defaultdict(lambda: ZERO)
     by_practice: dict[str, dict[str, Any]] = {}
-    totals = {"invoiced": ZERO, "fees": ZERO, "employer": ZERO, "paid": ZERO, "outstanding": ZERO}
+    totals = {
+        "invoiced": ZERO,
+        "fees": ZERO,
+        "employer": ZERO,
+        "paid": ZERO,
+        "outstanding": ZERO,
+        "pensionable_pay": ZERO,
+    }
     for inv in invs:
         gt = inv.grand_total or ZERO
         assert inv.invoice_date is not None
@@ -61,6 +68,7 @@ def summary(s: Session, year: int) -> dict[str, Any]:
         totals["invoiced"] += gt
         totals["fees"] += inv.fee_subtotal or ZERO
         totals["employer"] += inv.employer_contribution or ZERO
+        totals["pensionable_pay"] += inv.pensionable_pay or ZERO
         totals["paid"] += paid
         totals["outstanding"] += max(gt - paid, ZERO)
     months = []
@@ -78,7 +86,19 @@ def summary(s: Session, year: int) -> dict[str, Any]:
         ),
         default=current,
     )
+    rate = core.get_profile(s).employee_rate
+    self_assessment = {
+        # Figures for the owner's accountant — not tax advice.
+        "fees": str(round_money(totals["fees"])),
+        "employer_contributions": str(round_money(totals["employer"])),
+        "pensionable_pay": str(round_money(totals["pensionable_pay"])),
+        "employee_rate": str(rate) if rate is not None else None,
+        "employee_contributions_estimate": (
+            str(round_money(totals["pensionable_pay"] * rate)) if rate is not None else None
+        ),
+    }
     return {
+        "self_assessment": self_assessment,
         "tax_year": year,
         "label": f"{year}/{str(year + 1)[-2:]}",
         "start": start.isoformat(),

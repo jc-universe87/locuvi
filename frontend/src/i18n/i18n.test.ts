@@ -38,6 +38,11 @@ describe("i18n catalogues", () => {
     for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]) expect(en).toHaveProperty(`diary.wd_${d}`);
     for (const m of ["bank_transfer", "cheque", "cash", "other"]) expect(en).toHaveProperty(`pay.method_${m}`);
     for (const g of ["morning", "afternoon", "evening"]) expect(en).toHaveProperty(`today.${g}`);
+    // Every finding kind the backend checks engine can emit (backend/locuvi/services/checks.py)
+    for (const k of ["uninvoiced_month", "uninvoiced_current", "draft_stale", "po_missing", "invoice_overdue",
+      "invoice_due_soon", "invoice_awaiting", "session_duplicate", "session_overlap", "pension_due",
+      "pension_changed", "pension_tier_missing", "practice_no_address", "archive_failed", "archive_conflict",
+      "backup_never", "backup_stale"]) expect(en).toHaveProperty(`finding.${k}`);
   });
 
   it("other locales only contain known keys with the same placeholders", () => {

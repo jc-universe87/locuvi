@@ -63,6 +63,7 @@ class ProfileIn(Strict):
     pension_ref: Annotated[str, StringConstraints(max_length=40)] | None = None
     employee_rate: DecStr | None = None
     setup_completed: bool | None = None
+    digest_enabled: bool | None = None
 
 
 class ProfileOut(BaseModel):
@@ -84,6 +85,8 @@ class ProfileOut(BaseModel):
     pension_ref: str | None
     employee_rate: str | None
     setup_completed: bool
+    digest_enabled: bool
+    last_digest_sent_at: str | None
 
 
 class NumberingIn(Strict):
@@ -133,6 +136,9 @@ class PracticeIn(Strict):
     default_payment_terms_days: Annotated[int, Field(ge=0, le=365)] | None = None
     is_archived: bool = False
     practice_code: Annotated[str, StringConstraints(max_length=20)] | None = None
+    po_required: bool = False
+    invoice_instructions: Annotated[str, StringConstraints(max_length=2000)] | None = None
+    form_a_signatory: Short | None = None
 
 
 class PracticePatch(Strict):
@@ -148,6 +154,9 @@ class PracticePatch(Strict):
     default_payment_terms_days: Annotated[int, Field(ge=0, le=365)] | None = None
     is_archived: bool | None = None
     practice_code: Annotated[str, StringConstraints(max_length=20)] | None = None
+    po_required: bool | None = None
+    invoice_instructions: Annotated[str, StringConstraints(max_length=2000)] | None = None
+    form_a_signatory: Short | None = None
 
 
 class PracticeOut(BaseModel):
@@ -164,6 +173,9 @@ class PracticeOut(BaseModel):
     default_payment_terms_days: int | None
     is_archived: bool
     practice_code: str | None
+    po_required: bool
+    invoice_instructions: str | None
+    form_a_signatory: str | None
 
 
 # --------------------------------------------------------------------- invoices
@@ -194,6 +206,7 @@ class InvoiceIn(Strict):
 class CalculateIn(Strict):
     practice_id: str | None = None
     pension_enabled: bool = True
+    reference: Annotated[str, StringConstraints(max_length=100)] | None = None
     lines: list[LineIn] = []
 
 
@@ -286,3 +299,7 @@ class EmailSendIn(Strict):
 
 class PensionSubmitIn(Strict):
     submitted_on: date | None = None
+
+
+class DismissIn(Strict):
+    days: Annotated[int, Field(ge=1, le=365)] = 7

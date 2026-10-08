@@ -78,6 +78,8 @@ class Settings:
     encryption_key_file: Path | None = None
     worker_enabled: bool = True
     worker_poll_seconds: float = 15.0
+    backup_dir: Path | None = None  # automatic nightly backups go here (BACKUP_DIR)
+    backup_keep_days: int = 30
     log_level: str = "INFO"
 
     @property
@@ -95,10 +97,6 @@ class Settings:
     @property
     def quarantine_dir(self) -> Path:
         return self.data_dir / "invoices" / "quarantine"
-
-    @property
-    def backup_dir(self) -> Path:
-        return self.data_dir / "backups"
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> Settings:
@@ -124,6 +122,8 @@ class Settings:
             worker_enabled=_bool(e.get("ARCHIVE_WORKER_ENABLED"), default=True),
             worker_poll_seconds=float(e.get("ARCHIVE_WORKER_POLL_SECONDS", "15")),
             log_level=e.get("LOG_LEVEL", "INFO").upper(),
+            backup_dir=Path(e["BACKUP_DIR"]) if e.get("BACKUP_DIR") else None,
+            backup_keep_days=int(e.get("BACKUP_KEEP_DAYS", "30")),
         )
 
     def validate(self) -> None:

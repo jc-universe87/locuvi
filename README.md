@@ -162,18 +162,22 @@ secret mounted at `/run/secrets/locuvi_webdav_password` and set
 
 ## 5. Backups and restore
 
-Back up regularly to separate storage. Archives contain bank details — **encrypt them**.
+Locuvi backs itself up **every night after 02:00** into `./backups` (the `/backups` volume),
+keeping 30 days (`BACKUP_KEEP_DAYS`). If a backup is missing or old, Today shows it with a
+**Back up now** button. Each archive is a consistent snapshot (SQLite online backup + every issued
+PDF + checksum manifest) and is refused if any issued PDF is missing or altered.
 
+Archives contain bank details. Copy them **off the server, encrypted**, e.g. nightly:
 ```bash
-# Consistent snapshot (SQLite online backup + issued PDFs + checksum manifest)
-docker compose exec locuvi python -m locuvi.cli backup /backups/locuvi-$(date +%F).tar.gz
-
-# Encrypt before it leaves the machine, e.g. with age or gpg
-age -p -o locuvi-$(date +%F).tar.gz.age backups/locuvi-$(date +%F).tar.gz
-# Also keep a copy of the keys volume (separately, encrypted) if you store the
-# WebDAV app password in the UI:
+age -p -o offsite/locuvi-$(date +%F).tar.gz.age "$(ls -t backups/locuvi-*.tar.gz | head -1)"
+# or rclone/restic to another machine
+```
+Also keep a copy of the keys volume (separately, encrypted) if you store the WebDAV or email
+password in the UI:
+```bash
 docker run --rm -v locuvi_locuvi-keys:/keys -v "$PWD/backups:/out" alpine tar czf /out/keys.tgz -C /keys .
 ```
+Manual backup any time: `docker compose exec locuvi python -m locuvi.cli backup /backups/manual.tar.gz`.
 
 Restore (verified against the manifest checksums before anything is written):
 

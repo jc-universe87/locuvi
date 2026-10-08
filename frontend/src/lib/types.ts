@@ -115,6 +115,9 @@ export interface Practice {
   default_payment_terms_days: number | null;
   is_archived: boolean;
   practice_code: string | null;
+  po_required: boolean;
+  invoice_instructions: string | null;
+  form_a_signatory: string | null;
 }
 
 export interface Profile {
@@ -136,6 +139,8 @@ export interface Profile {
   pension_ref: string | null;
   employee_rate: string | null;
   setup_completed: boolean;
+  digest_enabled: boolean;
+  last_digest_sent_at: string | null;
 }
 
 export interface Numbering {
@@ -199,6 +204,7 @@ export interface Overview {
   pension_due: PensionMonth[];
   upcoming: { id: string; date: string; unit: Unit; practice_name: string }[];
   this_month_invoiced: string;
+  findings: Finding[];
   tax_year: { invoiced: string; paid: string; outstanding: string; employer: string; fees: string };
 }
 
@@ -223,4 +229,22 @@ export interface EmailConfig {
   from_name: string;
   bcc_self: boolean;
   password_set: boolean;
+}
+
+export interface Finding {
+  key: string;
+  kind: string;
+  severity: "urgent" | "warn" | "info";
+  params: Record<string, string | number | null>;
+  ref: { type: string; id: string } | null;
+  action:
+    | { type: "create_invoice"; practice_id: string; month: string }
+    | { type: "open_draft" | "open_invoice"; invoice_id: string }
+    | { type: "mark_paid"; invoice_id: string; number: string }
+    | { type: "open_diary"; date: string }
+    | { type: "open_pension"; month: string }
+    | { type: "open_settings"; section: string }
+    | { type: "backup_now" }
+    | null;
+  dismissible: boolean;
 }
