@@ -1,0 +1,56 @@
+"""Startup consistency check between issued invoice rows and PDF files."""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from locuvi.config import Settings
+from locuvi.models import Invoice
+from locuvi.storage.local import sha256_file
+
+log = logging.getLogger("locuvi.integrity")
+
+
+def check(s: Session, settings: Settings) -> dict[str, Any]:
+    problems: list[dict[str, str]] = []
+    referenced: set[str] = set()
+    rows = s.scalars(select(Invoice).where(Invoice.status != "draft")).all()
+    for inv in rows:
+        if not inv.local_pdf_path or not inv.local_pdf_sha256 or not inv.invoice_number:
+            problems.append({"invoice_id": inv.id, "problem": "incomplete_issue_record"})
+            continue
+        referenced.add(inv.local_pdf_path)
+        path = settings.data_dir / inv.local_pdf_path
+        if not path.is_file():
+            problems.append({"invoice_id": inv.id, "problem": "pdf_missing"})
+        elif sha256_file(path) != inv.local_pdf_sha256:
+            problems.append({"invoice_id": inv.id, "problem": "pdf_checksum_mismatch"})
+
+    # PDFs that no issued row references come from an issue that never committed.
+    quarantined = 0
+    issued_dir = settings.issued_dir
+    if issued_dir.is_dir():
+        for f in issued_dir.iterdir():
+            rel = f"invoices/issued/{f.name}"
+            if f.name.startswith(".") and f.name.endswith(".tmp"):
+                f.unlink(missing_ok=True)
+                continue
+            if f.suffix == ".pdf" and rel not in referenced:
+                settings.quarantine_dir.mkdir(parents=True, exist_ok=True)
+                os.replace(f, settings.quarantine_dir / f.name)
+                quarantined += 1
+    for p in problems:
+        log.error("integrity problem invoice=%s %s", p["invoice_id"], p["problem"])
+    if quarantined:
+        log.warning("moved %d unreferenced PDF(s) to quarantine", quarantined)
+    return {
+        "ok": not problems,
+        "issued_checked": len(rows),
+        "problems": problems,
+        "quarantined": quarantined,
+    }

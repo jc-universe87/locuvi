@@ -46,16 +46,23 @@ def ctx(local_settings, engine):
 
 
 def configure(s, ctx, dav, **kw):
-    params = dict(enabled=True, target_url=dav.base_url, username=USER,
-                  base_path="Locuvi/Invoices", auto_upload=True, password=PASSWORD)
+    params = dict(
+        enabled=True,
+        target_url=dav.base_url,
+        username=USER,
+        base_path="Locuvi/Invoices",
+        auto_upload=True,
+        password=PASSWORD,
+    )
     params.update(kw)
     return archive.save_config(s, ctx, **params)
 
 
 def issue(ctx, s, practice, d="2026-10-08"):
     inv = svc.save_draft(s, None, practice_id=practice.id, lines=[line(d)])
-    return svc.issue(ctx.settings, inv.id, uuid.uuid4().hex,
-                     after_issue=archive.enqueue_on_issue).invoice
+    return svc.issue(
+        ctx.settings, inv.id, uuid.uuid4().hex, after_issue=archive.enqueue_on_issue
+    ).invoice
 
 
 def job_for(inv_id) -> ArchiveJob:
@@ -148,8 +155,16 @@ def test_offline_then_eventually_syncs(ctx, session, ready, tmp_path):
     srv = DavServer(tmp_path / "late")
     url = srv.base_url
     srv.stop()
-    archive.save_config(session, ctx, enabled=True, target_url=url, username=USER,
-                        base_path="Locuvi/Invoices", auto_upload=True, password=PASSWORD)
+    archive.save_config(
+        session,
+        ctx,
+        enabled=True,
+        target_url=url,
+        username=USER,
+        base_path="Locuvi/Invoices",
+        auto_upload=True,
+        password=PASSWORD,
+    )
     inv = issue(ctx, session, ready)
     assert inv.status == "issued"
     assert list(archive.run_due_jobs(ctx).values()) == ["failed"]
@@ -160,11 +175,13 @@ def test_offline_then_eventually_syncs(ctx, session, ready, tmp_path):
     assert archive.run_due_jobs(ctx) == {}
     # Server comes back on the same port; make the job due
     from cheroot import wsgi
+
     srv2 = DavServer(tmp_path / "late")
     srv2.server.stop()
     srv2.server = wsgi.Server(("127.0.0.1", srv.port), srv2.app)
     srv2.server.prepare()
     import threading
+
     threading.Thread(target=srv2.server.serve, daemon=True).start()
     try:
         s = db.new_session()
@@ -202,11 +219,18 @@ def test_change_destination_folder(ctx, session, ready, dav):
 
 
 def test_test_connection(ctx, session, dav):
-    ok = archive.test_connection(session, ctx, target_url=dav.base_url, username=USER,
-                                 base_path="Locuvi/Invoices", password=PASSWORD)
+    ok = archive.test_connection(
+        session,
+        ctx,
+        target_url=dav.base_url,
+        username=USER,
+        base_path="Locuvi/Invoices",
+        password=PASSWORD,
+    )
     assert ok == {"ok": True, "folder_exists": False}
-    bad = archive.test_connection(session, ctx, target_url=dav.base_url, username=USER,
-                                  base_path="Locuvi", password="nope")
+    bad = archive.test_connection(
+        session, ctx, target_url=dav.base_url, username=USER, base_path="Locuvi", password="nope"
+    )
     assert bad == {"ok": False, "error_class": "auth_rejected"}
     # nothing persisted
     assert core.get_storage_config(session).password_ciphertext is None
@@ -225,22 +249,25 @@ def test_secret_never_returned_and_encrypted(ctx, session, dav, caplog):
 # ------------------------------------------------------------ SSRF / URLs
 
 
-@pytest.mark.parametrize("url,reason", [
-    ("http://cloud.example.org/remote.php/dav/files/a/", "scheme"),
-    ("ftp://cloud.example.org/", "scheme"),
-    ("https://localhost/remote.php/dav/", "private"),
-    ("https://127.0.0.1/dav/", "private"),
-    ("https://[::1]/dav/", "private"),
-    ("https://169.254.169.254/latest/", "private"),
-    ("https://10.0.0.5/dav/", "private"),
-    ("https://192.168.1.10/dav/", "private"),
-    ("https://100.101.102.103/dav/", "private"),
-    ("https://[::ffff:127.0.0.1]/dav/", "private"),
-    ("https://metadata.google.internal/", "private"),
-    ("https://user:pw@cloud.example.org/dav/", "userinfo"),
-    ("https://cloud.example.org/dav/?x=1", "invalid"),
-    ("javascript:alert(1)", "scheme"),
-])
+@pytest.mark.parametrize(
+    "url,reason",
+    [
+        ("http://cloud.example.org/remote.php/dav/files/a/", "scheme"),
+        ("ftp://cloud.example.org/", "scheme"),
+        ("https://localhost/remote.php/dav/", "private"),
+        ("https://127.0.0.1/dav/", "private"),
+        ("https://[::1]/dav/", "private"),
+        ("https://169.254.169.254/latest/", "private"),
+        ("https://10.0.0.5/dav/", "private"),
+        ("https://192.168.1.10/dav/", "private"),
+        ("https://100.101.102.103/dav/", "private"),
+        ("https://[::ffff:127.0.0.1]/dav/", "private"),
+        ("https://metadata.google.internal/", "private"),
+        ("https://user:pw@cloud.example.org/dav/", "userinfo"),
+        ("https://cloud.example.org/dav/?x=1", "invalid"),
+        ("javascript:alert(1)", "scheme"),
+    ],
+)
 def test_malicious_urls_blocked(settings, url, reason):
     with pytest.raises(UrlBlocked) as ei:
         validate_base_url(url, settings)
@@ -257,15 +284,17 @@ def test_allowlist_permits_private_target(settings):
 
 def test_dns_resolving_to_private_blocked(settings, monkeypatch):
     import socket
-    monkeypatch.setattr(socket, "getaddrinfo",
-                        lambda *a, **k: [(2, 1, 6, "", ("10.1.2.3", 443))])
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("10.1.2.3", 443))])
     from locuvi.webdav.urlguard import resolve_and_check
+
     with pytest.raises(UrlBlocked):
         resolve_and_check("rebind.example.org", 443, settings)
 
 
-@pytest.mark.parametrize("bad", ["../etc", "a/./b", "a/..", "x" * 101, "a:b", "con\x00trol",
-                                 ".hidden"])
+@pytest.mark.parametrize(
+    "bad", ["../etc", "a/./b", "a/..", "x" * 101, "a:b", "con\x00trol", ".hidden"]
+)
 def test_invalid_folder_names(bad):
     with pytest.raises(InvalidPath):
         validate_base_path(bad)
@@ -273,14 +302,23 @@ def test_invalid_folder_names(bad):
 
 def test_unicode_folder_encoded():
     from locuvi.webdav.urlguard import encode_path
+
     segs = validate_base_path("Rechnungen/Café 2026")
     assert encode_path(segs) == "Rechnungen/Caf%C3%A9%202026"
 
 
 def test_save_config_rejects_bad_url(ctx, session):
     with pytest.raises(DomainError) as ei:
-        archive.save_config(session, ctx, enabled=True, target_url="https://10.0.0.1/",
-                            username="u", base_path="x", auto_upload=True, password="p")
+        archive.save_config(
+            session,
+            ctx,
+            enabled=True,
+            target_url="https://10.0.0.1/",
+            username="u",
+            base_path="x",
+            auto_upload=True,
+            password="p",
+        )
     assert ei.value.code == "webdav.url_blocked"
 
 
@@ -289,25 +327,37 @@ def test_save_config_rejects_bad_url(ctx, session):
 
 def fake_ctx(local_settings, handler):
     transport = httpx.MockTransport(handler)
-    return archive.ArchiveContext(local_settings, SecretBox(local_settings),
-                                  transport_factory=lambda: transport)
+    return archive.ArchiveContext(
+        local_settings, SecretBox(local_settings), transport_factory=lambda: transport
+    )
 
 
 def _setup_fake(ctx, session, ready):
-    archive.save_config(session, ctx, enabled=True, target_url="https://dav.example.org/dav/",
-                        username="u", base_path="L", auto_upload=True, password="secret-pw")
+    archive.save_config(
+        session,
+        ctx,
+        enabled=True,
+        target_url="https://dav.example.org/dav/",
+        username="u",
+        base_path="L",
+        auto_upload=True,
+        password="secret-pw",
+    )
     return issue(ctx, session, ready)
 
 
-@pytest.mark.parametrize("status,err,paused", [
-    (401, "auth_rejected", True),
-    (403, "permission_denied", True),
-    (429, "rate_limited", False),
-    (500, "server_error", False),
-    (503, "server_unavailable", False),
-    (507, "insufficient_storage", False),
-    (302, "redirect_blocked", True),
-])
+@pytest.mark.parametrize(
+    "status,err,paused",
+    [
+        (401, "auth_rejected", True),
+        (403, "permission_denied", True),
+        (429, "rate_limited", False),
+        (500, "server_error", False),
+        (503, "server_unavailable", False),
+        (507, "insufficient_storage", False),
+        (302, "redirect_blocked", True),
+    ],
+)
 def test_http_failures_classified(local_settings, engine, session, ready, status, err, paused):
     seen = []
 
@@ -346,11 +396,15 @@ def test_timeout_classified(local_settings, engine, session, ready):
 
 def test_never_marked_synced_without_verification(local_settings, engine, session, ready):
     """Server accepts PUT/MOVE but serves different bytes back -> not synced."""
+
     def handler(req: httpx.Request):
         if req.method == "PROPFIND":
             if req.url.path.endswith(".pdf"):
                 return httpx.Response(404)
-            return httpx.Response(207, content=b'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>')
+            return httpx.Response(
+                207,
+                content=b'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>',
+            )
         if req.method in ("PUT", "MOVE"):
             return httpx.Response(201)
         if req.method == "GET":
@@ -373,7 +427,10 @@ def test_move_precondition_failed_race(local_settings, engine, session, ready):
         if req.method == "PROPFIND":
             if req.url.path.endswith(".pdf"):
                 return httpx.Response(404)
-            return httpx.Response(207, content=b'<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>')
+            return httpx.Response(
+                207,
+                content=b'<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>',
+            )
         if req.method == "PUT":
             return httpx.Response(201)
         if req.method == "MOVE":
@@ -395,9 +452,16 @@ def test_disabled_webdav_suppresses_processing(ctx, session, ready, dav):
     configure(session, ctx, dav)
     issue(ctx, session, ready)
     cfg = session.get(StorageConfig, 1)
-    archive.save_config(session, ctx, enabled=False, target_url=cfg.target_url,
-                        username=cfg.username, base_path=cfg.base_path, auto_upload=True,
-                        password=None)
+    archive.save_config(
+        session,
+        ctx,
+        enabled=False,
+        target_url=cfg.target_url,
+        username=cfg.username,
+        base_path=cfg.base_path,
+        auto_upload=True,
+        password=None,
+    )
     assert archive.run_due_jobs(ctx) == {}
 
 
