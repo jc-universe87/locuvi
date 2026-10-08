@@ -4,10 +4,10 @@ from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
+from webdav_fixture import PASSWORD, USER, DavServer
 
 from locuvi.config import WebDavAllowlist
 from locuvi.main import create_app
-from webdav_fixture import PASSWORD, USER, DavServer
 
 PROFILE = {
     "legal_name": "Dr Alex Example",

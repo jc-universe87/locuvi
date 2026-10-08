@@ -16,7 +16,12 @@ from locuvi.storage.local import sha256_file
 log = logging.getLogger("locuvi.integrity")
 
 
-def check(s: Session, settings: Settings) -> dict[str, Any]:
+def check(s: Session, settings: Settings, *, quarantine: bool = True) -> dict[str, Any]:
+    """Verify issued rows against files.
+
+    ``quarantine`` must only be True at startup (no issue can be in flight);
+    the read-only ``verify`` command passes False.
+    """
     problems: list[dict[str, str]] = []
     referenced: set[str] = set()
     rows = s.scalars(select(Invoice).where(Invoice.status != "draft")).all()
@@ -34,7 +39,7 @@ def check(s: Session, settings: Settings) -> dict[str, Any]:
     # PDFs that no issued row references come from an issue that never committed.
     quarantined = 0
     issued_dir = settings.issued_dir
-    if issued_dir.is_dir():
+    if quarantine and issued_dir.is_dir():
         for f in issued_dir.iterdir():
             rel = f"invoices/issued/{f.name}"
             if f.name.startswith(".") and f.name.endswith(".tmp"):

@@ -47,11 +47,7 @@ EN_GB: dict[str, str] = {
         "is not an NHS Pension Scheme form (GP Locum A/B)."
     ),
     "pdf.page_x_of_y": "Page {page} of {total}",
-    "unit.am": "AM session",
-    "unit.pm": "PM session",
-    "unit.day": "full day",
-    "unit.hours": "hours",
-    "unit.custom": "",
+    "pdf.qty_hours": "{qty} h",
 }
 
 

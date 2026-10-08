@@ -84,6 +84,7 @@ export default function InvoiceEditor() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newPractice, setNewPractice] = useState(false);
   const issueKey = useRef<string | null>(null);
+  const touched = useRef(false);
 
   const practice = practices.find((p) => p.id === form.practice_id) ?? null;
 
@@ -114,7 +115,10 @@ export default function InvoiceEditor() {
           setDirty(false);
         } else {
           const profile = await api.get<Profile>("/settings/profile");
-          if (!cancelled) setForm({ ...emptyForm, pension_enabled: profile.pension_default_enabled });
+          // Only apply the default if the user has not touched the form meanwhile.
+          if (!cancelled && !touched.current) {
+            setForm((f) => ({ ...f, pension_enabled: profile.pension_default_enabled }));
+          }
         }
       } catch (e) {
         if (!cancelled) setError(e);
@@ -149,16 +153,18 @@ export default function InvoiceEditor() {
     return pos >= 0 && calc ? calc.totals.line_amounts[pos] : null;
   };
 
-  const update = (patch: Partial<Form>) => {
-    setForm((f) => ({ ...f, ...patch }));
+  const update = (patch: Partial<Form> | ((f: Form) => Partial<Form>)) => {
+    touched.current = true;
+    setForm((f) => ({ ...f, ...(typeof patch === "function" ? patch(f) : patch) }));
     setDirty(true);
     setNotice(null);
   };
   const updateLine = (i: number, patch: Partial<Line>) =>
-    update({ lines: form.lines.map((l, j) => (j === i ? { ...l, ...patch } : l)) });
+    update((f) => ({ lines: f.lines.map((l, j) => (j === i ? { ...l, ...patch } : l)) }));
 
-  const addLine = () => {
-    const last = form.lines[form.lines.length - 1];
+  const addLine = () =>
+    update((f) => {
+      const last = f.lines[f.lines.length - 1];
     const unit: Unit = last?.unit ?? practice?.default_unit ?? "am";
     const next: Line = last
       ? { ...last, id: undefined, amount: undefined, service_date: last.service_date ? addDays(last.service_date, 1) : todayLondon() }
@@ -170,8 +176,8 @@ export default function InvoiceEditor() {
           unit_price: practice?.default_rate ?? "",
           pensionable: practice?.default_pensionable ?? true,
         };
-    update({ lines: [...form.lines, next] });
-  };
+      return { lines: [...f.lines, next] };
+    });
 
   const save = useCallback(async (): Promise<InvoiceDetail | null> => {
     setBusy("save");
@@ -292,7 +298,7 @@ export default function InvoiceEditor() {
       <div className="editor">
         <div>
           <section className="card" aria-labelledby="h-details">
-            <h2 id="h-details" className="sr-only">{t("editor.practice")}</h2>
+            <h2 id="h-details" className="sr-only">{t("editor.details")}</h2>
             <div className="grid grid-2">
               <Field id="practice" label={t("editor.practice")} className="span-2">
                 <div className="actions" style={{ flexWrap: "nowrap" }}>
@@ -370,7 +376,7 @@ export default function InvoiceEditor() {
                       </label>
                       <span className="actions">
                         <span className="money amount" aria-label={t("editor.line_amount")}>{gbp(amount)}</span>
-                        <button type="button" className="btn ghost small" onClick={() => update({ lines: form.lines.filter((_, j) => j !== i) })}
+                        <button type="button" className="btn ghost small" onClick={() => update((f) => ({ lines: f.lines.filter((_, j) => j !== i) }))}
                           aria-label={t("editor.line_remove", { n })}>
                           {t("common.remove")}
                         </button>

@@ -80,6 +80,19 @@ def uk_date(value: str | date | None) -> str:
     return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
 
 
+def uk_period(start: str, end: str | None) -> str:
+    """Compact range: '8–15 October 2026', '30 October – 2 November 2026'."""
+    a = date.fromisoformat(start)
+    b = date.fromisoformat(end) if end else a
+    if a == b:
+        return uk_date(a)
+    if (a.year, a.month) == (b.year, b.month):
+        return f"{a.day}–{b.day} {MONTHS[a.month - 1]} {a.year}"
+    if a.year == b.year:
+        return f"{a.day} {MONTHS[a.month - 1]} – {uk_date(b)}"
+    return f"{uk_date(a)} – {uk_date(b)}"
+
+
 def short_date(value: str) -> str:
     d = date.fromisoformat(value)
     return d.strftime("%d/%m/%Y")
@@ -110,6 +123,7 @@ class _NumberedCanvas(rl_canvas.Canvas):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("invariant", 1)
+        kwargs.setdefault("initialFontName", "Inter")
         super().__init__(*args, **kwargs)
         self._saved_pages: list[dict[str, Any]] = []
 
@@ -222,7 +236,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         pagesize=A4,
         leftMargin=18 * mm,
         rightMargin=18 * mm,
-        topMargin=16 * mm,
+        topMargin=14 * mm,
         bottomMargin=22 * mm,
         title=f"{label('pdf.invoice')} {number}",
         author=seller.get("legal_name", ""),
@@ -251,10 +265,9 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         [label("pdf.due_date"), uk_date(inv.get("due_date"))],
     ]
     if inv.get("work_start_date"):
-        period = uk_date(inv["work_start_date"])
-        if inv.get("work_end_date") and inv["work_end_date"] != inv["work_start_date"]:
-            period = f"{period} – {uk_date(inv['work_end_date'])}"
-        meta_rows.append([label("pdf.work_period"), period])
+        meta_rows.append(
+            [label("pdf.work_period"), uk_period(inv["work_start_date"], inv.get("work_end_date"))]
+        )
     if inv.get("reference"):
         meta_rows.append([label("pdf.reference"), inv["reference"]])
     meta = Table(
@@ -262,6 +275,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         colWidths=[30 * mm, 48 * mm],
         style=TableStyle(
             [
+                ("FONTNAME", (0, 0), (-1, -1), "Inter"),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
@@ -276,6 +290,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         colWidths=[width - 80 * mm, 80 * mm],
         style=TableStyle(
             [
+                ("FONTNAME", (0, 0), (-1, -1), "Inter"),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
@@ -285,8 +300,8 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
 
     story: list[Any] = [
         header,
-        Spacer(1, 6 * mm),
-        HRFlowable(width="100%", thickness=1.2, color=STEEL, spaceAfter=5 * mm),
+        Spacer(1, 4 * mm),
+        HRFlowable(width="100%", thickness=1.2, color=STEEL, spaceAfter=4 * mm),
     ]
 
     bill_lines = [f"<font name='Inter-SemiBold'>{_esc(bill['name'])}</font>"]
@@ -298,7 +313,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     story += [
         Paragraph(label("pdf.bill_to").upper(), st["h"]),
         Paragraph("<br/>".join(bill_lines), st["base"]),
-        Spacer(1, 7 * mm),
+        Spacer(1, 5 * mm),
     ]
 
     # Line items
@@ -315,13 +330,13 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     rows: list[list[Any]] = [head]
     for ln in snapshot["lines"]:
         desc = _esc(ln["description"])
-        unit_label = label(f"unit.{ln['unit']}")
-        if unit_label and ln["unit"] != "custom":
-            desc = f"{desc} <font color='#56656F'>({_esc(unit_label)})</font>"
+        qty = _qty(ln["quantity"])
+        if ln["unit"] == "hours":
+            qty = label("pdf.qty_hours", qty=qty)
         row = [
             Paragraph(short_date(ln["service_date"]), st["cell"]),
             Paragraph(desc, st["cell"]),
-            Paragraph(_qty(ln["quantity"]), st["cellr"]),
+            Paragraph(qty, st["cellr"]),
             Paragraph(fmt_gbp(Decimal(ln["unit_price"])), st["cellr"]),
             Paragraph(fmt_gbp(Decimal(ln["amount"])), st["cellr"]),
         ]
@@ -343,6 +358,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     else:
         col_w = [22 * mm, width - 22 * mm - 14 * mm - 24 * mm - 26 * mm, 14 * mm, 24 * mm, 26 * mm]
     line_style = [
+        ("FONTNAME", (0, 0), (-1, -1), "Inter"),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LINEBELOW", (0, 0), (-1, 0), 0.8, STEEL),
         ("LINEBELOW", (0, -1), (-1, -1), 0.5, RULE),
@@ -403,6 +419,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         colWidths=[tot_w - 30 * mm, 30 * mm],
         style=TableStyle(
             [
+                ("FONTNAME", (0, 0), (-1, -1), "Inter"),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LINEABOVE", (0, -1), (-1, -1), 1.0, STEEL),
                 ("TOPPADDING", (0, -1), (-1, -1), 6),
@@ -426,6 +443,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         colWidths=[38 * mm, 60 * mm],
         style=TableStyle(
             [
+                ("FONTNAME", (0, 0), (-1, -1), "Inter"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 1.2),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 1.2),
@@ -433,16 +451,23 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         ),
         hAlign="LEFT",
     )
+    pension_note = (
+        Paragraph(_esc(label("pdf.pension_footnote")), st["small"])
+        if pension_on and basic > 0
+        else None
+    )
     closing: list[Any] = [
         totals_table,
         Spacer(1, 2 * mm),
         Table(
-            [[vat_note]],
+            [[vat_note], *([[pension_note]] if pension_note else [])],
             colWidths=[tot_w],
             hAlign="RIGHT",
-            style=TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 3)]),
+            style=TableStyle(
+                [("FONTNAME", (0, 0), (-1, -1), "Inter"), ("LEFTPADDING", (0, 0), (-1, -1), 3)]
+            ),
         ),
-        Spacer(1, 7 * mm),
+        Spacer(1, 5 * mm),
         Paragraph(label("pdf.payment_details").upper(), st["h"]),
         pay,
     ]
@@ -450,7 +475,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
 
     if inv.get("notes"):
         story += [
-            Spacer(1, 6 * mm),
+            Spacer(1, 4 * mm),
             KeepTogether(
                 [
                     Paragraph(label("pdf.notes").upper(), st["h"]),
@@ -458,8 +483,6 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
                 ]
             ),
         ]
-    if pension_on and basic > 0:
-        story += [Spacer(1, 6 * mm), Paragraph(_esc(label("pdf.pension_footnote")), st["small"])]
 
     footer = seller.get("legal_name", "")
     footer_left = f"{footer} · {label('pdf.invoice')} {number}" if footer else number

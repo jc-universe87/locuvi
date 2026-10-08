@@ -4,8 +4,9 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-
 from conftest import line
+from webdav_fixture import PASSWORD, USER, DavServer
+
 from locuvi import db
 from locuvi.config import WebDavAllowlist
 from locuvi.errors import DomainError
@@ -20,7 +21,6 @@ from locuvi.webdav.urlguard import (
     validate_base_path,
     validate_base_url,
 )
-from webdav_fixture import PASSWORD, USER, DavServer
 
 
 @pytest.fixture
@@ -325,6 +325,13 @@ def test_save_config_rejects_bad_url(ctx, session):
 # ------------------------------------------------- fault injection (fake server)
 
 
+COLLECTION_207 = (
+    b'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop>'
+    b"<d:resourcetype><d:collection/></d:resourcetype></d:prop>"
+    b"<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>"
+)
+
+
 def fake_ctx(local_settings, handler):
     transport = httpx.MockTransport(handler)
     return archive.ArchiveContext(
@@ -403,7 +410,7 @@ def test_never_marked_synced_without_verification(local_settings, engine, sessio
                 return httpx.Response(404)
             return httpx.Response(
                 207,
-                content=b'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>',
+                content=COLLECTION_207,
             )
         if req.method in ("PUT", "MOVE"):
             return httpx.Response(201)
@@ -429,7 +436,7 @@ def test_move_precondition_failed_race(local_settings, engine, session, ready):
                 return httpx.Response(404)
             return httpx.Response(
                 207,
-                content=b'<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>',
+                content=COLLECTION_207,
             )
         if req.method == "PUT":
             return httpx.Response(201)

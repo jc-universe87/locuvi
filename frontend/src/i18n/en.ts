@@ -104,6 +104,7 @@ const en = {
 
   "editor.title_new": "New invoice",
   "editor.title_draft": "Draft invoice",
+  "editor.details": "Invoice details",
   "editor.practice": "Practice",
   "editor.choose_practice": "Choose a practice…",
   "editor.new_practice": "New practice",

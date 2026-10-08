@@ -6,7 +6,8 @@ export default defineConfig({
   server: {
     proxy: { "/api": "http://127.0.0.1:8000" },
   },
-  build: { sourcemap: false, target: "es2020" },
+  // No data: URI inlining: the server CSP only allows same-origin fonts/scripts.
+  build: { sourcemap: false, target: "es2020", assetsInlineLimit: 0 },
   test: {
     environment: "jsdom",
     globals: true,
