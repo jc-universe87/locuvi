@@ -48,12 +48,15 @@ interface I18n {
   locale: Locale;
   setLocale: (l: Locale) => void;
   t: (key: MessageKey, params?: Params) => string;
+  /** Count-aware: uses `${key}_one` when n === 1 and that key exists. */
+  tn: (key: MessageKey, n: number, params?: Params) => string;
 }
 
 const Ctx = createContext<I18n>({
   locale: "en",
   setLocale: () => undefined,
   t: (key, params) => translate("en", key, params),
+  tn: (key, n, params) => translate("en", n === 1 && hasKey(`${key}_one`) ? `${key}_one` : key, { n, ...params }),
 });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -68,7 +71,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = l === "en" ? "en-GB" : l;
   }, []);
   const value = useMemo<I18n>(
-    () => ({ locale, setLocale, t: (key, params) => translate(locale, key, params) }),
+    () => ({
+      locale,
+      setLocale,
+      t: (key, params) => translate(locale, key, params),
+      tn: (key, n, params) =>
+        translate(locale, n === 1 && hasKey(`${key}_one`) ? `${key}_one` : key, { n, ...params }),
+    }),
     [locale, setLocale],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

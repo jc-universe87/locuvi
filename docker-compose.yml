@@ -6,7 +6,7 @@ name: locuvi
 services:
   locuvi:
     build: .
-    image: locuvi:0.1.0
+    image: locuvi:1.0.0
     restart: unless-stopped
     ports:
       - "${LOCUVI_BIND:-127.0.0.1}:${LOCUVI_PORT:-8000}:8000"

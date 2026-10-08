@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Dialog, ErrorAlert, Field, useIssueText } from "../components/ui";
+import { Dialog, ErrorAlert, Field, SavedIndicator, Toggle, useIssueText } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob, newIdempotencyKey, openBlob } from "../lib/api";
@@ -199,9 +199,20 @@ export default function InvoiceEditor() {
     }
   }, [form, saved, nav]);
 
-  const onSave = async () => {
-    if (await save()) setNotice(t("common.saved"));
-  };
+  // Drafts save themselves: shortly after any change, once every line is valid.
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  useEffect(() => {
+    if (!dirty || busy !== null) return;
+    if (!saved && !form.practice_id && form.lines.length === 0) return;
+    if (!form.lines.every(lineValid)) return;
+    const h = setTimeout(async () => {
+      setSaveState("saving");
+      const d = await save();
+      setSaveState(d ? "saved" : "error");
+      if (d) setTimeout(() => setSaveState((x) => (x === "saved" ? "idle" : x)), 1800);
+    }, 900);
+    return () => clearTimeout(h);
+  }, [dirty, form, saved, busy, save]);
 
   const preview = async () => {
     const d = dirty || !saved ? await save() : saved;
@@ -288,9 +299,9 @@ export default function InvoiceEditor() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="row" style={{ alignItems: "baseline" }}>
         <h1>{saved ? t("editor.title_draft") : t("editor.title_new")}</h1>
-        {dirty && <span className="badge pending">{t("common.unsaved")}</span>}
+        <SavedIndicator state={saveState === "error" ? "idle" : saveState} />
       </div>
       <ErrorAlert error={error} />
       {notice && <div className="alert ok" role="status">{notice}</div>}
@@ -326,17 +337,15 @@ export default function InvoiceEditor() {
           </section>
 
           <section className="card" aria-labelledby="h-lines">
-            <div className="page-head" style={{ marginBottom: "0.75rem" }}>
-              <h2 id="h-lines" style={{ margin: 0 }}>{t("editor.lines")}</h2>
-            </div>
-            <label className="check" style={{ marginBottom: "0.75rem" }}>
-              <input type="checkbox" checked={form.pension_enabled} onChange={(e) => update({ pension_enabled: e.target.checked })} />
-              <span>
+            <h2 id="h-lines">{t("editor.lines")}</h2>
+            <div className="toggle-row" style={{ marginBottom: "0.9rem" }}>
+              <span className="text">
                 {t("editor.pension_enabled")}
                 <br />
                 <span className="hint">{t("editor.pension_help")}</span>
               </span>
-            </label>
+              <Toggle checked={form.pension_enabled} onChange={(v) => update({ pension_enabled: v })} label={t("editor.pension_enabled")} />
+            </div>
             {form.lines.length === 0 && <p className="muted">{t("editor.no_lines")}</p>}
             <div className="lines">
               {form.lines.map((l, i) => {
@@ -452,19 +461,15 @@ export default function InvoiceEditor() {
           )}
 
           <div className="grid" style={{ marginTop: "0.75rem" }}>
-            <button className="btn" onClick={startIssue} disabled={busy !== null || blocking.length > 0 || form.lines.length === 0}>
+            <button className="btn big" onClick={startIssue} disabled={busy === "issue" || blocking.length > 0 || form.lines.length === 0}>
               {t("editor.issue")}
             </button>
-            <div className="actions">
-              <button className="btn secondary" onClick={onSave} disabled={busy !== null}>
-                {busy === "save" ? t("common.saving") : t("editor.save_draft")}
-              </button>
-              <button className="btn secondary" onClick={preview} disabled={busy !== null || form.lines.length === 0}>
-                {t("editor.preview")}
-              </button>
-            </div>
+            <button className="btn secondary" onClick={preview} disabled={busy === "preview" || form.lines.length === 0}>
+              {t("editor.preview")}
+            </button>
+            <p className="hint" style={{ margin: 0, textAlign: "center" }}>{t("editor.autosave_hint")}</p>
             {saved && (
-              <button className="btn danger small" onClick={() => setConfirmDelete(true)}>{t("editor.delete_draft")}</button>
+              <button className="btn ghost small" style={{ color: "var(--err)" }} onClick={() => setConfirmDelete(true)}>{t("editor.delete_draft")}</button>
             )}
           </div>
         </aside>

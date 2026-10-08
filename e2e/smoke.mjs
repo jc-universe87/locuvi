@@ -1,9 +1,9 @@
-// UI smoke test: drives the real app through the key acceptance flow with fictional data.
+// UI smoke test: the owner's whole month, with fictional data, on a FRESH instance.
 //
 //   BASE_URL=http://127.0.0.1:8000 LOCUVI_PASSWORD=... SHOTS=./shots node e2e/smoke.mjs
 //
-// Requires the `playwright` package (npm i -g playwright, or NODE_PATH to an install)
-// and a Chromium build (PLAYWRIGHT_BROWSERS_PATH or CHROMIUM_PATH).
+// Requires `playwright` (a global install works via NODE_PATH) and Chromium
+// (PLAYWRIGHT_BROWSERS_PATH or CHROMIUM_PATH).
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -30,100 +30,137 @@ process.on("unhandledRejection", async (e) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/FAILED.png`, fullPage: true }).catch(() => {});
   process.exit(1);
 });
+const fail = async (msg) => {
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/FAILED.png`, fullPage: true }).catch(() => {});
+  throw new Error(msg);
+};
 
 await page.goto(`${BASE}/`);
 if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() => false)) {
   step("sign in");
-  await shot("00-login");
   await page.getByLabel("Password").fill(PASSWORD ?? "");
   await page.getByRole("button", { name: "Sign in" }).click();
 }
-await page.getByRole("heading", { name: "Invoices" }).waitFor();
-await shot("01-invoices-empty");
 
-step("settings: sender & bank (fictional)");
-await page.getByRole("link", { name: "Settings" }).click();
+step("welcome wizard (3 steps)");
+await page.getByRole("heading", { name: "Let's get you set up" }).waitFor();
+await shot("01-welcome");
 await page.getByLabel("Legal name").fill("Dr Alex Example");
-await page.getByLabel("Professional label").fill("General Practitioner (Locum)");
-await page.getByLabel("Address", { exact: true }).fill("1 Sample Street\nExampletown");
-await page.getByLabel("Postcode").fill("EX1 1AA");
+await page.getByLabel("Address").fill("1 Sample Street\nExampletown");
+await page.getByLabel("Postcode").fill("ex1 1aa");
 await page.getByLabel("Email").fill("alex@example.invalid");
-await page.getByLabel("Account name").fill("Dr Alex Example");
+await page.getByRole("button", { name: "Continue" }).click();
+await page.getByRole("heading", { name: "Getting paid" }).waitFor();
+if ((await page.getByLabel("Account name").inputValue()) !== "Dr Alex Example") await fail("account name not prefilled");
 await page.getByLabel("Sort code").fill("00-00-00");
 await page.getByLabel("Account number").fill("00000000");
-await page.locator("#sender").getByRole("button", { name: "Save" }).click();
-await page.locator("#sender").getByRole("status").waitFor();
-await shot("02-settings");
-
-step("practice");
-await page.getByRole("link", { name: "Practices" }).click();
-await page.getByRole("button", { name: "+ Add practice" }).click();
+await page.getByRole("button", { name: "Continue" }).click();
+await page.getByRole("heading", { name: "Your first practice" }).waitFor();
 await page.getByLabel("Practice name").fill("Example Medical Practice");
 await page.getByLabel("Billing address").fill("2 Test Road\nSampleford\nSF1 2BB");
-await page.getByLabel(/Usual rate/).fill("600.00");
-await page.getByRole("button", { name: "Save" }).click();
-await page.getByRole("cell", { name: /Example Medical Practice/ }).waitFor();
-await shot("03-practices");
+await page.getByLabel("Usual session rate (£)").fill("600.00");
+await shot("02-welcome-practice");
+await page.getByRole("button", { name: "Start using Locuvi" }).click();
 
-step("new invoice with two October sessions");
-await page.getByRole("link", { name: "Invoices" }).first().click();
-await page.getByRole("link", { name: /New invoice/ }).click();
-await page.getByLabel("Practice", { exact: true }).selectOption({ label: "Example Medical Practice" });
-await page.getByLabel("Issue date").fill("2026-10-20");
-await page.getByRole("button", { name: /Add next date/ }).click();
-await page.locator("#d0").fill("2026-10-08");
-await page.getByRole("button", { name: /Add next date/ }).click();
-await page.locator("#d1").fill("2026-10-15");
-await page.locator("#u1").selectOption("pm");
-await page.locator("#desc1").fill("GP locum PM session");
-await page.locator("#r1").fill("550.00");
+step("today: greeting and caught up");
+await page.getByRole("heading", { name: /Alex$/ }).waitFor();
+await page.getByText("You're all caught up").waitFor();
+await shot("03-today-empty");
+
+step("diary: tap three days last month");
+await page.getByRole("link", { name: "Diary" }).first().click();
+await page.getByText(/Tap a day to log/).waitFor();
+await page.getByRole("button", { name: "Previous month" }).click();
+const prevMonth = await page.locator(".month-nav h2").innerText();
+const cell = (d) => page.locator(".day:not(.out)").nth(d - 1);
+await cell(1).click();
+await page.getByText(/^Added AM/).waitFor();
+await cell(8).click();
+await page.getByRole("group", { name: "Session" }).getByRole("button", { name: "PM" }).click();
+await page.getByRole("button", { name: /£600.00/ }).waitFor(); // remembered rate
+await cell(9).click();
+await page.locator("#h-month").waitFor();
+await page.getByText("3 sessions · £1,800.00 · not invoiced yet").waitFor();
+await shot("04-diary");
+
+step("today: month ready to invoice -> create invoice");
+await page.getByRole("link", { name: "Today" }).first().click();
+await page.getByText(`${prevMonth} is ready to invoice`).waitFor();
+await shot("05-today-ready");
+await page.getByRole("button", { name: "Create invoice" }).click();
+await page.getByRole("heading", { name: "Draft invoice" }).waitFor();
 const summary = page.locator("aside.summary");
-await summary.getByText("£1,298.83").waitFor();
-await summary.getByText("£148.83").waitFor();
-await shot("04-editor");
-
-step("multi-month guard");
-await page.locator("#d1").fill("2026-11-02");
-await summary.getByText(/more than one calendar month/).waitFor();
-await page.locator("#d1").fill("2026-10-15");
-await summary.getByText(/more than one calendar month/).waitFor({ state: "detached" });
-
-step("save draft, preview has no number");
-await page.getByRole("button", { name: "Save draft" }).click();
-await page.getByRole("status").getByText("Saved").waitFor();
+await summary.getByText("£2,032.96").waitFor(); // 1800 -> 1620 -> 232.956 -> 232.96
+await shot("06-editor");
 
 step("issue & download");
 await page.getByRole("button", { name: "Issue & download" }).first().click();
 const dialog = page.getByRole("dialog");
-await dialog.getByText("Number to be allocated: LOC-2026-0001").waitFor();
-await shot("05-issue-confirm");
+await dialog.getByText("Number to be allocated: LOC-").waitFor();
 const [download] = await Promise.all([
   page.waitForEvent("download"),
   dialog.getByRole("button", { name: "Issue invoice" }).click(),
 ]);
-if (download.suggestedFilename() !== "LOC-2026-0001.pdf") throw new Error(`bad filename ${download.suggestedFilename()}`);
-await page.getByRole("heading", { name: "Invoice LOC-2026-0001" }).waitFor();
-await page.locator(".badge", { hasText: "PDF saved locally" }).waitFor();
-await shot("06-detail");
+if (!/^LOC-\d{4}-0001\.pdf$/.test(download.suggestedFilename())) await fail(`bad filename ${download.suggestedFilename()}`);
+await page.locator(".inv-hero .amount", { hasText: "£2,032.96" }).waitFor();
+await page.locator(".pill", { hasText: /^Due / }).waitFor();
+await shot("07-detail");
 
-step("issued invoice listed");
-await page.getByRole("link", { name: "Invoices" }).first().click();
-await page.getByRole("link", { name: "LOC-2026-0001" }).first().waitFor();
-await shot("07-invoices-list");
+step("mark paid (one tap, undo available)");
+await page.getByRole("button", { name: "Mark paid" }).click();
+await page.getByRole("status").getByText(/marked as paid/).waitFor();
+await page.locator(".inv-hero .pill", { hasText: "Paid" }).waitFor();
+await shot("08-paid");
+
+step("email sheet asks to set up email");
+await page.getByRole("button", { name: "Send" }).click();
+await page.getByRole("dialog").getByText("Connect your email account once").waitFor();
+await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+
+step("pension: month ready, worksheet, mark submitted");
+await page.getByRole("link", { name: "Pension" }).first().click();
+const row = page.locator(".list-row", { hasText: prevMonth });
+await row.getByText("Ready").waitFor();
+await row.click();
+await page.getByRole("dialog").getByText("£1,620.00").first().waitFor();
+const [ws] = await Promise.all([
+  page.waitForEvent("download"),
+  page.getByRole("dialog").getByRole("button", { name: "Worksheet" }).click(),
+]);
+if (!ws.suggestedFilename().startsWith("nhs-pension-worksheet-")) await fail("worksheet name");
+await shot("09-pension-month");
+await page.getByRole("dialog").getByRole("button", { name: "Mark submitted" }).click();
+await row.getByText("Submitted").waitFor();
+
+step("reports");
+await page.getByRole("link", { name: "Reports" }).first().click();
+await page.locator(".stat", { hasText: "Invoiced" }).getByText("£2,033").waitFor();
+await page.locator(".stat", { hasText: "Received" }).getByText("£2,033").waitFor();
+await shot("10-reports");
+
+step("settings hub and sections");
+await page.getByRole("link", { name: "Settings" }).click();
+await page.getByRole("link", { name: /Bank details/ }).click();
+await page.getByLabel("Account number").waitFor();
+if ((await page.getByLabel("Account number").getAttribute("placeholder")) !== "••••0000") await fail("masked account");
+await page.getByRole("link", { name: "Settings" }).first().click();
+await page.getByRole("link", { name: /^You/ }).click();
+await page.getByLabel("Telephone").fill("01234 567890");
+await page.getByText("✓ Saved").waitFor(); // autosave
+await shot("11-settings-you");
 
 step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await mobile.addCookies(await ctx.cookies());
 const mp = await mobile.newPage();
-await mp.goto(`${BASE}/invoices`);
-await mp.locator(".cards").getByText("LOC-2026-0001").waitFor();
-const overflow = await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-if (overflow) throw new Error("horizontal overflow on mobile invoices list");
-await shot("08-mobile-invoices", mp);
-await mp.goto(`${BASE}/invoices/new`);
-await mp.getByRole("button", { name: /Add next date/ }).click();
-await mp.locator(".mobile-total").waitFor();
-await shot("09-mobile-editor", mp);
+for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diary"], ["/invoices", "14-mobile-invoices"]]) {
+  await mp.goto(`${BASE}${path}`);
+  await mp.locator(".tabbar").waitFor();
+  await mp.waitForTimeout(300);
+  const overflow = await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  if (overflow) await fail(`horizontal overflow on mobile ${path}`);
+  await shot(name, mp);
+}
 
 await browser.close();
 if (errors.length) {

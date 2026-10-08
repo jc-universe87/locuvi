@@ -59,3 +59,29 @@ export function addDays(iso: string, days: number): string {
   const dt = new Date(Date.UTC(y, m - 1, d + days));
   return dt.toISOString().slice(0, 10);
 }
+
+const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** "2026-10" → "October 2026" */
+export function monthLabel(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return `${LONG_MONTHS[m - 1]} ${y}`;
+}
+
+/** "2026-10" → "Oct" */
+export function monthShort(ym: string): string {
+  return MONTHS[Number(ym.split("-")[1]) - 1];
+}
+
+/** Whole pounds for headline numbers: "1411.78" → "£1,412" */
+export function gbpRound(value: string | null | undefined): string {
+  if (!value) return "£0";
+  const n = Math.round(Number(value));
+  return `${n < 0 ? "-" : ""}£${Math.abs(n).toLocaleString("en-GB")}`;
+}
+
+export function weekdayDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
+  return `${wd} ${d} ${MONTHS[m - 1]}`;
+}

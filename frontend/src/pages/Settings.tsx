@@ -1,417 +1,458 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { ErrorAlert, Field } from "../components/ui";
-import { hasKey, useT } from "../i18n";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave } from "../components/ui";
+import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
 import { pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
-import type { Numbering, Policy, Profile, WebDavConfig } from "../lib/types";
+import type { EmailConfig, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
+import { PracticeSheet } from "./Diary";
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <section className="card" id={id} aria-labelledby={`${id}-h`}>
-      <h2 id={`${id}-h`}>{title}</h2>
-      {children}
-    </section>
-  );
-}
+const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage"] as const;
+type Section = (typeof SECTIONS)[number];
+const ICON: Record<Section, string> = {
+  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud",
+};
 
-function useSaveState() {
-  const [error, setError] = useState<unknown>(null);
-  const [ok, setOk] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    setError(null);
-    setOk(false);
-    try {
-      await fn();
-      setOk(true);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return { error, ok, busy, run };
-}
-
-export default function SettingsPage() {
-  const { t } = useT();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [error, setError] = useState<unknown>(null);
-
-  useEffect(() => {
-    api.get<Profile>("/settings/profile").then(setProfile, setError);
-  }, []);
-
+export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
+  const { t, locale, setLocale } = useT();
+  const { section } = useParams();
+  if (section && (SECTIONS as readonly string[]).includes(section)) {
+    return (
+      <>
+        <p style={{ margin: "0.5rem 0 0" }}>
+          <Link to="/settings" className="btn ghost small"><Icon name="back" size={16} /> {t("nav.settings")}</Link>
+        </p>
+        <h1>{t(`settings.s_${section}` as MessageKey)}</h1>
+        {section === "you" && <ProfileSection fields="you" />}
+        {section === "bank" && <ProfileSection fields="bank" />}
+        {section === "practices" && <PracticesSection />}
+        {section === "invoicing" && <InvoicingSection />}
+        {section === "pension" && <PensionSection />}
+        {section === "email" && <EmailSection />}
+        {section === "storage" && <StorageSection />}
+      </>
+    );
+  }
   return (
     <>
-      <h1>{t("settings.title")}</h1>
-      <nav className="section-nav" aria-label={t("settings.title")}>
-        <a href="#sender">{t("settings.sender")}</a>
-        <a href="#numbering">{t("settings.numbering")}</a>
-        <a href="#pension">{t("settings.pension")}</a>
-        <a href="#storage">{t("settings.storage")}</a>
-      </nav>
-      <ErrorAlert error={error} />
-      {profile && (
-        <>
-          <SenderSection profile={profile} onSaved={setProfile} />
-          <NumberingSection profile={profile} onSaved={setProfile} />
-          <PensionSection profile={profile} onSaved={setProfile} />
-        </>
+      <h1>{t("nav.settings")}</h1>
+      <div className="form-list">
+        {SECTIONS.map((s) => (
+          <Link key={s} to={`/settings/${s}`} className="list-row">
+            <span className="task-icon" style={{ width: "2rem", height: "2rem", borderRadius: 9 }}><Icon name={ICON[s]} size={18} /></span>
+            <span className="list-main">
+              <span className="list-title">{t(`settings.s_${s}` as MessageKey)}</span>
+              <span className="list-sub">{t(`settings.s_${s}_sub` as MessageKey)}</span>
+            </span>
+            <span className="chev"><Icon name="chevron" size={18} /></span>
+          </Link>
+        ))}
+      </div>
+      <div className="form-list" style={{ marginTop: "1rem" }}>
+        <div className="form-row">
+          <label htmlFor="lang">{t("app.language")}</label>
+          <select id="lang" value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
+            {(Object.keys(localeNames) as Locale[]).map((l) => <option key={l} value={l}>{localeNames[l]}</option>)}
+          </select>
+        </div>
+      </div>
+      {onSignOut && (
+        <div className="form-list" style={{ marginTop: "1rem" }}>
+          <button className="list-row" onClick={onSignOut} style={{ color: "var(--err)", fontWeight: 600 }}>{t("nav.signout")}</button>
+        </div>
       )}
-      <StorageSection />
+      <p className="form-foot" style={{ textAlign: "center", marginTop: "1.5rem" }}>Locuvi · {t("app.tagline")}</p>
     </>
   );
 }
 
-function profileBody(p: Profile, accountNumber: string | null) {
-  const { bank_account_number_masked: _m, bank_account_number_set: _s, ...rest } = p;
-  return { ...rest, bank_account_number: accountNumber };
-}
-
-function SenderSection({ profile, onSaved }: { profile: Profile; onSaved: (p: Profile) => void }) {
-  const { t } = useT();
-  const [p, setP] = useState(profile);
-  const [acct, setAcct] = useState("");
-  const st = useSaveState();
-  const set = (patch: Partial<Profile>) => setP({ ...p, ...patch });
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    void st.run(async () => {
-      const saved = await api.put<Profile>("/settings/profile", profileBody({ ...profile, ...pick(p) }, acct.trim() || null));
-      setAcct("");
-      setP(saved);
-      onSaved(saved);
-    });
-  };
-  const pick = (x: Profile) => ({
-    legal_name: x.legal_name, trading_name: x.trading_name, designation: x.designation, address_lines: x.address_lines,
-    postcode: x.postcode, email: x.email, phone: x.phone, bank_account_holder: x.bank_account_holder, bank_sort_code: x.bank_sort_code,
-  });
+function Row({ id, label, children, stacked, hint }: { id?: string; label: string; children: ReactNode; stacked?: boolean; hint?: string }) {
   return (
-    <Section id="sender" title={t("settings.sender")}>
-      <p className="hint" style={{ marginTop: 0 }}>{t("settings.sender_help")}</p>
-      <form onSubmit={submit} className="grid grid-2">
-        <Field id="s-legal" label={t("settings.legal_name")}>
-          <input id="s-legal" type="text" autoComplete="name" value={p.legal_name} onChange={(e) => set({ legal_name: e.target.value })} />
-        </Field>
-        <Field id="s-trading" label={t("settings.trading_name")} optional>
-          <input id="s-trading" type="text" value={p.trading_name ?? ""} onChange={(e) => set({ trading_name: e.target.value })} />
-        </Field>
-        <Field id="s-desig" label={t("settings.designation")} optional className="span-2">
-          <input id="s-desig" type="text" value={p.designation} onChange={(e) => set({ designation: e.target.value })} />
-        </Field>
-        <Field id="s-addr" label={t("settings.address")} className="span-2">
-          <textarea id="s-addr" autoComplete="street-address" value={p.address_lines} onChange={(e) => set({ address_lines: e.target.value })} />
-        </Field>
-        <Field id="s-pc" label={t("settings.postcode")}>
-          <input id="s-pc" type="text" autoComplete="postal-code" value={p.postcode} onChange={(e) => set({ postcode: e.target.value })} />
-        </Field>
-        <Field id="s-email" label={t("settings.email")}>
-          <input id="s-email" type="email" autoComplete="email" value={p.email} onChange={(e) => set({ email: e.target.value })} />
-        </Field>
-        <Field id="s-phone" label={t("settings.phone")} optional>
-          <input id="s-phone" type="tel" autoComplete="tel" value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} />
-        </Field>
-        <Field id="s-holder" label={t("settings.bank_holder")}>
-          <input id="s-holder" type="text" value={p.bank_account_holder} onChange={(e) => set({ bank_account_holder: e.target.value })} />
-        </Field>
-        <Field id="s-sort" label={t("settings.sort_code")}>
-          <input id="s-sort" type="text" inputMode="numeric" autoComplete="off" placeholder="00-00-00" value={p.bank_sort_code}
-            onChange={(e) => set({ bank_sort_code: e.target.value })} />
-        </Field>
-        <Field id="s-acct" label={t("settings.account_number")}
-          hint={profile.bank_account_number_set ? t("settings.account_saved", { masked: profile.bank_account_number_masked }) : undefined}>
-          <input id="s-acct" type="text" inputMode="numeric" autoComplete="off" maxLength={8} value={acct} onChange={(e) => setAcct(e.target.value)} />
-        </Field>
-        <div className="span-2">
-          <ErrorAlert error={st.error} />
-          <div className="actions">
-            <button className="btn" disabled={st.busy}>{t("common.save")}</button>
-            {st.ok && <span className="tick" role="status">✓ {t("common.saved")}</span>}
-          </div>
-        </div>
-      </form>
-    </Section>
+    <div className={`form-row ${stacked ? "stacked" : ""}`}>
+      <label htmlFor={id}>{label}{hint && <span className="hint" style={{ display: "block", fontWeight: 400 }}>{hint}</span>}</label>
+      {children}
+    </div>
   );
 }
 
-function NumberingSection({ profile, onSaved }: { profile: Profile; onSaved: (p: Profile) => void }) {
-  const { t } = useT();
-  const [n, setN] = useState<Numbering | null>(null);
-  const [terms, setTerms] = useState(String(profile.payment_terms_days));
-  const [vat, setVat] = useState(profile.vat_status);
-  const st = useSaveState();
+function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>
+      <span><span style={{ fontWeight: 500 }}>{label}</span>{hint && <span className="hint" style={{ display: "block" }}>{hint}</span>}</span>
+      <Toggle checked={checked} onChange={onChange} label={label} />
+    </div>
+  );
+}
+
+type ProfileEdit = Omit<Profile, "bank_account_number_masked" | "bank_account_number_set"> & { bank_account_number?: string };
+
+function useProfile() {
+  const [p, setP] = useState<ProfileEdit | null>(null);
+  const [server, setServer] = useState<Profile | null>(null);
   useEffect(() => {
-    api.get<Numbering>("/settings/numbering").then(setN, () => undefined);
+    api.get<Profile>("/settings/profile").then((x) => {
+      setServer(x);
+      const { bank_account_number_masked: _m, bank_account_number_set: _s, ...rest } = x;
+      setP(rest);
+    }, () => undefined);
   }, []);
-  if (!n) return null;
-  const preview = `${n.prefix}${String(n.next_number).padStart(n.padding, "0")}`;
-  const suggested = suggestYearPrefix(n.prefix, Number(todayLondon().slice(0, 4)));
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    void st.run(async () => {
-      setN(await api.put<Numbering>("/settings/numbering", { prefix: n.prefix, next_number: n.next_number, padding: n.padding }));
-      const saved = await api.put<Profile>("/settings/profile",
-        profileBody({ ...profile, payment_terms_days: Number(terms), vat_status: vat }, null));
-      onSaved(saved);
-    });
-  };
+  const save = useAutosave(p, async (v) => {
+    if (!v) return;
+    const body: Record<string, unknown> = { ...v };
+    if (!v.bank_account_number) delete body.bank_account_number;
+    const digits = String(v.bank_sort_code ?? "").replace(/\D/g, "");
+    if (digits.length !== 0 && digits.length !== 6) delete body.bank_sort_code;
+    if (v.bank_account_number && v.bank_account_number.replace(/\D/g, "").length !== 8) delete body.bank_account_number;
+    if (v.employee_rate !== null && v.employee_rate !== "" && !/^0?\.\d{1,4}$/.test(String(v.employee_rate))) delete body.employee_rate;
+    setServer(await api.patch<Profile>("/settings/profile", body));
+  }, { enabled: p !== null, delay: 700 });
+  return { p, setP, server, save };
+}
+
+function ProfileSection({ fields }: { fields: "you" | "bank" }) {
+  const { t } = useT();
+  const { p, setP, server, save } = useProfile();
+  if (!p) return null;
+  const set = (patch: Partial<ProfileEdit>) => setP({ ...p, ...patch });
   return (
-    <Section id="numbering" title={t("settings.numbering")}>
-      <p className="hint" style={{ marginTop: 0 }}>{t("settings.numbering_help")}</p>
-      <form onSubmit={submit} className="grid grid-3">
-        <Field id="n-prefix" label={t("settings.prefix")}>
-          <input id="n-prefix" type="text" value={n.prefix} onChange={(e) => setN({ ...n, prefix: e.target.value })} />
-        </Field>
-        <Field id="n-next" label={t("settings.next_number")}>
-          <input id="n-next" type="number" min={1} value={n.next_number} onChange={(e) => setN({ ...n, next_number: Number(e.target.value) })} />
-        </Field>
-        <Field id="n-pad" label={t("settings.padding")}>
-          <input id="n-pad" type="number" min={1} max={8} value={n.padding} onChange={(e) => setN({ ...n, padding: Number(e.target.value) })} />
-        </Field>
-        <p className="span-2" style={{ margin: 0 }}><strong>{t("settings.number_preview", { number: preview })}</strong></p>
-        <div />
-        {suggested && (
-          <div className="alert info span-2" role="status" style={{ margin: 0 }}>
-            {t("settings.year_prefix_hint", { prefix: suggested })}{" "}
-            <button type="button" className="btn secondary small"
-              onClick={() => setN({ ...n, prefix: suggested, next_number: 1 })}>
-              {t("settings.year_prefix_apply", { number: `${suggested}${"1".padStart(n.padding, "0")}` })}
-            </button>
+    <>
+      <ErrorAlert error={save.error} />
+      {fields === "you" ? (
+        <>
+          <div className="form-list">
+            <Row id="p-name" label={t("settings.legal_name")}><input id="p-name" type="text" autoComplete="name" value={p.legal_name} onChange={(e) => set({ legal_name: e.target.value })} /></Row>
+            <Row id="p-trading" label={t("settings.trading_name")}><input id="p-trading" type="text" placeholder={t("common.optional")} value={p.trading_name ?? ""} onChange={(e) => set({ trading_name: e.target.value })} /></Row>
+            <Row id="p-desig" label={t("settings.designation")}><input id="p-desig" type="text" placeholder={t("settings.designation_ph")} value={p.designation} onChange={(e) => set({ designation: e.target.value })} /></Row>
+            <Row id="p-addr" label={t("settings.address")} stacked><textarea id="p-addr" rows={2} autoComplete="street-address" value={p.address_lines} onChange={(e) => set({ address_lines: e.target.value })} /></Row>
+            <Row id="p-pc" label={t("settings.postcode")}><input id="p-pc" type="text" autoComplete="postal-code" value={p.postcode} onChange={(e) => set({ postcode: e.target.value.toUpperCase() })} /></Row>
+            <Row id="p-email" label={t("settings.email")}><input id="p-email" type="email" autoComplete="email" value={p.email} onChange={(e) => set({ email: e.target.value })} /></Row>
+            <Row id="p-phone" label={t("settings.phone")}><input id="p-phone" type="tel" autoComplete="tel" placeholder={t("common.optional")} value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} /></Row>
           </div>
-        )}
-        <Field id="n-terms" label={t("settings.terms")}>
-          <input id="n-terms" type="number" min={0} max={365} value={terms} onChange={(e) => setTerms(e.target.value)} />
-        </Field>
-        <Field id="n-vat" label={t("settings.vat_status")} hint={t("settings.vat_help")} className="span-2">
-          <select id="n-vat" value={vat} onChange={(e) => setVat(e.target.value as Profile["vat_status"])}>
-            <option value="not_vat_registered">{t("settings.vat_not_registered")}</option>
-            <option value="vat_registered">{t("settings.vat_registered")}</option>
-          </select>
-        </Field>
-        <div className="span-2">
-          <ErrorAlert error={st.error} />
-          <div className="actions">
-            <button className="btn" disabled={st.busy}>{t("common.save")}</button>
-            {st.ok && <span className="tick" role="status">✓ {t("common.saved")}</span>}
+          <p className="form-foot">{t("settings.sender_help")} <SavedIndicator state={save.state} /></p>
+        </>
+      ) : (
+        <>
+          <div className="form-list">
+            <Row id="p-holder" label={t("settings.bank_holder")}><input id="p-holder" type="text" value={p.bank_account_holder} onChange={(e) => set({ bank_account_holder: e.target.value })} /></Row>
+            <Row id="p-sort" label={t("settings.sort_code")}><input id="p-sort" type="text" inputMode="numeric" autoComplete="off" placeholder="00-00-00" value={p.bank_sort_code} onChange={(e) => set({ bank_sort_code: e.target.value })} /></Row>
+            <Row id="p-acct" label={t("settings.account_number")}>
+              <input id="p-acct" type="text" inputMode="numeric" autoComplete="off" maxLength={8}
+                placeholder={server?.bank_account_number_set ? server.bank_account_number_masked : ""}
+                value={p.bank_account_number ?? ""} onChange={(e) => set({ bank_account_number: e.target.value })} />
+            </Row>
           </div>
-        </div>
-      </form>
-    </Section>
+          <p className="form-foot">{t("settings.bank_help")} <SavedIndicator state={save.state} /></p>
+        </>
+      )}
+    </>
   );
 }
 
-function PensionSection({ profile, onSaved }: { profile: Profile; onSaved: (p: Profile) => void }) {
+function PracticesSection() {
   const { t } = useT();
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [def, setDef] = useState(profile.pension_default_enabled);
-  const [np, setNp] = useState({ effective_from: "", employer_rate: "", pensionable_fraction: "0.90", label: "" });
-  const st = useSaveState();
-  const add = useSaveState();
-  const load = () => api.get<Policy[]>("/settings/pension-policies").then(setPolicies, () => undefined);
+  const [list, setList] = useState<Practice[]>([]);
+  const [open, setOpen] = useState<Practice | "new" | null>(null);
+  const load = () => api.get<Practice[]>("/practices?include_archived=true").then(setList, () => undefined);
   useEffect(() => {
     void load();
   }, []);
   return (
-    <Section id="pension" title={t("settings.pension")}>
-      <p className="hint" style={{ marginTop: 0 }}>{t("settings.pension_help")}</p>
-      <label className="check">
-        <input type="checkbox" checked={def} onChange={(e) => {
-          const v = e.target.checked;
-          setDef(v);
-          void st.run(async () => onSaved(await api.put<Profile>("/settings/profile",
-            profileBody({ ...profile, pension_default_enabled: v }, null))));
-        }} />
-        <span>{t("settings.pension_default")}</span>
-      </label>
-      <ErrorAlert error={st.error} />
-      <h3 style={{ marginTop: "1rem" }}>{t("settings.policies")}</h3>
-      <div className="table-wrap">
-        <table className="list">
-          <thead>
-            <tr>
-              <th>{t("settings.policy_from")}</th>
-              <th>{t("settings.policy_rate")}</th>
-              <th>{t("settings.policy_fraction")}</th>
-              <th>{t("settings.policy_label")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {policies.map((p) => (
-              <tr key={p.id}>
-                <td>{ukDate(p.effective_from)}</td>
-                <td>{pct(p.employer_rate)}</td>
-                <td>{pct(p.pensionable_fraction)}</td>
-                <td>{p.label}{p.in_use && <div className="hint">{t("settings.policy_in_use")}</div>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <>
+      <div className="form-list">
+        {list.map((p) => (
+          <button key={p.id} type="button" className="list-row" onClick={() => setOpen(p)}>
+            <span className="list-main">
+              <span className="list-title">{p.name}</span>
+              <span className="list-sub">
+                {p.default_rate ? `£${p.default_rate}` : t("practices.no_rate")}
+                {p.default_pensionable ? ` · ${t("detail.pensionable_short")}` : ""}
+                {p.is_archived ? ` · ${t("practices.archived_short")}` : ""}
+              </span>
+            </span>
+            <span className="chev"><Icon name="chevron" size={18} /></span>
+          </button>
+        ))}
+        <button type="button" className="list-row" onClick={() => setOpen("new")} style={{ color: "var(--steel)", fontWeight: 600 }}>
+          <Icon name="plus" size={18} /> {t("practices.add")}
+        </button>
       </div>
-      <form className="grid grid-3" style={{ marginTop: "1rem" }} onSubmit={(e) => {
-        e.preventDefault();
-        void add.run(async () => {
-          await api.post("/settings/pension-policies", np);
-          setNp({ effective_from: "", employer_rate: "", pensionable_fraction: "0.90", label: "" });
-          await load();
-        });
-      }}>
-        <Field id="pp-from" label={t("settings.policy_from")}>
-          <input id="pp-from" type="date" required value={np.effective_from} onChange={(e) => setNp({ ...np, effective_from: e.target.value })} />
-        </Field>
-        <Field id="pp-rate" label={t("settings.policy_rate")} hint={t("settings.policy_rate_hint")}>
-          <input id="pp-rate" type="text" inputMode="decimal" required value={np.employer_rate} onChange={(e) => setNp({ ...np, employer_rate: e.target.value })} />
-        </Field>
-        <Field id="pp-frac" label={t("settings.policy_fraction")}>
-          <input id="pp-frac" type="text" inputMode="decimal" required value={np.pensionable_fraction} onChange={(e) => setNp({ ...np, pensionable_fraction: e.target.value })} />
-        </Field>
-        <Field id="pp-label" label={t("settings.policy_label")} optional className="span-2">
-          <input id="pp-label" type="text" value={np.label} onChange={(e) => setNp({ ...np, label: e.target.value })} />
-        </Field>
-        <div style={{ alignSelf: "end" }}>
-          <button className="btn secondary" disabled={add.busy}>{t("settings.policy_add")}</button>
-        </div>
-      </form>
-      <ErrorAlert error={add.error} />
-    </Section>
+      {open && (
+        <PracticeSheet practice={open === "new" ? undefined : open} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); void load(); }} />
+      )}
+    </>
   );
 }
 
-function StorageSection() {
+function InvoicingSection() {
   const { t } = useT();
+  const { p, setP, save } = useProfile();
+  const [n, setN] = useState<Numbering | null>(null);
+  const nSave = useAutosave(n, async (v) => {
+    if (!v || !v.prefix || !v.next_number) return;
+    setN(await api.put<Numbering>("/settings/numbering", { prefix: v.prefix, next_number: v.next_number, padding: v.padding }));
+  }, { enabled: n !== null, delay: 900 });
+  useEffect(() => {
+    api.get<Numbering>("/settings/numbering").then(setN, () => undefined);
+  }, []);
+  if (!p || !n) return null;
+  const preview = `${n.prefix}${String(n.next_number).padStart(n.padding, "0")}`;
+  const suggested = suggestYearPrefix(n.prefix, Number(todayLondon().slice(0, 4)));
+  return (
+    <>
+      <ErrorAlert error={nSave.error ?? save.error} />
+      {suggested && (
+        <div className="alert info">
+          {t("settings.year_prefix_hint", { prefix: suggested })}{" "}
+          <button type="button" className="btn secondary small" onClick={() => setN({ ...n, prefix: suggested, next_number: 1 })}>
+            {t("settings.year_prefix_apply", { number: `${suggested}${"1".padStart(n.padding, "0")}` })}
+          </button>
+        </div>
+      )}
+      <h3>{t("settings.numbering")}</h3>
+      <div className="form-list">
+        <Row id="n-prefix" label={t("settings.prefix")}><input id="n-prefix" type="text" value={n.prefix} onChange={(e) => setN({ ...n, prefix: e.target.value })} /></Row>
+        <Row id="n-next" label={t("settings.next_number")}><input id="n-next" type="number" min={1} value={n.next_number} onChange={(e) => setN({ ...n, next_number: Number(e.target.value) })} /></Row>
+        <Row id="n-pad" label={t("settings.padding")}><input id="n-pad" type="number" min={1} max={8} value={n.padding} onChange={(e) => setN({ ...n, padding: Number(e.target.value) })} /></Row>
+      </div>
+      <p className="form-foot">{t("settings.number_preview", { number: preview })}. {t("settings.numbering_help")} <SavedIndicator state={nSave.state} /></p>
+      <h3>{t("settings.terms_vat")}</h3>
+      <div className="form-list">
+        <Row id="n-terms" label={t("settings.terms")}><input id="n-terms" type="number" min={0} max={365} value={p.payment_terms_days} onChange={(e) => setP({ ...p, payment_terms_days: Number(e.target.value) })} /></Row>
+        <Row id="n-vat" label={t("settings.vat_status")}>
+          <select id="n-vat" value={p.vat_status} onChange={(e) => setP({ ...p, vat_status: e.target.value as Profile["vat_status"] })}>
+            <option value="not_vat_registered">{t("settings.vat_not_registered")}</option>
+            <option value="vat_registered">{t("settings.vat_registered")}</option>
+          </select>
+        </Row>
+      </div>
+      <p className="form-foot">{t("settings.vat_help")} <SavedIndicator state={save.state} /></p>
+    </>
+  );
+}
+
+function PensionSection() {
+  const { t } = useT();
+  const { p, setP, save } = useProfile();
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [np, setNp] = useState({ effective_from: "", employer_rate: "", pensionable_fraction: "0.90", label: "" });
+  const [addError, setAddError] = useState<unknown>(null);
+  const load = () => api.get<Policy[]>("/settings/pension-policies").then(setPolicies, () => undefined);
+  useEffect(() => {
+    void load();
+  }, []);
+  if (!p) return null;
+  return (
+    <>
+      <ErrorAlert error={save.error} />
+      <div className="form-list">
+        <SwitchRow label={t("settings.pension_default")} checked={p.pension_default_enabled} onChange={(v) => setP({ ...p, pension_default_enabled: v })} />
+      </div>
+      <p className="form-foot">{t("settings.pension_help")}</p>
+      <h3>{t("settings.pension_forms")}</h3>
+      <div className="form-list">
+        <Row id="pe-tier" label={t("settings.employee_rate")} hint={t("settings.employee_rate_hint")}>
+          <input id="pe-tier" type="text" inputMode="decimal" placeholder="0.098" value={p.employee_rate ?? ""} onChange={(e) => setP({ ...p, employee_rate: e.target.value })} />
+        </Row>
+        <Row id="pe-ref" label={t("settings.pension_ref")}><input id="pe-ref" type="text" placeholder={t("common.optional")} value={p.pension_ref ?? ""} onChange={(e) => setP({ ...p, pension_ref: e.target.value })} /></Row>
+        <Row id="pe-gmc" label={t("settings.professional_number")}><input id="pe-gmc" type="text" placeholder={t("common.optional")} value={p.professional_number ?? ""} onChange={(e) => setP({ ...p, professional_number: e.target.value })} /></Row>
+      </div>
+      <p className="form-foot">{t("settings.pension_forms_help")} <SavedIndicator state={save.state} /></p>
+      <h3>{t("settings.policies")}</h3>
+      <div className="form-list">
+        {policies.map((x) => (
+          <div key={x.id} className="list-row">
+            <span className="list-main">
+              <span className="list-title">{t("settings.policy_line", { rate: pct(x.employer_rate), fraction: pct(x.pensionable_fraction) })}</span>
+              <span className="list-sub">{t("settings.policy_from_date", { date: ukDate(x.effective_from) })}{x.label ? ` · ${x.label}` : ""}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <h3>{t("settings.policy_add")}</h3>
+      <ErrorAlert error={addError} />
+      <div className="form-list">
+        <Row id="pp-from" label={t("settings.policy_from")}><input id="pp-from" type="date" value={np.effective_from} onChange={(e) => setNp({ ...np, effective_from: e.target.value })} /></Row>
+        <Row id="pp-rate" label={t("settings.policy_rate")} hint={t("settings.policy_rate_hint")}><input id="pp-rate" type="text" inputMode="decimal" value={np.employer_rate} onChange={(e) => setNp({ ...np, employer_rate: e.target.value })} /></Row>
+      </div>
+      <button className="btn secondary" style={{ marginTop: "0.5rem" }} disabled={!np.effective_from || !np.employer_rate}
+        onClick={async () => {
+          try {
+            await api.post("/settings/pension-policies", np);
+            setNp({ effective_from: "", employer_rate: "", pensionable_fraction: "0.90", label: "" });
+            setAddError(null);
+            await load();
+          } catch (e) {
+            setAddError(e);
+          }
+        }}>{t("common.add")}</button>
+    </>
+  );
+}
+
+function EmailSection() {
+  const { t } = useT();
+  const [cfg, setCfg] = useState<EmailConfig | null>(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    api.get<EmailConfig>("/settings/email").then(setCfg, setError);
+  }, []);
+  if (!cfg) return <ErrorAlert error={error} />;
+  const set = (patch: Partial<EmailConfig>) => setCfg({ ...cfg, ...patch });
+  const save = async (enabled = cfg.enabled) => {
+    setError(null);
+    setMsg(null);
+    try {
+      const { password_set: _p, ...rest } = cfg;
+      setCfg(await api.put<EmailConfig>("/settings/email", { ...rest, enabled, password: password || null }));
+      setPassword("");
+      setMsg(t("common.saved"));
+      return true;
+    } catch (e) {
+      setError(e);
+      return false;
+    }
+  };
+  const test = async () => {
+    if (!(await save())) return;
+    try {
+      await api.post("/settings/email/test");
+      setMsg(t("email.test_sent", { address: cfg.from_address }));
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("email.settings_lead")}</p>
+      <ErrorAlert error={error} />
+      {msg && <div className="alert ok" role="status">{msg}</div>}
+      <div className="form-list">
+        <Row id="e-from" label={t("email.from_address")}><input id="e-from" type="email" value={cfg.from_address} onChange={(e) => set({ from_address: e.target.value, username: cfg.username || e.target.value })} /></Row>
+        <Row id="e-name" label={t("email.from_name")}><input id="e-name" type="text" value={cfg.from_name} onChange={(e) => set({ from_name: e.target.value })} /></Row>
+        <Row id="e-host" label={t("email.host")}><input id="e-host" type="text" placeholder="smtp.example.com" autoCapitalize="none" value={cfg.host} onChange={(e) => set({ host: e.target.value })} /></Row>
+        <Row id="e-port" label={t("email.port")}>
+          <select id="e-port" value={`${cfg.security}:${cfg.port}`} onChange={(e) => {
+            const [sec, port] = e.target.value.split(":");
+            set({ security: sec as EmailConfig["security"], port: Number(port) });
+          }}>
+            <option value="starttls:587">587 · STARTTLS</option>
+            <option value="ssl:465">465 · SSL/TLS</option>
+          </select>
+        </Row>
+        <Row id="e-user" label={t("email.username")}><input id="e-user" type="text" autoCapitalize="none" value={cfg.username} onChange={(e) => set({ username: e.target.value })} /></Row>
+        <Row id="e-pass" label={t("email.password")}>
+          <input id="e-pass" type="password" autoComplete="new-password" placeholder={cfg.password_set ? "••••••••" : ""} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Row>
+        <SwitchRow label={t("email.bcc_self")} checked={cfg.bcc_self} onChange={(v) => set({ bcc_self: v })} />
+      </div>
+      <p className="form-foot">{t("email.password_hint")}</p>
+      <div className="actions">
+        <button className="btn" onClick={() => save(true)}>{cfg.enabled ? t("common.save") : t("email.turn_on")}</button>
+        <button className="btn secondary" onClick={test} disabled={!cfg.host || !cfg.from_address}>{t("email.send_test")}</button>
+        {cfg.enabled && <button className="btn ghost" onClick={() => save(false)}>{t("email.turn_off")}</button>}
+      </div>
+    </>
+  );
+}
+
+type Backlog = { not_archived: number; pending: number; synced: number; failed: number; conflict: number };
+
+function StorageSection() {
+  const { t, tn } = useT();
   const [cfg, setCfg] = useState<WebDavConfig | null>(null);
   const [password, setPassword] = useState("");
   const [test, setTest] = useState<{ ok: boolean; error_class?: string; folder_exists?: boolean } | null>(null);
-  const [testing, setTesting] = useState(false);
-  const st = useSaveState();
+  const [error, setError] = useState<unknown>(null);
+  const [saved, setSaved] = useState(false);
+  const [backlog, setBacklog] = useState<Backlog | null>(null);
+  const [queued, setQueued] = useState<number | null>(null);
   useEffect(() => {
-    api.get<WebDavConfig>("/storage/webdav").then(setCfg, () => undefined);
+    api.get<WebDavConfig>("/storage/webdav").then(setCfg, setError);
   }, []);
-  if (!cfg) return null;
+  useEffect(() => {
+    if (cfg?.enabled && cfg.password_set) api.get<Backlog>("/storage/webdav/backlog").then(setBacklog, () => undefined);
+  }, [cfg?.enabled, cfg?.password_set]);
+  if (!cfg) return <ErrorAlert error={error} />;
   const set = (patch: Partial<WebDavConfig>) => {
     setCfg({ ...cfg, ...patch });
     setTest(null);
+    setSaved(false);
   };
-  const body = () => ({
-    enabled: cfg.enabled,
-    target_url: cfg.target_url,
-    username: cfg.username,
-    base_path: cfg.base_path,
-    auto_upload: cfg.auto_upload,
-    password: password ? password : null,
+  const body = (enabled = cfg.enabled) => ({
+    enabled, target_url: cfg.target_url, username: cfg.username, base_path: cfg.base_path,
+    auto_upload: cfg.auto_upload, password: password || null,
   });
+  const save = async (enabled = cfg.enabled) => {
+    setError(null);
+    try {
+      setCfg(await api.put<WebDavConfig>("/storage/webdav", body(enabled)));
+      setPassword("");
+      setSaved(true);
+    } catch (e) {
+      setError(e);
+    }
+  };
   const runTest = async () => {
-    setTesting(true);
     setTest(null);
     try {
       const { enabled: _e, auto_upload: _a, ...rest } = body();
       setTest(await api.post("/storage/webdav/test", rest));
     } catch (e) {
-      st.run(async () => { throw e; });
-    } finally {
-      setTesting(false);
+      setError(e);
     }
   };
-  const save = (e: FormEvent) => {
-    e.preventDefault();
-    void st.run(async () => {
-      setCfg(await api.put<WebDavConfig>("/storage/webdav", body()));
-      setPassword("");
-    });
-  };
   const reason = (cls?: string) => (cls && hasKey(`archive_error.${cls}`) ? t(`archive_error.${cls}` as MessageKey) : cls ?? "");
+  const todo = backlog ? backlog.not_archived + backlog.failed : 0;
   return (
-    <Section id="storage" title={t("settings.storage")}>
-      <h3>{t("settings.local")}</h3>
-      <p className="hint" style={{ marginTop: 0 }}>{t("settings.local_help")}</p>
-      <h3 style={{ marginTop: "1rem" }}>{t("settings.webdav")}</h3>
-      <form onSubmit={save} className="grid grid-2">
-        <label className="check span-2">
-          <input type="checkbox" checked={cfg.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
-          <span>{t("settings.webdav_enabled")}</span>
-        </label>
-        <Field id="w-url" label={t("settings.webdav_url")} hint={t("settings.webdav_url_hint")} className="span-2">
-          <input id="w-url" type="url" autoComplete="off" spellCheck={false} value={cfg.target_url} onChange={(e) => set({ target_url: e.target.value })} />
-        </Field>
-        <Field id="w-user" label={t("settings.webdav_user")}>
-          <input id="w-user" type="text" autoComplete="off" value={cfg.username} onChange={(e) => set({ username: e.target.value })} />
-        </Field>
-        <Field id="w-pass" label={t("settings.webdav_password")}
-          hint={cfg.password_source === "secret_file" ? t("settings.webdav_password_file")
-            : cfg.password_set ? t("settings.webdav_password_saved") : t("settings.webdav_password_hint")}>
-          <input id="w-pass" type="password" autoComplete="new-password" value={password}
-            disabled={cfg.password_source === "secret_file"} onChange={(e) => { setPassword(e.target.value); setTest(null); }} />
-        </Field>
-        <Field id="w-folder" label={t("settings.webdav_folder")}
-          hint={t("settings.webdav_privacy", { example: `${cfg.base_path || "Locuvi/Invoices"}/2026/10/LOC-2026-0001.pdf` })} className="span-2">
-          <input id="w-folder" type="text" value={cfg.base_path} onChange={(e) => set({ base_path: e.target.value })} />
-        </Field>
-        <label className="check span-2">
-          <input type="checkbox" checked={cfg.auto_upload} onChange={(e) => set({ auto_upload: e.target.checked })} />
-          <span>{t("settings.webdav_auto")}</span>
-        </label>
-        <div className="span-2">
-          {test && (
-            <div className={`alert ${test.ok ? "ok" : "error"}`} role="status">
-              {test.ok
-                ? t("settings.webdav_test_ok", { folder: test.folder_exists ? t("settings.webdav_folder_exists") : t("settings.webdav_folder_missing") })
-                : t("settings.webdav_test_failed", { reason: reason(test.error_class) })}
-            </div>
-          )}
-          <ErrorAlert error={st.error} />
-          <div className="actions">
-            <button type="button" className="btn secondary" onClick={runTest} disabled={testing || !cfg.target_url}>
-              {testing ? t("settings.webdav_testing") : t("settings.webdav_test")}
-            </button>
-            <button className="btn" disabled={st.busy}>{t("common.save")}</button>
-            {st.ok && <span className="tick" role="status">✓ {t("common.saved")}</span>}
-          </div>
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("settings.local_help")}</p>
+      <ErrorAlert error={error} />
+      {test && (
+        <div className={`alert ${test.ok ? "ok" : "error"}`} role="status">
+          {test.ok
+            ? t("settings.webdav_test_ok", { folder: test.folder_exists ? t("settings.webdav_folder_exists") : t("settings.webdav_folder_missing") })
+            : t("settings.webdav_test_failed", { reason: reason(test.error_class) })}
         </div>
-      </form>
-      {cfg.enabled && cfg.password_set && <ArchiveBacklog />}
-    </Section>
-  );
-}
-
-interface Backlog {
-  not_archived: number;
-  pending: number;
-  synced: number;
-  failed: number;
-  conflict: number;
-}
-
-function ArchiveBacklog() {
-  const { t } = useT();
-  const [b, setB] = useState<Backlog | null>(null);
-  const [queued, setQueued] = useState<number | null>(null);
-  const st = useSaveState();
-  useEffect(() => {
-    api.get<Backlog>("/storage/webdav/backlog").then(setB, () => undefined);
-  }, []);
-  if (!b) return null;
-  const todo = b.not_archived + b.failed;
-  const run = () =>
-    void st.run(async () => {
-      const res = await api.post<{ queued: number; backlog: Backlog }>("/storage/webdav/archive-all");
-      setQueued(res.queued);
-      setB(res.backlog);
-    });
-  return (
-    <div style={{ marginTop: "1.25rem" }}>
-      <h3>{t("settings.archive_all_title")}</h3>
-      <p className="hint" style={{ marginTop: 0 }}>
-        {t("settings.archive_all_counts", { synced: b.synced, pending: b.pending, todo, conflict: b.conflict })}
-      </p>
-      {queued !== null && <div className="alert ok" role="status">{t("settings.archive_all_queued", { n: queued })}</div>}
-      <ErrorAlert error={st.error} />
-      <button type="button" className="btn secondary" onClick={run} disabled={st.busy || todo === 0}>
-        {t("settings.archive_all_button", { n: todo })}
-      </button>
-    </div>
+      )}
+      {saved && <div className="alert ok" role="status">✓ {t("common.saved")}</div>}
+      <div className="form-list">
+        <Row id="w-url" label={t("settings.webdav_url")} stacked hint={t("settings.webdav_url_hint")}>
+          <input id="w-url" type="url" autoComplete="off" spellCheck={false} value={cfg.target_url} onChange={(e) => set({ target_url: e.target.value })} />
+        </Row>
+        <Row id="w-user" label={t("settings.webdav_user")}><input id="w-user" type="text" autoCapitalize="none" value={cfg.username} onChange={(e) => set({ username: e.target.value })} /></Row>
+        <Row id="w-pass" label={t("settings.webdav_password")}>
+          <input id="w-pass" type="password" autoComplete="new-password" disabled={cfg.password_source === "secret_file"}
+            placeholder={cfg.password_set ? "••••••••" : ""} value={password} onChange={(e) => { setPassword(e.target.value); setTest(null); }} />
+        </Row>
+        <Row id="w-folder" label={t("settings.webdav_folder")}><input id="w-folder" type="text" value={cfg.base_path} onChange={(e) => set({ base_path: e.target.value })} /></Row>
+        <SwitchRow label={t("settings.webdav_auto")} checked={cfg.auto_upload} onChange={(v) => set({ auto_upload: v })} />
+      </div>
+      <p className="form-foot">{t("settings.webdav_password_hint")} {t("settings.webdav_privacy", { example: `${cfg.base_path || "Locuvi/Invoices"}/2026/10/LOC-2026-0001.pdf` })}</p>
+      <div className="actions">
+        <button className="btn" onClick={() => save(true)}>{cfg.enabled ? t("common.save") : t("settings.webdav_turn_on")}</button>
+        <button className="btn secondary" onClick={runTest} disabled={!cfg.target_url}>{t("settings.webdav_test")}</button>
+        {cfg.enabled && <button className="btn ghost" onClick={() => save(false)}>{t("settings.webdav_turn_off")}</button>}
+      </div>
+      {backlog && cfg.enabled && (
+        <>
+          <h3>{t("settings.archive_all_title")}</h3>
+          <p className="muted" style={{ marginTop: 0 }}>{t("settings.archive_all_counts", { synced: backlog.synced, pending: backlog.pending, todo, conflict: backlog.conflict })}</p>
+          {queued !== null && <div className="alert ok" role="status">{tn("settings.archive_all_queued", queued)}</div>}
+          <button className="btn secondary" disabled={todo === 0} onClick={async () => {
+            try {
+              const r = await api.post<{ queued: number; backlog: Backlog }>("/storage/webdav/archive-all");
+              setQueued(r.queued);
+              setBacklog(r.backlog);
+            } catch (e) {
+              setError(e);
+            }
+          }}>{tn("settings.archive_all_button", todo)}</button>
+        </>
+      )}
+    </>
   );
 }

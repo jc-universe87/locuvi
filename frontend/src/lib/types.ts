@@ -55,6 +55,14 @@ export interface Line {
   pensionable: boolean;
 }
 
+export interface PaymentState {
+  state: "unpaid" | "part_paid" | "paid" | "overdue" | "n/a";
+  paid: string | null;
+  outstanding: string | null;
+  days_overdue: number;
+  paid_on?: string | null;
+}
+
 export interface InvoiceSummary {
   id: string;
   status: InvoiceStatus;
@@ -67,6 +75,8 @@ export interface InvoiceSummary {
   work_end_date: string | null;
   grand_total: string | null;
   archive: ArchiveStatus;
+  payment: PaymentState;
+  last_emailed_at: string | null;
 }
 
 export interface InvoiceDetail extends InvoiceSummary {
@@ -78,6 +88,7 @@ export interface InvoiceDetail extends InvoiceSummary {
   void_reason: string | null;
   local_pdf_sha256: string | null;
   lines: Line[];
+  payments: { id: string; paid_on: string; amount: string; method: string; reference: string | null }[];
   events: { timestamp: string; event_type: string; metadata: Record<string, unknown> }[];
   analysis?: Analysis;
   snapshot?: {
@@ -103,6 +114,7 @@ export interface Practice {
   rate_includes_pension: boolean;
   default_payment_terms_days: number | null;
   is_archived: boolean;
+  practice_code: string | null;
 }
 
 export interface Profile {
@@ -120,6 +132,10 @@ export interface Profile {
   vat_status: "not_vat_registered" | "vat_registered";
   payment_terms_days: number;
   pension_default_enabled: boolean;
+  professional_number: string | null;
+  pension_ref: string | null;
+  employee_rate: string | null;
+  setup_completed: boolean;
 }
 
 export interface Numbering {
@@ -147,4 +163,64 @@ export interface WebDavConfig {
   auto_upload: boolean;
   password_set: boolean;
   password_source: "secret_file" | "stored" | "none";
+}
+
+export interface WorkSession {
+  id: string;
+  practice_id: string;
+  practice_name: string;
+  date: string;
+  unit: Unit;
+  quantity: string;
+  rate: string;
+  pensionable: boolean;
+  description: string;
+  status: "active" | "cancelled";
+  invoice: { id: string; status: InvoiceStatus; invoice_number: string | null } | null;
+}
+
+export interface ReadyGroup {
+  practice_id: string;
+  practice_name: string;
+  month: string;
+  sessions: number;
+  total: string;
+}
+
+export interface Overview {
+  today: string;
+  greeting_name: string;
+  setup: { completed: boolean; profile: boolean; practice: boolean };
+  ready_to_invoice: ReadyGroup[];
+  drafts: { id: string; practice_name: string | null; grand_total: string | null; work_start_date: string | null; work_end_date: string | null }[];
+  unpaid: { id: string; invoice_number: string; practice_name: string; due_date: string; outstanding: string; state: PaymentState["state"]; days_overdue: number }[];
+  outstanding_total: string;
+  overdue_count: number;
+  pension_due: PensionMonth[];
+  upcoming: { id: string; date: string; unit: Unit; practice_name: string }[];
+  this_month_invoiced: string;
+  tax_year: { invoiced: string; paid: string; outstanding: string; employer: string; fees: string };
+}
+
+export interface PensionMonth {
+  month: string;
+  practices: number;
+  pensionable_pay: string;
+  employer: string;
+  employee: string | null;
+  submitted_on: string | null;
+  changed_since_submitted: boolean;
+  ready: boolean;
+}
+
+export interface EmailConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  security: "starttls" | "ssl";
+  username: string;
+  from_address: string;
+  from_name: string;
+  bcc_self: boolean;
+  password_set: boolean;
 }

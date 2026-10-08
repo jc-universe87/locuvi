@@ -1,7 +1,8 @@
 # Locuvi roadmap
 
-Living plan for Locuvi. **v0.1 = GP Locum Invoicing** (done). The long-term product is
-**GP Locum Management**, built in small, verified steps.
+Living plan for Locuvi. **v0.1 = GP Locum Invoicing** (done). **v1.0 = GP Locum Management**
+(done, 8 Oct 2026): diary, payments, email, pension worksheets, reports and the "it just works"
+redesign (ADR 0005). Further work is driven by real use.
 
 Sources: the original handover (`docs/handover/` — especially `implementation/BUILD_PLAN.md`,
 `specs/PRODUCT.md` "Explicit exclusions" and `engineering/ARCHITECTURE.md` "Future
@@ -52,55 +53,34 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 
 ## Part 3 — Product roadmap
 
-### v0.1.x — Polish from real use — 🔜 in progress
-Small fixes after issuing real invoices.
-- ✅ "Upload all past invoices" to Nextcloud (Settings → Storage → Archive past invoices);
-  queues only invoices with no archive copy or a failed one; never re-uploads synced files.
-- ✅ Annual prefix helper: Settings suggests `LOC-<this year>-` starting at 1 when the prefix
-  has an older year; applied only when the owner clicks and saves.
-- ✅ Automated test: a self-signed HTTPS WebDAV server is rejected (`tls_error`) even when allowlisted.
-- 🔜 Owner feedback after the first real invoices (to be listed here).
-- 🧭 Native translations reviewed for DE/KO/FR/ES/PT (currently navigation only).
-- 🧭 Password change without editing the secret file; optional session timeout setting.
-- 🧭 Each April: add the new employer contribution rate (Settings → Pension) after checking NHSBSA.
+Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuitiveness** —
+"oh, it just works", minimal fields, smart defaults, hands-free feeling. See ADR 0005.
 
-### v0.2 — Payments (getting paid) — 🧭
-Original exclusion "payment tracking/reconciliation" — first module after v0.1.
-- Mark invoice paid (date, amount, method/reference), part-payments, overdue view.
-- Outstanding/aged-debt summary per practice; due-date reminders inside the app.
-- Payment records are separate rows linked to the invoice; the issued invoice never changes.
-- Credit notes for corrections (a proper document with its own number), replacing
-  "void and reissue" where a practice has already recorded the invoice.
+### v0.1.x — Polish — ✅
+- ✅ Upload all past invoices to Nextcloud in one go; ✅ new-year prefix helper;
+  ✅ TLS test with a self-signed WebDAV server.
 
-### v0.3 — Sending invoices — 🧭
-Original exclusion "no automatic emailing in v0.1".
-- Send the issued PDF to the practice's billing email (owner's SMTP or provider), with a
-  sent-log on the invoice. Always a deliberate click; no automatic sending.
-- Optional polite payment-reminder email (owner-approved text, owner-triggered).
+### v1.0 — GP Locum Management — ✅ (ADR 0005)
+| Former version | Feature | Status |
+| --- | --- | --- |
+| v0.5 Session diary | Tap-a-day calendar, remembered rates, Undo; month → draft invoice in one tap | ✅ |
+| v0.2 Payments | One-tap "Mark paid" with Undo, part payments, overdue detection, outstanding totals | ✅ |
+| v0.3 Sending | Email the issued PDF from your own address (explicit tap, sent log) | ✅ |
+| v0.4 Pension A/B | Monthly Form A/B figures from issued invoices, worksheet PDF, mark submitted | ✅ (worksheet, not a submission) |
+| v0.6 Reports | Tax-year summary, by month/practice, CSV, year ZIP pack | ✅ |
+| — | Today screen, 3-step welcome wizard, autosave, iOS-style navigation, sheets, toasts | ✅ |
 
-### v0.4 — NHS pension Forms A/B — 🧭
-Original exclusions "pension Forms A/B, PCSE uploads"; architecture says to link work-item
-IDs to Form A/B. The per-date, per-line pensionable data needed is already stored.
-- **Locum A** (monthly, per practice): generated from issued pensionable lines of that month.
-- **Locum B** (monthly summary across practices) built from the Locum A records.
-- Track which invoices/lines went into which form; forms are immutable once generated.
-- Exports in the formats NHSBSA/PCSE accept; no automatic submission without explicit
-  owner action. Rules must be verified against current NHSBSA guidance before building
-  and an ADR written. Issuing an invoice still never implies a pension submission.
-
-### v0.5 — Session diary — 🧭
-Original exclusion "no full session diary".
-- Log sessions as booked/worked (practice, date, AM/PM/hours, agreed rate, pensionable).
-- Month-end: turn worked sessions into draft invoices (one per practice per month).
-- Optional calendar export (ICS) for booked sessions.
-
-### v0.6 — Reporting & exports — 💭
-- Income by month / tax year / practice; pension contributions summary.
-- Structured exports (CSV/JSON) for the owner's accountant — exports only, no accountant
-  portal (original exclusion "accountants").
-- Year-end pack: all issued PDFs + summary for a tax year.
+### Next — 🔜 driven by owner feedback
+- 🔜 Owner feedback after a month of real use (list items here).
+- 🧭 Credit notes (own number series) for corrections after a practice has booked an invoice.
+- 🧭 Repeating bookings ("every Tuesday AM at X until December") in the Diary.
+- 🧭 Calendar subscription (ICS) of booked sessions for the phone calendar.
+- 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
+- 🧭 Password change without editing the secret file.
+- 🧭 Each April: add the new employer rate and check your employee tier (Settings → Pension).
 
 ### Later ideas — 💭
+- Automatic payment reminders (owner-approved text, still one tap to send).
 - Bank statement import (CSV/OFX) to suggest payment matches — owner confirms each match;
   no live bank connection by default.
 - Assistant/agent actions (the handover's "AI agent/Bevro actions"): drafts and

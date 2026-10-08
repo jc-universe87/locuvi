@@ -85,3 +85,39 @@ automatic backups (run the `backup` command from cron/systemd timer).
 - Single process by design (SQLite + in-process worker); do not run multiple replicas.
 - The 2026/27 contribution rate and the multi-month rule come from the handover and must be
   checked against current NHSBSA/PCSE guidance before real use.
+
+---
+
+# v1.0 — GP Locum Management (8 October 2026)
+
+Owner brief: "build the whole app", Apple-style intuitiveness, hands-free feeling.
+Rules and design in [ADR 0005](decisions/0005-v1-full-app-and-design.md).
+
+## Added
+- **Today**: greeting, three headline numbers, a single to-do list (months ready to invoice,
+  drafts, unpaid/overdue invoices with one-tap *Mark paid*, pension months ready), coming-up sessions.
+- **Welcome wizard** (3 steps) on first run; existing v0.1 installs skip it automatically.
+- **Diary**: month calendar, practice chips, AM/PM/Full day/Hours, tap a day to log, tap a
+  session to edit, remembered rate per practice + session type, Undo, month summary with
+  *Create invoice*.
+- **Payments**: mark paid (with Undo), part payments, method/date, overdue state, filters.
+- **Email**: owner SMTP, test email, pre-filled message, PDF attached, BCC self, sent log.
+- **Pension**: monthly Form A/B figures from issued invoices, worksheet PDF, mark submitted
+  (flagged if figures change later), employee tier, SD reference, GMC number, practice codes.
+- **Reports**: tax-year totals, by month (bar chart with table view), by practice, CSV, ZIP pack.
+- **Redesign**: iOS-style tab bar on phones, quiet top nav on desktop, settings as grouped
+  lists that autosave, bottom sheets, toggles, segmented controls, toasts with Undo; drafts autosave.
+
+## Verification
+| Check | Result |
+| --- | --- |
+| Backend tests (`uv run pytest`) incl. diary→invoice, payments, pension figures + worksheet, tax year, CSV/ZIP, email with fake SMTP (auth failure, bad address, BCC), API, migration 0001→0002 with data | **112 passed**, ruff clean |
+| Frontend tests, typecheck, build | 9 passed, clean |
+| UI smoke (`e2e/smoke.mjs`): wizard → diary taps → Today → create invoice → issue → mark paid → email prompt → pension worksheet + submitted → reports → settings autosave → mobile (no overflow) | passed against a fresh local server and the Docker container |
+
+## Known limitations (v1.0)
+- Pension worksheets are not official forms and nothing is submitted; tiers/deadlines are
+  owner-checked against NHSBSA/PCSE guidance.
+- No credit notes yet; a paid invoice can't be voided until its payments are removed.
+- Email uses SMTP with a password (app password recommended); no OAuth providers.
+- Translations beyond English cover navigation only.

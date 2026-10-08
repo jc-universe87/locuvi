@@ -1,17 +1,21 @@
 # CLAUDE.md — Locuvi
 
-Personal, single-user GP locum invoicing app. v0.1 scope = invoicing + Nextcloud/WebDAV archive
-only. The original brief is in `docs/handover/` (read `docs/handover/CLAUDE.md` first);
+Personal, single-user GP locum management app (v1.0): diary, invoicing, payments, email,
+pension A/B worksheets, reports, Nextcloud archive. Design principle: Apple-style "it just
+works" — minimal fields, smart defaults, autosave, undo instead of confirm (ADR 0005). The original brief is in `docs/handover/` (read `docs/handover/CLAUDE.md` first);
 interpretations are in `docs/decisions/`; the plan is `docs/ROADMAP.md` (update it when a
-roadmap item ships). Do not expand scope (no Forms A/B, email, payments,
-VAT invoices) without the owner asking.
+roadmap item ships). Do not expand scope beyond the roadmap without the owner asking;
+never submit pension forms or send email without an explicit owner tap.
 
 ## Layout
 - `backend/locuvi/` FastAPI app: `money.py` (Decimal rules), `services/invoices.py` (draft,
-  analyse, issue, void, split), `pdf/render.py` (ReportLab A4), `webdav/` (urlguard, client,
-  archive queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
-- `frontend/src/` React + TS: `pages/`, `components/ui.tsx`, `i18n/` (en is the complete
-  reference catalogue), `lib/` (api, format, types).
+  analyse, issue, void, split), `services/diary.py`, `services/payments.py`,
+  `services/pension.py`, `services/reports.py` (+ Today overview), `mail.py` (SMTP),
+  `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
+  queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
+- `frontend/src/` React + TS: `pages/` (Today, Diary, Invoices, InvoiceEditor, InvoiceDetail,
+  Pension, Reports, Settings, Welcome), `components/ui.tsx` (sheets, toggles, segmented,
+  toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.
 - `e2e/smoke.mjs` Playwright UI smoke; `docs/` decisions, report, example PDF.
 
 ## Commands

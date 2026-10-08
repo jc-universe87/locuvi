@@ -31,6 +31,13 @@ describe("i18n catalogues", () => {
     for (const s of ["draft", "issued", "voided"]) expect(en).toHaveProperty(`status.${s}`);
     for (const s of ["pending", "uploading", "synced", "failed", "conflict", "not_configured"])
       expect(en).toHaveProperty(`archive.${s}`);
+    for (const s of ["you", "bank", "practices", "invoicing", "pension", "email", "storage"]) {
+      expect(en).toHaveProperty(`settings.s_${s}`);
+      expect(en).toHaveProperty(`settings.s_${s}_sub`);
+    }
+    for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]) expect(en).toHaveProperty(`diary.wd_${d}`);
+    for (const m of ["bank_transfer", "cheque", "cash", "other"]) expect(en).toHaveProperty(`pay.method_${m}`);
+    for (const g of ["morning", "afternoon", "evening"]) expect(en).toHaveProperty(`today.${g}`);
   });
 
   it("other locales only contain known keys with the same placeholders", () => {

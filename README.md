@@ -1,23 +1,28 @@
 # Locuvi
 
-**Every session accounted for.** — personal, self-hosted GP locum invoicing (v0.1).
+**Every session accounted for.** — personal, self-hosted GP locum management (v1.0).
 
-Locuvi creates a GP locum invoice from a saved practice and dated work lines, adds the
-NHS employer pension contribution where you mark work as pensionable, issues an
-immutable A4 PDF with a unique sequential number, keeps the original forever on your
-server, and can archive each issued PDF to your Nextcloud over WebDAV.
+Tap the days you worked in a calendar. Locuvi remembers each practice's rate, tells you when a
+month is ready to invoice, adds the NHS employer pension contribution, issues an immutable A4
+PDF, emails it from your own address, tracks payment, prepares your monthly GP Locum A/B
+pension figures and gives your accountant a tax-year pack — all on your own server.
 
-It is single-user software for one UK self-employed GP. It is not a SaaS, not a pension
-submission tool and not an accounting package.
+Designed to feel like *"it just works"*: few fields, sensible defaults, drafts that save
+themselves, Undo instead of "Are you sure?" (see [ADR 0005](docs/decisions/0005-v1-full-app-and-design.md)).
 
-| v0.1 includes | Not in v0.1 |
+It is single-user software for one UK self-employed GP. It is not a SaaS, it never submits
+pension forms or sends anything without you tapping, and it is not an accounting package.
+
+| Included | Not included |
 | --- | --- |
-| Owner/sender & bank details, practices | Pension Forms A/B, PCSE uploads |
-| Draft → preview → issue (immutable number + PDF) | Emailing invoices, payment tracking |
-| Employer pension addition (versioned rates) | VAT invoices (issuing is blocked if VAT registered) |
-| Void with reason, duplicate, search/filter | Credit notes |
-| Nextcloud/WebDAV one-way archive with retry | Two-way sync, OAuth, multi-user |
-| Backup / restore / integrity commands | Bank integration, AI features |
+| **Today**: what needs doing, one tap each | Multi-user, public hosting |
+| **Diary**: tap-a-day sessions, remembered rates | Pension *submission* (worksheets only) |
+| **Invoices**: one tap per month, immutable numbered PDF | VAT invoices (blocked if VAT registered) |
+| Payments: mark paid with Undo, overdue detection | Credit notes (planned) |
+| Email invoices via your SMTP account | Bank feeds, AI features |
+| **Pension**: monthly Locum A/B figures + worksheet PDF | |
+| **Reports**: tax year, CSV, year ZIP pack | |
+| Nextcloud/WebDAV archive, backup/restore commands | |
 
 The roadmap (what's done, what's next) is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 The full brief is in [`docs/handover/`](docs/handover/). Decisions that interpret or deviate
@@ -75,7 +80,7 @@ ufw/firewalld, so binding to the LAN IP (not `0.0.0.0`) and not forwarding the p
 your router are what keep it off the internet.
 
 **Behind a TLS-intercepting proxy?** Pass its CA to the build only:
-`docker build --secret id=build_ca,src=/path/ca.pem -t locuvi:0.1.0 .` then `docker compose up -d --no-build`.
+`docker build --secret id=build_ca,src=/path/ca.pem -t locuvi:1.0.0 .` then `docker compose up -d --no-build`.
 
 ### Data and volumes
 
@@ -89,38 +94,36 @@ Migrations run automatically at start. On every start Locuvi checks that each is
 invoice's PDF exists and matches its SHA-256; `/api/v1/health/ready` (and the container
 health check) reports `degraded` if not.
 
-## 2. First-time setup (in the app)
+## 2. First run
 
-1. **Settings → Sender & bank details**: legal name, address, email, bank account name,
-   sort code, account number. Shown on future invoices only; issued invoices keep the details
-   they were issued with.
-2. **Settings → Invoice numbering & terms**: prefix (default `LOC-<year>-`), next number,
-   default payment terms. Numbers are only allocated at issue and are never reused. The
-   prefix does not change automatically each year — edit it yourself in January if you
-   want year-based prefixes.
-3. **Settings → NHS employer pension contribution**: the 2026/27 rate (14.38% of 90%
-   pensionable pay) is pre-loaded. Check it against current NHSBSA/PCSE guidance. Add a new
-   effective-dated rate when it changes; existing rates are never edited.
-4. **Practices**: add each practice with billing address and usual rate. Tick *"Agreed rate
-   already includes employer pension"* only if the practice quoted an inclusive figure — Locuvi
-   then warns before adding the contribution again.
+Sign in and a three-step welcome asks for **you** (name, address), **getting paid** (bank
+details) and **your first practice** (name, address, usual session rate). That's all.
+Everything else is optional and lives under the gear icon (**Settings**): numbering and
+terms, pension rates and your employee tier, email, Nextcloud.
 
-## 3. Invoicing
+Check the pre-loaded 2026/27 employer rate (14.38% of 90% pensionable pay) against current
+NHSBSA/PCSE guidance. When it changes, add a new dated rate in Settings → Pension.
 
-**Invoices → New invoice** → choose practice → *Add next date* for each session → set
-date, session type, rate and whether the line is **NHS pensionable** → the summary shows the
-basic fee, pensionable pay (90%, for information), the employer contribution and the total,
-calculated on the server with exact decimal arithmetic.
+## 3. A normal month
 
-- *Save draft* / *Preview PDF* (watermarked, no number).
-- *Issue & download* asks for confirmation, then in one transaction allocates the number,
-  freezes a snapshot of all details, renders and stores the PDF. A double click or retry can
-  never issue twice. The PDF downloads straight away and is always available from the
-  invoice page — with or without Nextcloud.
-- Pensionable lines in **two calendar months** block issuing; *Split by month* creates one draft
-  per month. Non-pensionable lines across months are allowed with a warning.
-- Issued invoices cannot be edited or deleted. *Void* (with a reason) keeps the number and
-  the original PDF; *Duplicate* creates a new draft.
+1. **Diary** — pick the practice and AM / PM / Full day / Hours, then tap the days you work.
+   The rate is remembered per practice and session type. Tap a session to change it.
+   Each tap can be undone.
+2. **Today** — when a month's sessions are worked, it shows *"October is ready to invoice"*.
+   Tap **Create invoice**, check the draft (it saves itself) and tap **Issue & download**.
+   Issuing allocates the next number and freezes the invoice and its PDF — it can't be
+   edited afterwards, only voided or duplicated.
+3. **Send** it from the invoice page (after a one-time email setup) or download the PDF.
+4. When the money arrives, tap **Mark paid** (on Today or the invoice). Overdue invoices
+   rise to the top of Today.
+5. **Pension** — after the month ends, open it to see the Form A figures per practice and the
+   Form B summary, download the worksheet, copy the figures onto the official NHSBSA forms,
+   then tap **Mark submitted**.
+6. **Reports** — tax-year totals any time; at year end download the CSV or the ZIP pack for
+   your accountant.
+
+You can still create an invoice by hand (Invoices → New invoice). Pensionable lines in two
+calendar months block issuing with a one-tap *Split by month*.
 
 Rounding (see [ADR 0003](docs/decisions/0003-business-rules.md)): each line is rounded
 half-up to pennies; pensionable pay = 90% of the eligible basic fee, rounded; employer

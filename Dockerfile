@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Locuvi v0.1 — single container: FastAPI API + built React frontend + archive worker.
+# Locuvi v1.0 — single container: FastAPI API + built React frontend + archive worker.
 #
 # Behind a TLS-intercepting proxy, pass its CA as an optional build secret:
 #   docker build --secret id=build_ca,src=/path/to/ca.pem .
@@ -35,8 +35,8 @@ RUN --mount=type=secret,id=build_ca,required=false \
 # ---- runtime ----------------------------------------------------------------
 FROM python:3.12.8-slim-bookworm
 LABEL org.opencontainers.image.title="Locuvi" \
-      org.opencontainers.image.description="Personal GP locum invoicing (v0.1)" \
-      org.opencontainers.image.version="0.1.0"
+      org.opencontainers.image.description="Personal GP locum management (v1.0)" \
+      org.opencontainers.image.version="1.0.0"
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
