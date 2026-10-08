@@ -1,0 +1,24 @@
+{
+  "invoice": {
+    "practice": "Example Medical Practice",
+    "invoice_date": "2026-10-08",
+    "currency": "GBP",
+    "entries": [
+      {
+        "date": "2026-10-08",
+        "description": "GP locum AM session",
+        "quantity": "1",
+        "unit_rate": "600.00",
+        "pensionable": true
+      }
+    ],
+    "expected": {
+      "basic_fee": "600.00",
+      "pensionable_pay": "540.00",
+      "employer_rate": "0.1438",
+      "employer_contribution": "77.65",
+      "total": "677.65"
+    }
+  },
+  "note": "Fictional example; no personal details"
+}
