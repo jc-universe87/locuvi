@@ -70,8 +70,14 @@ def make_practice(s, **kw) -> Practice:
     return p
 
 
-def line(d: str, price: str = "600.00", qty: str = "1", pensionable: bool = True,
-         desc: str = "GP locum AM session", unit: str = "am") -> LineData:
+def line(
+    d: str,
+    price: str = "600.00",
+    qty: str = "1",
+    pensionable: bool = True,
+    desc: str = "GP locum AM session",
+    unit: str = "am",
+) -> LineData:
     return LineData(date.fromisoformat(d), desc, unit, Decimal(qty), Decimal(price), pensionable)
 
 

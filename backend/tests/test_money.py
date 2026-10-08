@@ -38,8 +38,9 @@ def test_handover_fixture_600():
 
 
 def test_non_pensionable_line_excluded():
-    t = calculate_totals([L("600.00"), L("150.00", pensionable=False)],
-                         pension_enabled=True, policy=POLICY)
+    t = calculate_totals(
+        [L("600.00"), L("150.00", pensionable=False)], pension_enabled=True, policy=POLICY
+    )
     assert t.fee_subtotal == Decimal("750.00")
     assert t.pensionable_basic_total == Decimal("600.00")
     assert t.non_pensionable_total == Decimal("150.00")
@@ -55,8 +56,11 @@ def test_pension_switched_off():
 
 
 def test_differing_rates_and_hours():
-    lines = [L("600.00", d=date(2026, 10, 1)), L("85.50", "3.5", d=date(2026, 10, 2)),
-             L("550.00", d=date(2026, 10, 3))]
+    lines = [
+        L("600.00", d=date(2026, 10, 1)),
+        L("85.50", "3.5", d=date(2026, 10, 2)),
+        L("550.00", d=date(2026, 10, 3)),
+    ]
     t = calculate_totals(lines, pension_enabled=True, policy=POLICY)
     assert t.line_amounts == (Decimal("600.00"), Decimal("299.25"), Decimal("550.00"))
     assert t.fee_subtotal == Decimal("1449.25")
@@ -68,8 +72,12 @@ def test_differing_rates_and_hours():
 
 @pytest.mark.parametrize(
     "qty,price,expected",
-    [("0.5", "0.01", "0.01"), ("0.5", "0.03", "0.02"), ("1.25", "10.10", "12.63"),
-     ("3", "33.33", "99.99")],
+    [
+        ("0.5", "0.01", "0.01"),
+        ("0.5", "0.03", "0.02"),
+        ("1.25", "10.10", "12.63"),
+        ("3", "33.33", "99.99"),
+    ],
 )
 def test_line_rounding_half_up(qty, price, expected):
     t = calculate_totals([L(price, qty)], pension_enabled=False, policy=None)
@@ -103,8 +111,11 @@ def test_formatting():
 
 
 def test_months_and_policy_selection():
-    lines = [L("1", d=date(2026, 10, 31)), L("1", d=date(2026, 11, 1)),
-             L("1", pensionable=False, d=date(2026, 12, 1))]
+    lines = [
+        L("1", d=date(2026, 10, 31)),
+        L("1", d=date(2026, 11, 1)),
+        L("1", pensionable=False, d=date(2026, 12, 1)),
+    ]
     assert pensionable_months(lines) == [(2026, 10), (2026, 11)]
     newer = PensionPolicyValues(date(2027, 4, 1), Decimal("0.90"), Decimal("0.15"))
     assert select_policy([POLICY, newer], date(2027, 3, 31)) is POLICY

@@ -238,9 +238,7 @@ def _issue_preflight(
     if practice is None:
         problems.append(Issue("invoice.no_practice", "Choose a practice to bill."))
     elif not practice.billing_address.strip():
-        problems.append(
-            Issue("practice.no_address", "The practice needs a billing address.")
-        )
+        problems.append(Issue("practice.no_address", "The practice needs a billing address."))
     if not lines:
         problems.append(Issue("invoice.no_lines", "Add at least one work line."))
     for i, ln in enumerate(lines):
@@ -373,10 +371,11 @@ def delete_draft(s: Session, inv: Invoice) -> None:
 
 def duplicate(s: Session, source: Invoice) -> Invoice:
     lines = [
-        LineData(ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price,
-                 ln.pensionable)
+        LineData(
+            ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price, ln.pensionable
+        )
         for ln in source.lines
-    ]  # fmt: skip
+    ]
     practice_id = source.practice_id
     if practice_id and (p := s.get(Practice, practice_id)) is not None and p.is_archived:
         practice_id = None
@@ -434,25 +433,40 @@ def split_by_month(s: Session, inv: Invoice) -> list[Invoice]:
         _set_lines(
             new,
             [
-                LineData(ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price,
-                         ln.pensionable)
+                LineData(
+                    ln.service_date,
+                    ln.description,
+                    ln.unit,
+                    ln.quantity,
+                    ln.unit_price,
+                    ln.pensionable,
+                )
                 for ln in groups[key]
             ],
-        )  # fmt: skip
+        )
         _refresh_draft_cache(s, new)
         s.flush()
-        s.add(InvoiceEvent(invoice_id=new.id, event_type="created",
-                           metadata_json={"split_from": inv.id}))  # fmt: skip
+        s.add(
+            InvoiceEvent(
+                invoice_id=new.id, event_type="created", metadata_json={"split_from": inv.id}
+            )
+        )
         result.append(new)
     keep = [
-        LineData(ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price,
-                 ln.pensionable)
+        LineData(
+            ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price, ln.pensionable
+        )
         for ln in groups[keys[0]]
-    ]  # fmt: skip
+    ]
     _set_lines(inv, keep)
     _refresh_draft_cache(s, inv)
-    s.add(InvoiceEvent(invoice_id=inv.id, event_type="split",
-                       metadata_json={"into": [x.id for x in result[1:]]}))  # fmt: skip
+    s.add(
+        InvoiceEvent(
+            invoice_id=inv.id,
+            event_type="split",
+            metadata_json={"into": [x.id for x in result[1:]]},
+        )
+    )
     s.commit()
     return result
 
@@ -552,8 +566,9 @@ def preview_pdf(s: Session, inv: Invoice) -> bytes:
     inv_date = inv.invoice_date or core.today_london()
     terms = _terms_days(inv, profile.payment_terms_days)
     due = inv.due_date or inv_date + timedelta(days=terms)
-    snap = build_snapshot(s, inv, a, number=None, invoice_date=inv_date, due_date=due,
-                          issued_at=None)  # fmt: skip
+    snap = build_snapshot(
+        s, inv, a, number=None, invoice_date=inv_date, due_date=due, issued_at=None
+    )
     return render_invoice_pdf(snap, draft=True)
 
 
@@ -598,14 +613,22 @@ def issue(
         if inv.status != InvoiceStatus.draft:
             if inv.issue_idempotency_key == key:
                 return IssueResult(inv, replayed=True)
-            raise Conflict("invoice.already_issued", "This invoice has already been issued.",
-                           number=inv.invoice_number)  # fmt: skip
+            raise Conflict(
+                "invoice.already_issued",
+                "This invoice has already been issued.",
+                number=inv.invoice_number,
+            )
         other = s.scalars(select(Invoice).where(Invoice.issue_idempotency_key == key)).first()
         if other is not None:
             raise Conflict("invoice.idempotency_key_reused", "Idempotency key already used.")
 
-        a = analyse(s, lines=inv.lines, pension_enabled=inv.pension_enabled,
-                    practice=inv.practice, for_issue=True)  # fmt: skip
+        a = analyse(
+            s,
+            lines=inv.lines,
+            pension_enabled=inv.pension_enabled,
+            practice=inv.practice,
+            for_issue=True,
+        )
         if a.blocking:
             raise ValidationFailed([p.as_dict() for p in a.blocking])
 
@@ -620,12 +643,15 @@ def issue(
             )
         issued_at = utcnow()
         inv_date = inv.invoice_date or core.today_london(issued_at)
-        due = inv.due_date or inv_date + timedelta(days=_terms_days(inv, profile.payment_terms_days))
+        due = inv.due_date or inv_date + timedelta(
+            days=_terms_days(inv, profile.payment_terms_days)
+        )
         if due < inv_date:
             raise DomainError("invoice.due_before_issue", "The due date is before the issue date.")
 
-        snapshot = build_snapshot(s, inv, a, number=number, invoice_date=inv_date, due_date=due,
-                                  issued_at=issued_at)  # fmt: skip
+        snapshot = build_snapshot(
+            s, inv, a, number=number, invoice_date=inv_date, due_date=due, issued_at=issued_at
+        )
         pdf = render(snapshot)
         stored = write_issued_pdf(settings.data_dir, inv.id, pdf)
 

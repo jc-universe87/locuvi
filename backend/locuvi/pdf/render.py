@@ -58,9 +58,19 @@ def _register_fonts() -> None:
 
 
 MONTHS = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-]  # fmt: skip
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+]
 
 
 def uk_date(value: str | date | None) -> str:
@@ -144,25 +154,55 @@ def _styles() -> dict[str, ParagraphStyle]:
         "base": base,
         "muted": ParagraphStyle("muted", parent=base, textColor=MUTED, fontSize=8.5),
         "small": ParagraphStyle("small", parent=base, textColor=MUTED, fontSize=7.5, leading=10),
-        "seller": ParagraphStyle("seller", parent=base, fontName="Inter-SemiBold", fontSize=12.5,
-                                 leading=16),
-        "title": ParagraphStyle("title", parent=base, fontName="Inter-SemiBold", fontSize=22,
-                                leading=26, textColor=STEEL, alignment=TA_RIGHT),
+        "seller": ParagraphStyle(
+            "seller", parent=base, fontName="Inter-SemiBold", fontSize=12.5, leading=16
+        ),
+        "title": ParagraphStyle(
+            "title",
+            parent=base,
+            fontName="Inter-SemiBold",
+            fontSize=22,
+            leading=26,
+            textColor=STEEL,
+            alignment=TA_RIGHT,
+        ),
         "right": ParagraphStyle("right", parent=base, alignment=TA_RIGHT),
-        "h": ParagraphStyle("h", parent=base, fontName="Inter-SemiBold", fontSize=8,
-                            textColor=MUTED, leading=11, spaceAfter=2),
+        "h": ParagraphStyle(
+            "h",
+            parent=base,
+            fontName="Inter-SemiBold",
+            fontSize=8,
+            textColor=MUTED,
+            leading=11,
+            spaceAfter=2,
+        ),
         "cell": ParagraphStyle("cell", parent=base, fontSize=8.5, leading=11),
-        "cellr": ParagraphStyle("cellr", parent=base, fontSize=8.5, leading=11,
-                                alignment=TA_RIGHT),
-        "th": ParagraphStyle("th", parent=base, fontName="Inter-SemiBold", fontSize=8,
-                             leading=10, textColor=MUTED, alignment=TA_LEFT),
-        "thr": ParagraphStyle("thr", parent=base, fontName="Inter-SemiBold", fontSize=8,
-                              leading=10, textColor=MUTED, alignment=TA_RIGHT),
-        "total": ParagraphStyle("total", parent=base, fontName="Inter-Bold", fontSize=11,
-                                leading=14, alignment=TA_RIGHT),
-        "totall": ParagraphStyle("totall", parent=base, fontName="Inter-Bold", fontSize=11,
-                                 leading=14),
-    }  # fmt: skip
+        "cellr": ParagraphStyle("cellr", parent=base, fontSize=8.5, leading=11, alignment=TA_RIGHT),
+        "th": ParagraphStyle(
+            "th",
+            parent=base,
+            fontName="Inter-SemiBold",
+            fontSize=8,
+            leading=10,
+            textColor=MUTED,
+            alignment=TA_LEFT,
+        ),
+        "thr": ParagraphStyle(
+            "thr",
+            parent=base,
+            fontName="Inter-SemiBold",
+            fontSize=8,
+            leading=10,
+            textColor=MUTED,
+            alignment=TA_RIGHT,
+        ),
+        "total": ParagraphStyle(
+            "total", parent=base, fontName="Inter-Bold", fontSize=11, leading=14, alignment=TA_RIGHT
+        ),
+        "totall": ParagraphStyle(
+            "totall", parent=base, fontName="Inter-Bold", fontSize=11, leading=14
+        ),
+    }
 
 
 def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> bytes:
@@ -292,11 +332,16 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
             )
         rows.append(row)
     if pension_on:
-        col_w = [22 * mm, width - 22 * mm - 20 * mm - 14 * mm - 24 * mm - 26 * mm,
-                 20 * mm, 14 * mm, 24 * mm, 26 * mm]  # fmt: skip
+        col_w = [
+            22 * mm,
+            width - 22 * mm - 20 * mm - 14 * mm - 24 * mm - 26 * mm,
+            20 * mm,
+            14 * mm,
+            24 * mm,
+            26 * mm,
+        ]
     else:
-        col_w = [22 * mm, width - 22 * mm - 14 * mm - 24 * mm - 26 * mm,
-                 14 * mm, 24 * mm, 26 * mm]  # fmt: skip
+        col_w = [22 * mm, width - 22 * mm - 14 * mm - 24 * mm - 26 * mm, 14 * mm, 24 * mm, 26 * mm]
     line_style = [
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LINEBELOW", (0, 0), (-1, 0), 0.8, STEEL),
@@ -340,10 +385,12 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
             )
         )
     tdata = [
-        [Paragraph(_esc(t), st["muted"] if kind == "muted" else st["base"]),
-         Paragraph(v, st["right"])]
+        [
+            Paragraph(_esc(t), st["muted"] if kind == "muted" else st["base"]),
+            Paragraph(v, st["right"]),
+        ]
         for kind, t, v in trows
-    ]  # fmt: skip
+    ]
     tdata.append(
         [
             Paragraph(label("pdf.total_due"), st["totall"]),
@@ -389,12 +436,16 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     closing: list[Any] = [
         totals_table,
         Spacer(1, 2 * mm),
-        Table([[vat_note]], colWidths=[tot_w], hAlign="RIGHT",
-              style=TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 3)])),
+        Table(
+            [[vat_note]],
+            colWidths=[tot_w],
+            hAlign="RIGHT",
+            style=TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 3)]),
+        ),
         Spacer(1, 7 * mm),
         Paragraph(label("pdf.payment_details").upper(), st["h"]),
         pay,
-    ]  # fmt: skip
+    ]
     story.append(KeepTogether(closing))
 
     if inv.get("notes"):

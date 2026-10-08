@@ -4,9 +4,9 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from conftest import line, make_practice
 from pypdf import PdfReader
 
-from conftest import line, make_practice
 from locuvi import db
 from locuvi.errors import Conflict, DomainError, ValidationFailed
 from locuvi.models import Invoice, InvoiceStatus
@@ -20,10 +20,13 @@ def key() -> str:
 
 
 def draft(s, practice, lines=None, **kw):
-    lines = lines or [line("2026-10-08"), line("2026-10-15", price="650.00",
-                                               desc="GP locum PM session", unit="pm")]
-    return svc.save_draft(s, None, practice_id=practice.id, lines=lines,
-                          invoice_date=date(2026, 10, 20), **kw)
+    lines = lines or [
+        line("2026-10-08"),
+        line("2026-10-15", price="650.00", desc="GP locum PM session", unit="pm"),
+    ]
+    return svc.save_draft(
+        s, None, practice_id=practice.id, lines=lines, invoice_date=date(2026, 10, 20), **kw
+    )
 
 
 def pdf_text(settings, inv) -> str:
@@ -44,9 +47,20 @@ def test_two_october_sessions_issue(settings, session, ready):
     path = settings.data_dir / inv.local_pdf_path
     assert sha256_file(path) == inv.local_pdf_sha256
     text = pdf_text(settings, inv)
-    for needle in ["INVOICE", "LOC-2026-0001", "Dr Alex Example", "Example Medical Practice",
-                   "20 October 2026", "19 November 2026", "£1,411.78", "£161.78",
-                   "00-00-00", "00000000", "Page 1 of 1", "14.38%"]:
+    for needle in [
+        "INVOICE",
+        "LOC-2026-0001",
+        "Dr Alex Example",
+        "Example Medical Practice",
+        "20 October 2026",
+        "19 November 2026",
+        "£1,411.78",
+        "£161.78",
+        "00-00-00",
+        "00000000",
+        "Page 1 of 1",
+        "14.38%",
+    ]:
         assert needle in text, needle
 
 
@@ -96,8 +110,12 @@ def test_parallel_issue_cannot_issue_twice(settings, session, ready):
 def test_parallel_issue_of_different_drafts_unique_numbers(settings, session, ready):
     drafts = [draft(session, ready, lines=[line("2026-10-02")]).id for _ in range(6)]
     out = []
-    threads = [threading.Thread(target=lambda i=i: out.append(
-        svc.issue(settings, i, key()).invoice.invoice_number)) for i in drafts]
+    threads = [
+        threading.Thread(
+            target=lambda i=i: out.append(svc.issue(settings, i, key()).invoice.invoice_number)
+        )
+        for i in drafts
+    ]
     for t in threads:
         t.start()
     for t in threads:
@@ -154,8 +172,11 @@ def test_pensionable_multi_month_blocked_and_split(settings, session, ready):
 
 
 def test_non_pensionable_multi_month_permitted(settings, session, ready):
-    inv = draft(session, ready, lines=[line("2026-10-30", pensionable=False),
-                                       line("2026-11-02", pensionable=False)])
+    inv = draft(
+        session,
+        ready,
+        lines=[line("2026-10-30", pensionable=False), line("2026-11-02", pensionable=False)],
+    )
     a = svc.analyse(session, lines=inv.lines, pension_enabled=True, practice=ready)
     assert [w.code for w in a.warnings][:1] == ["invoice.lines_multi_month"]
     assert svc.issue(settings, inv.id, key()).invoice.grand_total == Decimal("1200.00")
@@ -168,6 +189,7 @@ def test_preflight_requires_profile_and_vat_block(settings, session):
         svc.issue(settings, inv.id, key())
     assert "profile.incomplete" in [p["code"] for p in ei.value.params["problems"]]
     from conftest import fill_profile
+
     fill_profile(session)
     core.get_profile(session).vat_status = "vat_registered"
     session.commit()
@@ -209,14 +231,17 @@ def test_preview_has_no_number(settings, session, ready):
     inv = draft(session, ready)
     pdf = svc.preview_pdf(session, inv)
     import io
+
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
     assert "DRAFT" in text and "LOC-2026" not in text
     assert core.get_sequence(session).next_number == 1
 
 
 def test_multi_page_pdf_has_page_numbers(settings, session, ready):
-    lines = [line(f"2026-10-{d:02d}", desc=f"Session {i} " + "with notes " * 6)
-             for i, d in enumerate([*range(1, 31)] * 2)]
+    lines = [
+        line(f"2026-10-{d:02d}", desc=f"Session {i} " + "with notes " * 6)
+        for i, d in enumerate([*range(1, 31)] * 2)
+    ]
     inv = draft(session, ready, lines=lines)
     res = svc.issue(settings, inv.id, key()).invoice
     reader = PdfReader(str(settings.data_dir / res.local_pdf_path))
@@ -228,8 +253,15 @@ def test_multi_page_pdf_has_page_numbers(settings, session, ready):
 
 def test_policy_versioning_new_rate(settings, session, ready):
     from locuvi.models import PensionPolicy
-    session.add(PensionPolicy(effective_from=date(2027, 4, 1), pensionable_fraction=Decimal("0.90"),
-                              employer_rate=Decimal("0.1500"), label="test"))
+
+    session.add(
+        PensionPolicy(
+            effective_from=date(2027, 4, 1),
+            pensionable_fraction=Decimal("0.90"),
+            employer_rate=Decimal("0.1500"),
+            label="test",
+        )
+    )
     session.commit()
     inv = draft(session, ready, lines=[line("2027-04-05")])
     assert inv.employer_contribution == Decimal("81.00")  # 540 * 0.15
