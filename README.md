@@ -19,6 +19,7 @@ submission tool and not an accounting package.
 | Nextcloud/WebDAV one-way archive with retry | Two-way sync, OAuth, multi-user |
 | Backup / restore / integrity commands | Bank integration, AI features |
 
+The roadmap (what's done, what's next) is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 The full brief is in [`docs/handover/`](docs/handover/). Decisions that interpret or deviate
 from it are in [`docs/decisions/`](docs/decisions/). What was built and verified is in
 [`docs/IMPLEMENTATION_REPORT.md`](docs/IMPLEMENTATION_REPORT.md). An example invoice made

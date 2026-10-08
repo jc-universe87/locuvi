@@ -2,7 +2,8 @@
 
 Personal, single-user GP locum invoicing app. v0.1 scope = invoicing + Nextcloud/WebDAV archive
 only. The original brief is in `docs/handover/` (read `docs/handover/CLAUDE.md` first);
-interpretations are in `docs/decisions/`. Do not expand scope (no Forms A/B, email, payments,
+interpretations are in `docs/decisions/`; the plan is `docs/ROADMAP.md` (update it when a
+roadmap item ships). Do not expand scope (no Forms A/B, email, payments,
 VAT invoices) without the owner asking.
 
 ## Layout
