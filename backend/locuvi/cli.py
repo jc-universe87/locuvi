@@ -147,20 +147,36 @@ def example_snapshot() -> dict:
             "billing_email": "accounts@example.invalid",
             "reference": None,
         },
-        "bank": {"account_holder": "Dr Alex Example", "sort_code": "00-00-00",
-                 "account_number": "00000000"},
+        "bank": {
+            "account_holder": "Dr Alex Example",
+            "sort_code": "00-00-00",
+            "account_number": "00000000",
+        },
         "lines": [
-            {"service_date": d, "description": desc, "unit": u, "quantity": q, "unit_price": p,
-             "amount": str(a), "pensionable": pen}
+            {
+                "service_date": d,
+                "description": desc,
+                "unit": u,
+                "quantity": q,
+                "unit_price": p,
+                "amount": str(a),
+                "pensionable": pen,
+            }
             for (d, desc, u, q, p, pen), a in zip(lines, totals.line_amounts, strict=True)
         ],
         "totals": totals.as_strings(),
-        "pension": {"enabled": True, "policy_id": None, "policy_label": None,
-                    "effective_from": "2026-04-01", "pensionable_fraction": "0.90",
-                    "employer_rate": "0.1438", "rounding": "ROUND_HALF_UP"},
+        "pension": {
+            "enabled": True,
+            "policy_id": None,
+            "policy_label": None,
+            "effective_from": "2026-04-01",
+            "pensionable_fraction": "0.90",
+            "employer_rate": "0.1438",
+            "rounding": "ROUND_HALF_UP",
+        },
         "vat": {"status": "not_vat_registered", "amount": None},
         "presentation": {"locale": "en-GB", "timezone": "Europe/London", "template": "a4-v1"},
-    }  # fmt: skip
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

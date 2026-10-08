@@ -17,7 +17,7 @@ from locuvi.api.auth import COOKIE, SessionManager, Unauthorized
 from locuvi.db import get_session
 from locuvi.errors import Conflict, DomainError, NotFound
 from locuvi.models import Invoice, InvoiceEvent, PensionPolicy, Practice
-from locuvi.services import core
+from locuvi.services import core, diary, payments, pension, reports
 from locuvi.services import invoices as svc
 from locuvi.storage.local import resolve, sha256_file
 from locuvi.webdav import archive
@@ -119,6 +119,10 @@ def _profile_out(p: Any) -> dict[str, Any]:
         vat_status=p.vat_status,
         payment_terms_days=p.payment_terms_days,
         pension_default_enabled=p.pension_default_enabled,
+        professional_number=p.professional_number,
+        pension_ref=p.pension_ref,
+        employee_rate=str(p.employee_rate) if p.employee_rate is not None else None,
+        setup_completed=p.setup_completed,
     ).model_dump()
 
 
@@ -128,14 +132,30 @@ def get_profile(s: DB) -> dict[str, Any]:
 
 
 @api.put("/settings/profile")
+@api.patch("/settings/profile")
 def put_profile(body: S.ProfileIn, s: DB) -> dict[str, Any]:
+    """Partial update: only the fields sent are changed (autosave-friendly)."""
     p = core.get_profile(s)
-    data = body.model_dump()
-    acct = data.pop("bank_account_number")
+    data = body.model_dump(exclude_unset=True)
+    acct = data.pop("bank_account_number", None)
+    nullable = {"trading_name", "phone", "professional_number", "pension_ref"}
     for k, v in data.items():
-        setattr(p, k, v.strip() if isinstance(v, str) else v)
-    p.trading_name = (body.trading_name or "").strip() or None
-    p.phone = (body.phone or "").strip() or None
+        if k == "setup_completed" and v is None:
+            continue
+        if k == "employee_rate":
+            v = Decimal(v) if v not in (None, "") else None
+            if v is not None and not (Decimal("0") <= v < Decimal("1")):
+                raise DomainError(
+                    "profile.employee_rate_range",
+                    "Enter your tier as a fraction, e.g. 0.098 for 9.8%.",
+                )
+        elif isinstance(v, str):
+            v = v.strip()
+            if k in nullable:
+                v = v or None
+        elif v is None and k not in nullable:
+            continue
+        setattr(p, k, v)
     if acct is not None:
         p.bank_account_number = acct
     core.audit(s, "settings.profile_saved", bank_changed=acct is not None)
@@ -257,6 +277,7 @@ def _practice_out(p: Practice) -> dict[str, Any]:
         rate_includes_pension=p.rate_includes_pension,
         default_payment_terms_days=p.default_payment_terms_days,
         is_archived=p.is_archived,
+        practice_code=p.practice_code,
     ).model_dump()
 
 
@@ -266,7 +287,7 @@ def _apply_practice(p: Practice, data: dict[str, Any]) -> None:
             v = Decimal(v) if v not in (None, "") else None
         elif isinstance(v, str):
             v = v.strip()
-            if k in {"billing_email", "contact_name", "reference"}:
+            if k in {"billing_email", "contact_name", "reference", "practice_code"}:
                 v = v or None
         setattr(p, k, v)
 
@@ -339,6 +360,8 @@ def _summary(s: Session, inv: Invoice) -> dict[str, Any]:
         "work_end_date": inv.work_end_date,
         "grand_total": _s(inv.grand_total),
         "archive": archive.archive_status(s, inv),
+        "payment": payments.payment_state(inv),
+        "last_emailed_at": inv.last_emailed_at,
         "updated_at": inv.updated_at,
     }
 
@@ -378,6 +401,16 @@ def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
             "local_pdf_sha256": inv.local_pdf_sha256,
             "local_pdf_size": inv.local_pdf_size,
             "duplicated_from_id": inv.duplicated_from_id,
+            "payments": [
+                {
+                    "id": p.id,
+                    "paid_on": p.paid_on,
+                    "amount": str(p.amount),
+                    "method": p.method,
+                    "reference": p.reference,
+                }
+                for p in inv.payments
+            ],
             "lines": [
                 {
                     "id": ln.id,
@@ -430,6 +463,7 @@ def list_invoices(
     date_to: date | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+    payment: str | None = None,
 ) -> dict[str, Any]:
     stmt = select(Invoice).outerjoin(Practice, Invoice.practice_id == Practice.id)
     if status:
@@ -449,6 +483,11 @@ def list_invoices(
         stmt = stmt.where(func.coalesce(Invoice.work_end_date, Invoice.invoice_date) >= date_from)
     if date_to:
         stmt = stmt.where(func.coalesce(Invoice.work_start_date, Invoice.invoice_date) <= date_to)
+    if payment:
+        # Payment state is derived; filter in Python (single-user data volumes).
+        wanted = set(payment.split(","))
+        ids = [i.id for i in s.scalars(stmt) if payments.payment_state(i)["state"] in wanted]
+        stmt = select(Invoice).where(Invoice.id.in_(ids))
     total = s.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = s.scalars(
         stmt.order_by(
@@ -650,3 +689,261 @@ def system_info(request: Request) -> dict[str, Any]:
         "webdav_private_allowlist": bool(st.webdav_allowlist.hosts or st.webdav_allowlist.networks),
         "webdav_password_from_secret_file": st.webdav_password_override is not None,
     }
+
+
+# ------------------------------------------------------------------------ today
+
+
+@api.get("/overview")
+def overview(s: DB) -> dict[str, Any]:
+    return reports.today_overview(s)
+
+
+# ------------------------------------------------------------------------ diary
+
+
+def _session_out(s: Session, w: Any) -> dict[str, Any]:
+    inv = s.get(Invoice, w.invoice_id) if w.invoice_id else None
+    return {
+        "id": w.id,
+        "practice_id": w.practice_id,
+        "practice_name": w.practice.name,
+        "date": w.date,
+        "unit": w.unit,
+        "quantity": str(w.quantity),
+        "rate": str(w.rate),
+        "pensionable": w.pensionable,
+        "description": w.description,
+        "status": w.status,
+        "invoice": (
+            {"id": inv.id, "status": inv.status, "invoice_number": inv.invoice_number}
+            if inv and inv.status != "voided"
+            else None
+        ),
+    }
+
+
+@api.get("/sessions")
+def list_sessions(s: DB, start: date, end: date) -> list[dict[str, Any]]:
+    if (end - start).days > 400:
+        raise DomainError("session.range_too_long", "Choose a shorter period.")
+    return [_session_out(s, w) for w in diary.list_sessions(s, start, end)]
+
+
+@api.post("/sessions", status_code=201)
+def add_sessions(body: S.SessionsIn, s: DB) -> list[dict[str, Any]]:
+    items = [
+        diary.SessionInput(
+            practice_id=x.practice_id,
+            date=x.date,
+            unit=x.unit,
+            quantity=Decimal(x.quantity) if x.quantity else None,
+            rate=Decimal(x.rate) if x.rate else None,
+            pensionable=x.pensionable,
+            description=x.description,
+        )
+        for x in body.sessions
+    ]
+    return [_session_out(s, w) for w in diary.add_sessions(s, items)]
+
+
+@api.patch("/sessions/{session_id}")
+def patch_session(session_id: str, body: S.SessionPatch, s: DB) -> dict[str, Any]:
+    ws = diary.get_session_or_404(s, session_id)
+    data = body.model_dump(exclude_unset=True)
+    for k in ("quantity", "rate"):
+        if data.get(k) is not None:
+            data[k] = Decimal(data[k])
+    return _session_out(s, diary.update_session(s, ws, **data))
+
+
+@api.delete("/sessions/{session_id}", status_code=204)
+def delete_session(session_id: str, s: DB) -> Response:
+    diary.delete_session(s, diary.get_session_or_404(s, session_id))
+    return Response(status_code=204)
+
+
+@api.get("/sessions/suggest-rate")
+def suggest_rate(s: DB, practice_id: str, unit: str = "am") -> dict[str, Any]:
+    p = s.get(Practice, practice_id)
+    if p is None:
+        raise NotFound("practice.not_found", "Practice not found.")
+    r = diary.remembered_rate(s, p, unit)
+    return {"rate": str(r) if r is not None else None, "pensionable": p.default_pensionable}
+
+
+@api.get("/sessions/ready")
+def sessions_ready(s: DB) -> list[dict[str, Any]]:
+    return diary.ready_to_invoice(s)
+
+
+@api.post("/sessions/invoice", status_code=201)
+def invoice_from_sessions(body: S.InvoiceMonthIn, s: DB) -> dict[str, Any]:
+    return _detail(s, diary.invoice_month(s, body.practice_id, body.month))
+
+
+# --------------------------------------------------------------------- payments
+
+
+@api.post("/invoices/{invoice_id}/payments", status_code=201)
+def add_payment(invoice_id: str, body: S.PaymentIn, s: DB) -> dict[str, Any]:
+    inv = svc.get_invoice(s, invoice_id)
+    payments.record_payment(
+        s,
+        inv,
+        amount=Decimal(body.amount) if body.amount else None,
+        paid_on=body.paid_on,
+        method=body.method,
+        reference=body.reference,
+    )
+    return _detail(s, svc.get_invoice(s, invoice_id))
+
+
+@api.delete("/payments/{payment_id}")
+def remove_payment(payment_id: str, s: DB) -> dict[str, Any]:
+    inv = payments.delete_payment(s, payment_id)
+    return _detail(s, svc.get_invoice(s, inv.id))
+
+
+# ------------------------------------------------------------------------ email
+
+
+@api.get("/settings/email")
+def get_email(s: DB) -> dict[str, Any]:
+    from locuvi import mail
+
+    return mail.config_public(mail.get_config(s))
+
+
+@api.put("/settings/email")
+def put_email(body: S.EmailConfigIn, request: Request, s: DB) -> dict[str, Any]:
+    from locuvi import mail
+
+    return mail.config_public(mail.save_config(s, state(request).secrets, body.model_dump()))
+
+
+@api.post("/settings/email/test")
+def test_email(request: Request, s: DB) -> dict[str, bool]:
+    from locuvi import mail
+
+    mail.send_test(
+        s,
+        state(request).settings,
+        state(request).secrets,
+        smtp_factory=getattr(state(request), "smtp_factory", None),
+    )
+    return {"ok": True}
+
+
+@api.get("/invoices/{invoice_id}/email")
+def email_draft(invoice_id: str, s: DB) -> dict[str, Any]:
+    from locuvi import mail
+
+    return mail.draft_for(s, svc.get_invoice(s, invoice_id))
+
+
+@api.post("/invoices/{invoice_id}/email")
+def email_send(invoice_id: str, body: S.EmailSendIn, request: Request, s: DB) -> dict[str, Any]:
+    from locuvi import mail
+
+    return mail.send_invoice(
+        s,
+        state(request).settings,
+        state(request).secrets,
+        svc.get_invoice(s, invoice_id),
+        to=body.to,
+        subject=body.subject,
+        body=body.body,
+        smtp_factory=getattr(state(request), "smtp_factory", None),
+    )
+
+
+# ---------------------------------------------------------------------- pension
+
+
+@api.get("/pension")
+def pension_months(s: DB) -> dict[str, Any]:
+    p = core.get_profile(s)
+    return {
+        "months": pension.overview(s),
+        "employee_rate": str(p.employee_rate) if p.employee_rate is not None else None,
+    }
+
+
+@api.get("/pension/{month}")
+def pension_month(month: str, s: DB) -> dict[str, Any]:
+    _check_month(month)
+    return pension.month_figures(s, month)
+
+
+@api.get("/pension/{month}/worksheet.pdf")
+def pension_pdf(month: str, s: DB) -> Response:
+    from locuvi.pdf.pension import render_pension_worksheet
+
+    _check_month(month)
+    fig = pension.month_figures(s, month)
+    if not fig["forms_a"]:
+        raise NotFound("pension.no_work", "No pensionable invoices for that month.")
+    return Response(
+        render_pension_worksheet(fig),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="nhs-pension-worksheet-{month}.pdf"'
+        },
+    )
+
+
+@api.post("/pension/{month}/submitted")
+def pension_submitted(month: str, body: S.PensionSubmitIn, s: DB) -> dict[str, Any]:
+    _check_month(month)
+    pension.mark_submitted(s, month, body.submitted_on)
+    return {"months": pension.overview(s)}
+
+
+@api.delete("/pension/{month}/submitted")
+def pension_unsubmitted(month: str, s: DB) -> dict[str, Any]:
+    _check_month(month)
+    pension.unmark_submitted(s, month)
+    return {"months": pension.overview(s)}
+
+
+def _check_month(month: str) -> None:
+    import re
+
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        raise DomainError("pension.bad_month", "Month must be YYYY-MM.")
+
+
+# ---------------------------------------------------------------------- reports
+
+
+@api.get("/reports/summary")
+def report_summary(s: DB, tax_year: int | None = None) -> dict[str, Any]:
+    year = tax_year or reports.tax_year_of(core.today_london())
+    return reports.summary(s, year)
+
+
+@api.get("/reports/invoices.csv")
+def report_csv(s: DB, tax_year: int) -> Response:
+    start, end = reports.tax_year_bounds(tax_year)
+    return Response(
+        reports.invoices_csv(s, start, end),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="locuvi-invoices-{tax_year}-{tax_year + 1}.csv"'
+            )
+        },
+    )
+
+
+@api.get("/reports/year-pack.zip")
+def report_pack(s: DB, request: Request, tax_year: int) -> Response:
+    data = reports.year_pack(s, state(request).settings, tax_year)
+    return Response(
+        data,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="locuvi-{tax_year}-{tax_year + 1}.zip"'
+        },
+    )

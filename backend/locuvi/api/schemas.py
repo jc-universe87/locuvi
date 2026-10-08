@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 from datetime import date
 from decimal import Decimal
@@ -58,6 +59,10 @@ class ProfileIn(Strict):
     vat_status: Literal["not_vat_registered", "vat_registered"] = "not_vat_registered"
     payment_terms_days: Annotated[int, Field(ge=0, le=365)] = 30
     pension_default_enabled: bool = True
+    professional_number: Annotated[str, StringConstraints(max_length=40)] | None = None
+    pension_ref: Annotated[str, StringConstraints(max_length=40)] | None = None
+    employee_rate: DecStr | None = None
+    setup_completed: bool | None = None
 
 
 class ProfileOut(BaseModel):
@@ -75,6 +80,10 @@ class ProfileOut(BaseModel):
     vat_status: str
     payment_terms_days: int
     pension_default_enabled: bool
+    professional_number: str | None
+    pension_ref: str | None
+    employee_rate: str | None
+    setup_completed: bool
 
 
 class NumberingIn(Strict):
@@ -123,6 +132,7 @@ class PracticeIn(Strict):
     rate_includes_pension: bool = False
     default_payment_terms_days: Annotated[int, Field(ge=0, le=365)] | None = None
     is_archived: bool = False
+    practice_code: Annotated[str, StringConstraints(max_length=20)] | None = None
 
 
 class PracticePatch(Strict):
@@ -137,6 +147,7 @@ class PracticePatch(Strict):
     rate_includes_pension: bool | None = None
     default_payment_terms_days: Annotated[int, Field(ge=0, le=365)] | None = None
     is_archived: bool | None = None
+    practice_code: Annotated[str, StringConstraints(max_length=20)] | None = None
 
 
 class PracticeOut(BaseModel):
@@ -152,6 +163,7 @@ class PracticeOut(BaseModel):
     rate_includes_pension: bool
     default_payment_terms_days: int | None
     is_archived: bool
+    practice_code: str | None
 
 
 # --------------------------------------------------------------------- invoices
@@ -216,3 +228,61 @@ class Page(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class SessionIn(Strict):
+    practice_id: str
+    date: _dt.date
+    unit: Unit = "am"
+    quantity: DecStr | None = None
+    rate: DecStr | None = None
+    pensionable: bool | None = None
+    description: Annotated[str, StringConstraints(max_length=300)] | None = None
+
+
+class SessionsIn(Strict):
+    sessions: Annotated[list[SessionIn], Field(min_length=1, max_length=62)]
+
+
+class SessionPatch(Strict):
+    date: _dt.date | None = None
+    unit: Unit | None = None
+    quantity: DecStr | None = None
+    rate: DecStr | None = None
+    pensionable: bool | None = None
+    description: Annotated[str, StringConstraints(max_length=300)] | None = None
+    status: Literal["active", "cancelled"] | None = None
+
+
+class InvoiceMonthIn(Strict):
+    practice_id: str
+    month: Annotated[str, StringConstraints(pattern=r"^\d{4}-\d{2}$")]
+
+
+class PaymentIn(Strict):
+    amount: DecStr | None = None
+    paid_on: date | None = None
+    method: Literal["bank_transfer", "cheque", "cash", "other"] = "bank_transfer"
+    reference: Annotated[str, StringConstraints(max_length=100)] | None = None
+
+
+class EmailConfigIn(Strict):
+    enabled: bool = False
+    host: Annotated[str, StringConstraints(max_length=200)] = ""
+    port: Annotated[int, Field(ge=1, le=65535)] = 587
+    security: Literal["starttls", "ssl"] = "starttls"
+    username: Short = ""
+    password: Annotated[str, StringConstraints(max_length=500)] | None = None
+    from_address: Short = ""
+    from_name: Short = ""
+    bcc_self: bool = True
+
+
+class EmailSendIn(Strict):
+    to: Annotated[str, StringConstraints(min_length=3, max_length=500)]
+    subject: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    body: Annotated[str, StringConstraints(max_length=10000)]
+
+
+class PensionSubmitIn(Strict):
+    submitted_on: date | None = None

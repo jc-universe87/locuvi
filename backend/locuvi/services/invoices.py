@@ -364,6 +364,9 @@ def save_draft(
 
 def delete_draft(s: Session, inv: Invoice) -> None:
     _require_draft(inv)
+    from locuvi.services.diary import release_sessions
+
+    release_sessions(s, inv.id)
     s.query(InvoiceEvent).filter(InvoiceEvent.invoice_id == inv.id).delete()
     s.delete(inv)
     s.commit()
@@ -686,6 +689,9 @@ def issue(
                 metadata_json={"number": number, "pdf_sha256": stored.sha256},
             )
         )
+        from locuvi.services.diary import reconcile_on_issue
+
+        reconcile_on_issue(s, inv)
         if after_issue is not None:
             after_issue(s, inv)
         s.commit()
@@ -701,6 +707,14 @@ def void(s: Session, inv: Invoice, reason: str) -> Invoice:
         raise Conflict("invoice.void_draft", "Drafts can be deleted instead of voided.")
     if inv.status == InvoiceStatus.voided:
         raise Conflict("invoice.already_voided", "This invoice is already void.")
+    if inv.payments:
+        raise Conflict(
+            "invoice.void_has_payments",
+            "This invoice has payments recorded. Remove them before voiding.",
+        )
+    from locuvi.services.diary import release_sessions
+
+    release_sessions(s, inv.id)
     inv.status = InvoiceStatus.voided
     inv.voided_at = datetime.now(UTC)
     inv.void_reason = reason[:1000]

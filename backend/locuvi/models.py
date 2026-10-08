@@ -124,6 +124,11 @@ class OwnerProfile(TimestampMixin, Base):
     vat_status: Mapped[str] = mapped_column(String(32), default=VatStatus.not_vat_registered)
     payment_terms_days: Mapped[int] = mapped_column(Integer, default=30)
     pension_default_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Only used on pension worksheets, never on invoices.
+    professional_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    pension_ref: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    employee_rate: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
+    setup_completed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class InvoiceSequence(TimestampMixin, Base):
@@ -165,6 +170,7 @@ class Practice(TimestampMixin, Base):
     rate_includes_pension: Mapped[bool] = mapped_column(Boolean, default=False)
     default_payment_terms_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    practice_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class Invoice(TimestampMixin, Base):
@@ -206,6 +212,7 @@ class Invoice(TimestampMixin, Base):
         String(100), unique=True, nullable=True
     )
     duplicated_from_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    last_emailed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     practice: Mapped[Practice | None] = relationship(lazy="joined")
     lines: Mapped[list[InvoiceLine]] = relationship(
@@ -213,6 +220,9 @@ class Invoice(TimestampMixin, Base):
         cascade="all, delete-orphan",
         order_by="InvoiceLine.sort_order",
         lazy="selectin",
+    )
+    payments: Mapped[list[Payment]] = relationship(
+        back_populates="invoice", order_by="Payment.paid_on", lazy="selectin"
     )
     archive_jobs: Mapped[list[ArchiveJob]] = relationship(
         back_populates="invoice", order_by="ArchiveJob.created_at", lazy="selectin"
@@ -296,3 +306,76 @@ class AuditEvent(Base):
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     event_type: Mapped[str] = mapped_column(String(60))
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class SessionStatus(enum.StrEnum):
+    active = "active"
+    cancelled = "cancelled"
+
+
+class WorkSession(TimestampMixin, Base):
+    """A booked or worked locum session (diary). Past active sessions count as worked."""
+
+    __tablename__ = "work_session"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    practice_id: Mapped[str] = mapped_column(ForeignKey("practice.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    unit: Mapped[str] = mapped_column(String(16), default=LineUnit.am)
+    quantity: Mapped[Decimal] = mapped_column(DecimalString, default=Decimal("1"))
+    rate: Mapped[Decimal] = mapped_column(DecimalString)
+    pensionable: Mapped[bool] = mapped_column(Boolean, default=True)
+    description: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(16), default=SessionStatus.active)
+    invoice_id: Mapped[str | None] = mapped_column(
+        ForeignKey("invoice.id"), nullable=True, index=True
+    )
+
+    practice: Mapped[Practice] = relationship(lazy="joined")
+
+
+class Payment(Base):
+    """Money received against an invoice. Separate rows; the invoice never changes."""
+
+    __tablename__ = "payment"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    invoice_id: Mapped[str] = mapped_column(ForeignKey("invoice.id"), index=True)
+    paid_on: Mapped[date] = mapped_column(Date)
+    amount: Mapped[Decimal] = mapped_column(DecimalString)
+    method: Mapped[str] = mapped_column(String(30), default="bank_transfer")
+    reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    invoice: Mapped[Invoice] = relationship(back_populates="payments")
+
+
+class EmailConfig(Base):
+    """Singleton SMTP configuration (id is always 1). Password encrypted like WebDAV."""
+
+    __tablename__ = "email_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    host: Mapped[str] = mapped_column(String(200), default="")
+    port: Mapped[int] = mapped_column(Integer, default=587)
+    security: Mapped[str] = mapped_column(String(10), default="starttls")
+    username: Mapped[str] = mapped_column(String(200), default="")
+    password_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    from_address: Mapped[str] = mapped_column(String(200), default="")
+    from_name: Mapped[str] = mapped_column(String(200), default="")
+    bcc_self: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class PensionSubmission(Base):
+    """Owner's record that a month's Locum A/B figures were submitted (frozen figures)."""
+
+    __tablename__ = "pension_submission"
+    __table_args__ = (UniqueConstraint("month"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    month: Mapped[str] = mapped_column(String(7))  # YYYY-MM
+    submitted_on: Mapped[date] = mapped_column(Date)
+    figures_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

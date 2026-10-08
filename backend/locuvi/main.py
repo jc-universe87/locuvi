@@ -59,6 +59,7 @@ def create_app(
             core.ensure_singletons(s)
             app.state.integrity = integrity.check(s, settings)
         secrets = SecretBox(settings)
+        app.state.secrets = secrets
         app.state.archive_ctx = archive_ctx or ArchiveContext(settings, secrets)
         app.state.sessions = SessionManager(
             secrets.session_signing_key(),
