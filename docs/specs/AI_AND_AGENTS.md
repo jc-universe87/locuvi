@@ -150,7 +150,8 @@ These should operate through the application's existing service layer and permis
 through direct unrestricted database access.
 
 The system should eventually support integration with **Bevro**, allowing Locuvi's administrative
-functions to be used by external authorised agents.
+functions to be used by external authorised agents. (Bevro is the owner's agent platform, which
+links all of the owner's agents and lets them communicate from one place.)
 
 ## 5. Privacy and safety
 Locuvi manages personal financial and professional records. Therefore:

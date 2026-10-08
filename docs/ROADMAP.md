@@ -102,6 +102,18 @@ off by default. Calculations, numbering, deadlines and pension figures stay dete
 The AI proposes and the owner approves. It never issues, sends, pays, submits or changes bank
 details on its own, and every proposal and tool call is audit-logged.
 
+**Bevro** is the owner's own agent platform: it links all of the owner's agents and lets them
+communicate from one place. Locuvi joins it as one connected agent/tool provider (Phase 4).
+
+**Agreed order (owner, 8 Oct 2026):**
+1. Polish from real use.
+2. Checks engine and weekly digest.
+3. Document inbox, then paste-a-booking as the first AI feature.
+4. Bank CSV import.
+5. Form A tracking and PCSE import.
+6. The full administrative agent.
+7. Bevro integration.
+
 ### Phase 1 — Foundation without AI — ✅ (v1.0)
 Structured sessions, deterministic invoice engine, payments, pension figures, Nextcloud archive.
 The Today overview already gives rule-based monitoring for uninvoiced months, overdue invoices
@@ -127,6 +139,10 @@ Each item is useful on its own and gives the AI something reliable to work with.
   first by rules and later by the AI.
 - 🧭 **Notifications**: optional weekly email digest of findings ("2 sessions not invoiced,
   1 invoice overdue").
+- 🧭 **Practice instructions** as structured fields: PO number required, invoice address/email,
+  portal upload, who signs Form A. Useful now, and reliable context for the AI later.
+- 🧭 **Self-assessment figures** in the tax-year pack: income totals and employee pension
+  contributions, as figures only, not tax advice.
 
 ### Phase 2 — AI invoice assistant — 💭 (v2.0)
 - 💭 Provider-agnostic LLM interface (Claude API first; local model option later). The API key
@@ -160,8 +176,12 @@ Each item is useful on its own and gives the AI something reliable to work with.
 - 💭 Scheduled multi-step reviews (e.g. a Monday-morning admin brief).
 - 💭 Email (IMAP) and calendar connectors with narrowly scoped access.
 - 💭 Better document processing (scanned PDFs and photos of rota sheets).
-- 💭 **Bevro integration**: expose Locuvi's tools to authorised external agents, e.g. as
-  an MCP server with per-tool scopes and the same approval rules.
+- 💭 **Bevro integration**: Locuvi exposes its tools (the Phase 3 list) to Bevro, the owner's
+  agent platform, most likely as an MCP server. Each Bevro agent gets a token with per-tool
+  scopes (read-only by default). Writes become proposals the owner approves in Locuvi or in
+  Bevro. Every call is audit-logged, and secrets and bank details are never exposed. Bevro can
+  then combine Locuvi with the owner's other agents (e.g. calendar or email agents feeding
+  bookings in).
 - 💭 Optional local models for maximum privacy.
 - 💭 Controlled execution of workflows the owner has approved in advance.
 
