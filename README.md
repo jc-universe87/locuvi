@@ -28,8 +28,8 @@ from fictional data: [`docs/examples/example-invoice.pdf`](docs/examples/example
 
 ## 1. Run it (Docker Compose)
 
-Requirements: a Linux host with Docker Engine + Compose v2. Locuvi listens on
-`127.0.0.1` only; reach it through Tailscale or another authenticated private gateway.
+Requirements: a Linux host with Docker Engine + Compose v2. By default Locuvi listens on
+`127.0.0.1` only; reach it through Tailscale, or publish it on your LAN (see below).
 
 ```bash
 git clone <this repository> locuvi && cd locuvi
@@ -56,6 +56,22 @@ sudo tailscale serve --bg --https=443 http://127.0.0.1:8000
 
 Keep `COOKIE_SECURE=true` when serving over HTTPS. Do **not** use `tailscale funnel` or any
 public port forward.
+
+**Intranet (LAN) access**: publish on the server's LAN address instead of localhost:
+
+```bash
+# .env
+LOCUVI_BIND=192.168.1.20     # the server's LAN IP (`hostname -I`); avoid 0.0.0.0
+LOCUVI_PORT=8767
+COOKIE_SECURE=false          # plain http on the LAN
+```
+
+Then `docker compose up -d` and open `http://192.168.1.20:8767` from any device on the
+network. The owner password still protects the app, but plain HTTP on a LAN can be read
+by others on that network — prefer a trusted home/office network, or put a TLS reverse
+proxy (e.g. Caddy with an internal certificate) in front. Docker-published ports bypass
+ufw/firewalld, so binding to the LAN IP (not `0.0.0.0`) and not forwarding the port on
+your router are what keep it off the internet.
 
 **Behind a TLS-intercepting proxy?** Pass its CA to the build only:
 `docker build --secret id=build_ca,src=/path/ca.pem -t locuvi:0.1.0 .` then `docker compose up -d --no-build`.

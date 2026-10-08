@@ -1,6 +1,6 @@
 # Locuvi — private, single-user deployment.
-# Published only on 127.0.0.1: put Tailscale (`tailscale serve`) or another
-# authenticated private gateway in front. Never expose this port publicly.
+# Published on 127.0.0.1 by default. Set LOCUVI_BIND to the server's LAN IP to
+# open it on the intranet. Never expose this port to the internet.
 name: locuvi
 
 services:
@@ -9,7 +9,7 @@ services:
     image: locuvi:0.1.0
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${LOCUVI_PORT:-8000}:8000"
+      - "${LOCUVI_BIND:-127.0.0.1}:${LOCUVI_PORT:-8000}:8000"
     environment:
       APP_ENV: production
       TZ: Europe/London
