@@ -80,6 +80,8 @@ class Settings:
     worker_poll_seconds: float = 15.0
     backup_dir: Path | None = None  # automatic nightly backups go here (BACKUP_DIR)
     backup_keep_days: int = 30
+    ai_api_key_override: str | None = None  # ANTHROPIC_API_KEY_FILE (else the key saved in app)
+    ai_model: str = "claude-opus-5-5"
     log_level: str = "INFO"
 
     @property
@@ -124,6 +126,8 @@ class Settings:
             log_level=e.get("LOG_LEVEL", "INFO").upper(),
             backup_dir=Path(e["BACKUP_DIR"]) if e.get("BACKUP_DIR") else None,
             backup_keep_days=int(e.get("BACKUP_KEEP_DAYS", "30")),
+            ai_api_key_override=_read_secret_file(e.get("ANTHROPIC_API_KEY_FILE")),
+            ai_model=e.get("LOCUVI_AI_MODEL", "claude-opus-5-5").strip() or "claude-opus-5-5",
         )
 
     def validate(self) -> None:

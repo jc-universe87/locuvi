@@ -303,3 +303,39 @@ class PensionSubmitIn(Strict):
 
 class DismissIn(Strict):
     days: Annotated[int, Field(ge=1, le=365)] = 7
+
+
+# ------------------------------------------------------------ inbox & assistant
+
+DocKind = Literal["booking", "remittance", "statement", "pension", "other"]
+
+
+class PasteIn(Strict):
+    text: Annotated[str, StringConstraints(min_length=1, max_length=200_000)]
+    kind: DocKind | None = None
+
+
+class DocumentPatch(Strict):
+    kind: DocKind | None = None
+    title: Annotated[str, StringConstraints(min_length=1, max_length=200)] | None = None
+    status: Literal["new", "done"] | None = None
+    practice_id: Annotated[str, StringConstraints(max_length=36)] | None = None
+
+
+class AssistantIn(Strict):
+    enabled: bool = False
+    api_key: Annotated[str, StringConstraints(max_length=500)] | None = None
+    clear_key: bool = False
+
+
+class ProposalChoice(Strict):
+    index: Annotated[int, Field(ge=0, le=100)]
+    practice_id: Annotated[str, StringConstraints(max_length=36)] | None = None
+    date: _dt.date | None = None
+    unit: Literal["am", "pm", "day", "hours"] | None = None
+    hours: DecStr | None = None
+    rate: DecStr | None = None
+
+
+class ProposalAcceptIn(Strict):
+    items: Annotated[list[ProposalChoice], Field(min_length=1, max_length=62)]

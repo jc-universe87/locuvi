@@ -11,11 +11,13 @@ never submit pension forms or send email without an explicit owner tap.
 ## Layout
 - `backend/locuvi/` FastAPI app: `money.py` (Decimal rules), `services/invoices.py` (draft,
   analyse, issue, void, split), `services/diary.py`, `services/payments.py`,
-  `services/pension.py`, `services/reports.py` (+ Today overview), `mail.py` (SMTP),
+  `services/pension.py`, `services/reports.py` (+ Today overview), `services/checks.py`
+  (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,
+  audit), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
-- `frontend/src/` React + TS: `pages/` (Today, Diary, Invoices, InvoiceEditor, InvoiceDetail,
-  Pension, Reports, Settings, Welcome), `components/ui.tsx` (sheets, toggles, segmented,
+- `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Invoices, InvoiceEditor,
+  InvoiceDetail, Pension, Reports, Settings, Welcome), `components/Booking.tsx` (paste + review), `components/ui.tsx` (sheets, toggles, segmented,
   toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.
 - `e2e/smoke.mjs` Playwright UI smoke; `docs/` decisions, report, example PDF.
 
@@ -37,3 +39,5 @@ never submit pension forms or send email without an explicit owner tap.
   or git. Test only against disposable WebDAV servers, never the owner's live Nextcloud.
 - All UI text through i18n keys in `frontend/src/i18n/en.ts` (tests enforce this).
 - Fictional data only in fixtures (`example.invalid`, `00-00-00`, `00000000`).
+- Tests never call a real AI API (fake provider / fake SDK client). AI output is re-validated
+  server-side and only becomes data through `proposals.accept`.

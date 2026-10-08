@@ -37,6 +37,8 @@ TEXT: dict[str, str] = {
     "archive_conflict": "Nextcloud already has a different file for {number}.",
     "backup_never": "No backup has been made yet.",
     "backup_stale": "The last backup was {days} days ago.",
+    "proposals_pending": "{n} suggested diary change(s) are waiting for you in the inbox.",
+    "inbox_waiting": "{n} document(s) have been in your inbox for a few days.",
 }
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
           "September", "October", "November", "December"]  # fmt: skip
@@ -136,6 +138,13 @@ class DigestScheduler:
             log.warning("nightly backup not made: %s", exc.code)
         except Exception:  # noqa: BLE001
             log.exception("nightly backup failed")
+        try:
+            from locuvi.services import documents
+
+            with db.new_session() as s:
+                documents.purge_trash(s, self.settings)
+        except Exception:  # noqa: BLE001
+            log.exception("document trash purge failed")
         try:
             with db.new_session() as s:
                 if due(s):

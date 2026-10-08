@@ -73,7 +73,9 @@ def _validate(ws: WorkSession) -> None:
         raise DomainError("line.price_non_negative", "Rate cannot be negative.")
 
 
-def add_sessions(s: Session, items: list[SessionInput]) -> list[WorkSession]:
+def add_sessions(
+    s: Session, items: list[SessionInput], *, commit: bool = True
+) -> list[WorkSession]:
     created = []
     for it in items:
         p = _practice(s, it.practice_id)
@@ -95,7 +97,10 @@ def add_sessions(s: Session, items: list[SessionInput]) -> list[WorkSession]:
         _validate(ws)
         s.add(ws)
         created.append(ws)
-    s.commit()
+    if commit:
+        s.commit()
+    else:
+        s.flush()
     return created
 
 
@@ -106,7 +111,7 @@ def get_session_or_404(s: Session, session_id: str) -> WorkSession:
     return ws
 
 
-def _locked(ws: WorkSession, s: Session) -> bool:
+def is_locked(ws: WorkSession, s: Session) -> bool:
     if ws.invoice_id is None:
         return False
     inv = s.get(Invoice, ws.invoice_id)
@@ -114,7 +119,7 @@ def _locked(ws: WorkSession, s: Session) -> bool:
 
 
 def update_session(s: Session, ws: WorkSession, **changes: object) -> WorkSession:
-    if _locked(ws, s):
+    if is_locked(ws, s):
         raise Conflict("session.invoiced", "This session is on an issued invoice.")
     for k, v in changes.items():
         if v is not None:
@@ -127,7 +132,7 @@ def update_session(s: Session, ws: WorkSession, **changes: object) -> WorkSessio
 
 
 def delete_session(s: Session, ws: WorkSession) -> None:
-    if _locked(ws, s):
+    if is_locked(ws, s):
         raise Conflict("session.invoiced", "This session is on an issued invoice.")
     s.delete(ws)
     s.commit()

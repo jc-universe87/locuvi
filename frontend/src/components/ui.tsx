@@ -42,6 +42,11 @@ const ICONS: Record<string, string> = {
   alert: "M12 8v5M12 16.5v.5M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z",
   cloud: "M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.5A3.3 3.3 0 0 1 17 18z",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  inbox: "M4 13h4l1.5 3h5l1.5-3h4M6 5h12l2 8v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6z",
+  sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z",
+  paste: "M9 3h6v4H9zM7 5H5v16h14V5h-2M9 12h6M9 16h4",
+  upload: "M12 20V9M7 14l5-5 5 5M5 4h14",
+  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
 };
 
 export function Icon({ name, size = 22 }: { name: keyof typeof ICONS | string; size?: number }) {

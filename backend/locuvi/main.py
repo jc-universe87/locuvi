@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from locuvi import __version__, db, integrity
+from locuvi.api import inbox as _inbox  # noqa: F401  (registers routes on `api`)
 from locuvi.api.auth import SessionManager
 from locuvi.api.routes import api, public
 from locuvi.config import Settings, get_settings

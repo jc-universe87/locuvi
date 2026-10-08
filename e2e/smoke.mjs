@@ -165,6 +165,35 @@ if (await page.getByRole("button", { name: "Back up now" }).isVisible()) {
   await page.getByText(/No backup yet/).waitFor({ state: "detached" });
 }
 
+step("diary: paste a booking -> review -> add (rules engine, no AI)");
+await page.getByRole("link", { name: "Diary" }).first().click();
+await page.getByRole("button", { name: "Paste a booking" }).click();
+const next = new Date(Date.now() + 40 * 86400000);
+const nm = next.toLocaleDateString("en-GB", { month: "long", timeZone: "Europe/London" });
+await page.getByLabel("Booking email or message").fill(
+  `Hi Dr Example,\nConfirming locum cover at Example Medical Practice:\n20 ${nm} AM\n21 ${nm} 14:00-18:00\nFee £600 per session.`,
+);
+await page.getByRole("button", { name: "Read booking" }).click();
+await page.getByText("Found in the text — please check").waitFor();
+await shot("10c-booking-review");
+await page.getByRole("dialog").getByRole("button", { name: "Add 2 sessions" }).click();
+await page.getByRole("status").getByText("Added 2 sessions").waitFor();
+
+step("inbox: pasted booking is filed as done; upload a file");
+await page.getByRole("link", { name: /^Inbox/ }).click();
+await page.getByRole("heading", { name: "Inbox" }).waitFor();
+await page.locator("input[type=file]").setInputFiles({
+  name: "remittance.txt", mimeType: "text/plain", buffer: Buffer.from("Remittance advice: BACS payment £2,032.96"),
+});
+await page.getByText("Added 1 document").waitFor();
+await page.getByRole("button", { name: /remittance\.txt/ }).click();
+await page.getByRole("dialog").getByText("BACS payment").waitFor();
+await shot("10d-inbox-doc");
+await page.getByRole("dialog").getByRole("button", { name: "Mark done" }).click();
+await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+await page.getByRole("button", { name: "Done" }).click();
+await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
+
 step("settings hub and sections");
 await page.getByRole("link", { name: "Settings" }).click();
 await page.getByRole("link", { name: /Bank details/ }).click();
@@ -180,7 +209,7 @@ step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await mobile.addCookies(await ctx.cookies());
 const mp = await mobile.newPage();
-for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diary"], ["/invoices", "14-mobile-invoices"]]) {
+for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diary"], ["/invoices", "14-mobile-invoices"], ["/inbox", "15-mobile-inbox"]]) {
   await mp.goto(`${BASE}${path}`);
   await mp.locator(".tabbar").waitFor();
   await mp.waitForTimeout(300);

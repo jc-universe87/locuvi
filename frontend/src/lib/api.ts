@@ -27,14 +27,15 @@ export function setUnauthorizedHandler(fn: () => void) {
 
 async function request(method: string, url: string, body?: unknown, headers?: Record<string, string>) {
   const h: Record<string, string> = { Accept: "application/json", ...headers };
-  if (body !== undefined) h["Content-Type"] = "application/json";
+  const form = body instanceof FormData;
+  if (body !== undefined && !form) h["Content-Type"] = "application/json";
   if (method !== "GET" && csrfToken) h["X-CSRF-Token"] = csrfToken;
   let res: Response;
   try {
     res = await fetch(`/api/v1${url}`, {
       method,
       headers: h,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
       credentials: "same-origin",
     });
   } catch {
@@ -70,6 +71,10 @@ export const api = {
   },
   async del(url: string): Promise<void> {
     await request("DELETE", url);
+  },
+  /** multipart upload (the browser sets the boundary) */
+  async upload<T>(url: string, form: FormData): Promise<T> {
+    return (await request("POST", url, form)).json();
   },
   async blob(method: "GET" | "POST", url: string): Promise<Blob> {
     return (await request(method, url, method === "POST" ? {} : undefined)).blob();

@@ -109,7 +109,7 @@ communicate from one place. Locuvi joins it as one connected agent/tool provider
 **Agreed order (owner, 8 Oct 2026):**
 1. Polish from real use.
 2. Checks engine and weekly digest.
-3. Document inbox, then paste-a-booking as the first AI feature.
+3. Document inbox, then paste-a-booking as the first AI feature. ✅ (Oct 2026)
 4. Bank CSV import.
 5. Form A tracking and PCSE import.
 6. The full administrative agent.
@@ -126,9 +126,11 @@ Each item is useful on its own and gives the AI something reliable to work with.
   linked records, suggested action), e.g. uninvoiced sessions, due/overdue invoices,
   sessions with no rate, duplicate or overlapping bookings, Form A not returned, Form B missing,
   payments not matched. Today shows the findings; a scheduler re-runs them daily. (Spec E)
-- 🧭 **Document inbox**: upload or forward booking emails, PDFs and statements. Documents
-  are stored locally and linked to sessions, invoices or payments. Only documents the owner
-  added or authorised are readable later. (Spec A, 4 `read_authorised_document`)
+- ✅ **Document inbox** (`services/documents.py`, `/inbox`): add PDFs, images, .eml, text or
+  CSV files (drop or pick) or paste text. Stored locally under random names, de-duplicated by
+  SHA-256, text extracted once (pypdf / email parser), type and practice guessed, searchable,
+  New/Done, delete with undo (purged after 30 days). Forwarding by email is still to do.
+  (Spec A, 4 `read_authorised_document`)
 - 🧭 **Bank statement CSV import** with deterministic matching first: exact amount plus
   invoice number in the reference. Unmatched lines go to a review list. (Spec D)
 - 🧭 **Form A tracking**: per practice-month status (prepared → sent to practice → signed →
@@ -136,8 +138,9 @@ Each item is useful on its own and gives the AI something reliable to work with.
   expected and recorded contributions. (Spec C)
 - 🧭 **Correspondence log**: emails sent and received about an invoice or session, linked to
   it, so drafts can use context the owner has authorised. (Spec F)
-- 🧭 **Audit log for proposals**: a generic "proposed change → approved/rejected" record, used
-  first by rules and later by the AI.
+- ✅ **Audit log for proposals** (`Proposal` table, `services/proposals.py`): what was proposed,
+  by which engine (`rules` or `ai:<model>`), what the owner accepted, changed or rejected, and
+  what was created — with undo. Used by the rules reader and the AI alike.
 - ✅ **Notifications**: optional weekly email digest of findings ("2 sessions not invoiced,
   1 invoice overdue").
 - ✅ **Practice instructions** as structured fields: PO number required, invoice address/email,
@@ -145,12 +148,20 @@ Each item is useful on its own and gives the AI something reliable to work with.
 - ✅ **Self-assessment figures** in the tax-year pack: income totals and employee pension
   contributions, as figures only, not tax advice.
 
-### Phase 2 — AI invoice assistant — 💭 (v2.0)
-- 💭 Provider-agnostic LLM interface (Claude API first; local model option later). The API key
-  is stored as a secret; the feature is off by default.
-- 💭 **Paste or forward a booking** → extracted sessions (practice, dates, AM/PM/hours, fee),
-  shown as proposals to confirm. Changes, cancellations and duplicates are flagged against the
-  Diary. Missing details are asked for, not guessed. (A)
+### Phase 2 — AI invoice assistant — 🔜 in progress (v2.0)
+- ✅ Provider-agnostic LLM interface (`assistant/providers.py`; Claude API first via the
+  official SDK, local model option later). Off by default; API key encrypted at rest or
+  supplied as `ANTHROPIC_API_KEY_FILE`. Structured JSON output, explicit effort, server-side
+  refusal fallback enabled, refusals reported plainly. Long numbers and DOBs are redacted
+  before anything is sent; only the text, practice names and today's date leave Locuvi.
+- ✅ **Paste a booking** (Diary, Inbox) → sessions (practice, dates, AM/PM/day/hours, fee)
+  shown as a checklist to confirm: "Add N sessions", with undo. Works **without AI** too
+  (`assistant/rules.py` reads common formats); with the assistant on, scans/PDF images and
+  free-form emails are read by the model. Every value is re-validated by the server, rates
+  fall back to the remembered rate, and duplicates, clashes, cancellations, unknown
+  practices and missing rates are flagged against the Diary. Missing details become
+  questions, not guesses. (A)
+- 🧭 Forward a booking by email (IMAP mailbox poll) into the inbox.
 - 💭 "Prepare all outstanding invoices for September" → drafts made by the deterministic
   engine from confirmed sessions; inconsistent rates are flagged. (B)
 - 💭 Draft invoice emails and polite reminders in the right tone; always reviewed and sent with

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Dialog, ErrorAlert, Field, Icon, Segmented, Toggle, useToast } from "../components/ui";
+import { BookingSheet } from "../components/Booking";
+import { Dialog, ErrorAlert, Field, Icon, PageHead, Segmented, Toggle, useToast } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
@@ -67,6 +68,7 @@ export default function DiaryPage() {
   const [ready, setReady] = useState<ReadyGroup[]>([]);
   const [open, setOpen] = useState<WorkSession | null>(null);
   const [newPractice, setNewPractice] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   const { start, end, y, m, last } = monthBounds(month);
@@ -199,7 +201,11 @@ export default function DiaryPage() {
 
   return (
     <>
-      <h1>{t("nav.diary")}</h1>
+      <PageHead title={t("nav.diary")}>
+        <button className="btn secondary small" onClick={() => setPasting(true)}>
+          <Icon name="paste" size={16} /> {t("booking.open")}
+        </button>
+      </PageHead>
       <ErrorAlert error={error} />
 
       <div className="card" style={{ paddingBottom: "0.85rem" }}>
@@ -321,6 +327,7 @@ export default function DiaryPage() {
           setNewPractice(false);
         }} />
       )}
+      <BookingSheet open={pasting} onClose={() => setPasting(false)} onChanged={() => void load()} />
     </>
   );
 }

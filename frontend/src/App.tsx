@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Icon, Logo, ToastProvider } from "./components/ui";
 import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
 import DiaryPage from "./pages/Diary";
+import InboxPage from "./pages/Inbox";
 import InvoiceDetailPage from "./pages/InvoiceDetail";
 import InvoiceEditor from "./pages/InvoiceEditor";
 import InvoicesPage from "./pages/Invoices";
@@ -82,6 +83,7 @@ export default function App() {
               ))}
             </nav>
             <span className="spacer" />
+            <InboxLink />
             <NavLink to="/settings" className="icon-btn" aria-label={t("nav.settings")} title={t("nav.settings")}>
               <Icon name="settings" />
             </NavLink>
@@ -96,6 +98,7 @@ export default function App() {
             <Route path="/invoices/new" element={<InvoiceEditor />} />
             <Route path="/invoices/:id/edit" element={<InvoiceEditor />} />
             <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
+            <Route path="/inbox" element={<InboxPage />} />
             <Route path="/pension" element={<PensionPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage onSignOut={session.auth_mode === "password" ? signOut : undefined} />} />
@@ -114,5 +117,22 @@ export default function App() {
         </nav>
       </ToastProvider>
     </BrowserRouter>
+  );
+}
+
+/** Inbox tray in the top bar; the badge counts documents not yet dealt with. */
+function InboxLink() {
+  const { t } = useT();
+  const location = useLocation();
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    api.get<{ new: number }>("/documents?status=new").then((r) => setCount(r.new), () => undefined);
+  }, [location.pathname]);
+  const label = count ? `${t("inbox.title")} — ${t("inbox.badge", { n: count })}` : t("inbox.title");
+  return (
+    <NavLink to="/inbox" className="icon-btn badge-host" aria-label={label} title={label}>
+      <Icon name="inbox" />
+      {count > 0 && <span className="badge" aria-hidden="true">{count > 9 ? "9+" : count}</span>}
+    </NavLink>
   );
 }

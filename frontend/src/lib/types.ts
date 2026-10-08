@@ -245,6 +245,70 @@ export interface Finding {
     | { type: "open_pension"; month: string }
     | { type: "open_settings"; section: string }
     | { type: "backup_now" }
+    | { type: "open_inbox" }
     | null;
   dismissible: boolean;
+}
+
+export type DocKind = "booking" | "remittance" | "statement" | "pension" | "other";
+
+export interface Doc {
+  id: string;
+  kind: DocKind;
+  title: string;
+  source: "upload" | "paste";
+  filename: string | null;
+  content_type: string | null;
+  size: number;
+  status: "new" | "done";
+  practice_id: string | null;
+  has_file: boolean;
+  has_text: boolean;
+  excerpt: string;
+  created_at: string;
+  deleted: boolean;
+  text?: string;
+  proposals?: Proposal[];
+}
+
+export type ProposalFlag = "needs_practice" | "needs_rate" | "duplicate" | "clash" | "not_in_diary" | "invoiced";
+
+export interface ProposalItem {
+  date: string;
+  unit: "am" | "pm" | "day" | "hours";
+  hours: string | null;
+  practice_id: string | null;
+  practice_name: string | null;
+  rate: string | null;
+  rate_source: "text" | "remembered" | null;
+  action: "add" | "cancel";
+  note: string | null;
+  flags: ProposalFlag[];
+  clash_with: string | null;
+  session_id: string | null;
+  past: boolean;
+  selected: boolean;
+}
+
+export interface Proposal {
+  id: string;
+  kind: string;
+  document_id: string | null;
+  status: "pending" | "accepted" | "partial" | "rejected";
+  engine: string;
+  ai: boolean;
+  summary: string;
+  items: ProposalItem[];
+  questions: string[];
+  result: { applied: number[]; created: string[]; cancelled: string[] } | null;
+  created_at: string;
+}
+
+export interface AssistantConfig {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  key_saved: boolean;
+  key_from_server: boolean;
+  ready: boolean;
 }

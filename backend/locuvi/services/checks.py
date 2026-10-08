@@ -14,17 +14,19 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from locuvi.config import Settings
 from locuvi.models import (
     ArchiveJob,
     ArchiveStatus,
+    Document,
     FindingDismissal,
     Invoice,
     InvoiceStatus,
     Practice,
+    Proposal,
     SessionStatus,
     WorkSession,
 )
@@ -64,6 +66,7 @@ def run_checks(s: Session, settings: Settings | None = None, *, today: date | No
     out += _pension(s, today)
     out += _practices(s)
     out += _archive(s)
+    out += _inbox(s, today)
     if settings is not None:
         out += _backup(s, settings, today)
     if not include_dismissed:
@@ -241,6 +244,28 @@ def _archive(s: Session) -> list[Finding]:
             params={"number": inv.invoice_number if inv else "", "error": job.last_error_class},
             ref={"type": "invoice", "id": job.invoice_id},
             action={"type": "open_invoice", "invoice_id": job.invoice_id},
+        ))  # fmt: skip
+    return out
+
+
+def _inbox(s: Session, today: date) -> list[Finding]:
+    out = []
+    waiting = s.scalar(select(func.count(Proposal.id)).where(Proposal.status == "pending"))
+    if waiting:
+        out.append(Finding(
+            key="proposals_pending", kind="proposals_pending", severity="info",
+            params={"n": waiting}, action={"type": "open_inbox"}, dismissible=False,
+        ))  # fmt: skip
+    cutoff = datetime.combine(today - timedelta(days=3), datetime.min.time(), tzinfo=UTC)
+    old = s.scalar(
+        select(func.count(Document.id)).where(
+            Document.status == "new", Document.deleted_at.is_(None), Document.created_at < cutoff
+        )
+    )
+    if old:
+        out.append(Finding(
+            key="inbox_waiting", kind="inbox_waiting", severity="info",
+            params={"n": old}, action={"type": "open_inbox"},
         ))  # fmt: skip
     return out
 

@@ -13,12 +13,14 @@ dependencies = [
     "reportlab>=4.2",
     "cryptography>=43",
     "tzdata>=2024.2",
+    "anthropic>=1.12.1",
+    "python-multipart>=0.0.32",
+    "pypdf>=6.19.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "pypdf>=5.1",
     "wsgidav>=4.3",
     "cheroot>=10",
     "ruff>=0.8",

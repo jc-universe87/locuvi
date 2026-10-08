@@ -6,13 +6,13 @@ import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
 import { pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
-import type { EmailConfig, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
+import type { AssistantConfig, EmailConfig, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
 import { PracticeSheet } from "./Diary";
 
-const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage"] as const;
+const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "assistant"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud",
+  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", assistant: "sparkle",
 };
 
 export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
@@ -32,6 +32,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         {section === "pension" && <PensionSection />}
         {section === "email" && <EmailSection />}
         {section === "storage" && <StorageSection />}
+        {section === "assistant" && <AssistantSection />}
       </>
     );
   }
@@ -487,6 +488,61 @@ function StorageSection() {
           }}>{tn("settings.archive_all_button", todo)}</button>
         </>
       )}
+    </>
+  );
+}
+
+function AssistantSection() {
+  const { t } = useT();
+  const [cfg, setCfg] = useState<AssistantConfig | null>(null);
+  const [key, setKey] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    api.get<AssistantConfig>("/settings/assistant").then(setCfg, setError);
+  }, []);
+  if (!cfg) return <ErrorAlert error={error} />;
+  const save = async (enabled: boolean, clear = false) => {
+    setError(null);
+    setSaved(false);
+    try {
+      setCfg(await api.put<AssistantConfig>("/settings/assistant", { enabled, api_key: key || null, clear_key: clear }));
+      setKey("");
+      setSaved(true);
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const hasKey = cfg.key_saved || cfg.key_from_server;
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("assistant.intro")}</p>
+      <ErrorAlert error={error} />
+      {saved && <div className="alert ok" role="status">✓ {cfg.ready ? t("assistant.on") : t("common.saved")}</div>}
+      <div className="form-list">
+        <SwitchRow label={t("assistant.toggle")} hint={t("assistant.toggle_hint")} checked={cfg.enabled}
+          onChange={(v) => { if (!v || hasKey || key) void save(v); else setCfg({ ...cfg, enabled: true }); }} />
+        {cfg.enabled && (
+          <Row id="ai-key" label={t("assistant.key")} hint={cfg.key_from_server ? t("assistant.key_server") : t("assistant.key_hint")}>
+            <input id="ai-key" type="password" autoComplete="off" spellCheck={false} disabled={cfg.key_from_server}
+              placeholder={cfg.key_saved ? "••••••••" : "sk-ant-…"} value={key} onChange={(e) => setKey(e.target.value.trim())} />
+          </Row>
+        )}
+      </div>
+      {cfg.enabled && !cfg.key_from_server && (
+        <div className="actions" style={{ marginTop: "0.5rem" }}>
+          <button className="btn" disabled={!key && !cfg.key_saved} onClick={() => void save(true)}>{t("common.save")}</button>
+          {cfg.key_saved && <button className="btn ghost" onClick={() => void save(false, true)}>{t("assistant.forget_key")}</button>}
+        </div>
+      )}
+      <h3>{t("assistant.privacy_title")}</h3>
+      <ul className="muted bullets">
+        <li>{t("assistant.privacy_1")}</li>
+        <li>{t("assistant.privacy_2")}</li>
+        <li>{t("assistant.privacy_3")}</li>
+        <li>{t("assistant.privacy_4")}</li>
+      </ul>
+      <p className="form-foot">{t("assistant.model", { model: cfg.model })}</p>
     </>
   );
 }

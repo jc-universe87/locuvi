@@ -122,6 +122,24 @@ NHSBSA/PCSE guidance. When it changes, add a new dated rate in Settings → Pens
 6. **Reports** — tax-year totals any time; at year end download the CSV or the ZIP pack for
    your accountant.
 
+### Bookings and the inbox
+
+Got a booking email? **Diary → Paste a booking**, paste it, tap **Read booking**. Locuvi lists
+the sessions it found (date, AM/PM/day/hours, practice, fee) with anything odd flagged —
+*already in your diary*, *clashes with another practice*, *cancellation*, *which practice?* —
+and nothing is added until you tap **Add N sessions** (undo available). The **inbox** (tray icon,
+top right) keeps booking emails, remittances, statements and pension forms: drop files on it
+(PDF, images, .eml, text, CSV) or paste text; mark them done when dealt with.
+
+**Assistant (optional, off by default).** Without AI, Locuvi reads common booking formats
+itself. Settings → Assistant turns on an AI reader (Anthropic Claude) for free-form emails and
+scanned PDFs/photos: paste an API key (stored encrypted) or mount one as a Docker secret and
+set `ANTHROPIC_API_KEY_FILE`. Only the booking text, your practice names and today's date are
+sent — long numbers and dates of birth are removed first; never passwords, bank details or
+invoices. Refused requests are retried on a fallback model by the provider; the model used is
+recorded with every suggestion. It only suggests — calculations never use AI. See
+[`docs/specs/AI_AND_AGENTS.md`](docs/specs/AI_AND_AGENTS.md).
+
 You can still create an invoice by hand (Invoices → New invoice). Pensionable lines in two
 calendar months block issuing with a one-tap *Split by month*.
 

@@ -300,3 +300,24 @@ details.more > summary::-webkit-details-marker { display: none; }
 @media (max-width: 899px) {
   .mobile-total { position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 14; background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); border-top: 1px solid var(--line); padding: 0.55rem 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 }
+
+/* inbox & booking review */
+.badge-host { position: relative; }
+.badge { position: absolute; top: 0.15rem; right: 0.1rem; min-width: 1.05rem; height: 1.05rem; padding: 0 0.25rem; border-radius: 999px; background: var(--burgundy); color: #fff; font-size: 0.66rem; font-weight: 700; display: grid; place-items: center; line-height: 1; }
+.card-pad-title { padding: 0.9rem 1.15rem 0.2rem; margin: 0; }
+button.list-row { width: 100%; background: none; border: none; border-top: 1px solid var(--line); font: inherit; text-align: left; cursor: pointer; color: inherit; }
+button.list-row:first-of-type { border-top: none; }
+.dropping { outline: 2px dashed var(--steel); outline-offset: 6px; border-radius: var(--radius); }
+.doc-text { white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 0.88rem; background: var(--bg); border-radius: var(--radius-s); padding: 0.85rem; max-height: 40vh; overflow: auto; margin: 1rem 0 0; }
+.proposal-source { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; color: var(--steel); margin: 0 0 0.5rem; }
+.proposal-items > li { padding: 0.75rem 0.25rem; align-items: flex-start; }
+.proposal-items > li > input[type="checkbox"] { width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; flex: none; accent-color: var(--steel); }
+.proposal-items > li.cancel .list-title { text-decoration: line-through; color: var(--muted); }
+.proposal-items label.list-title { cursor: pointer; white-space: normal; }
+.proposal-fields { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.proposal-fields select { flex: 1 1 11rem; min-width: 0; }
+.money-input { display: inline-flex; align-items: center; gap: 0.25rem; }
+.money-input input { width: 6.5rem; }
+.bullets { padding-left: 1.2rem; margin-top: 0; }
+.bullets li { margin-bottom: 0.35rem; }
+#booking-text { width: 100%; resize: vertical; min-height: 10rem; }

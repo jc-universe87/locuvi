@@ -81,7 +81,9 @@ export default function TodayPage() {
   };
 
   const name = firstName(ov.greeting_name);
-  const attention = ov.findings.filter((f) => f.kind !== "draft_stale" && f.severity !== "info");
+  const attention = ov.findings.filter(
+    (f) => f.kind !== "draft_stale" && (f.severity !== "info" || f.kind === "proposals_pending"),
+  );
   const tasks =
     ov.ready_to_invoice.length + ov.drafts.length + ov.unpaid.length + ov.pension_due.length + attention.length;
 
@@ -243,6 +245,8 @@ export function findingHref(f: Finding): string | null {
       return "/pension";
     case "open_settings":
       return `/settings/${a.section}`;
+    case "open_inbox":
+      return "/inbox";
     default:
       return null;
   }
