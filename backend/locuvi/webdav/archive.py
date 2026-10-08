@@ -251,6 +251,43 @@ def request_upload(s: Session, inv: Invoice) -> ArchiveJob:
     return job
 
 
+def archive_backlog(s: Session) -> dict[str, int]:
+    """Counts of issued/voided invoices by archive state, for the bulk upload button."""
+    counts = {"not_archived": 0, "pending": 0, "synced": 0, "failed": 0, "conflict": 0}
+    for inv in s.scalars(select(Invoice).where(Invoice.status != "draft")):
+        job = next((j for j in inv.archive_jobs if j.is_current), None)
+        state = job.status if job else "not_archived"
+        if state == ArchiveStatus.uploading:
+            state = "pending"
+        counts[state] = counts.get(state, 0) + 1
+    return counts
+
+
+def request_upload_all(s: Session) -> int:
+    """Queue every issued/voided invoice that has no archive copy yet (or failed).
+
+    Synced, conflicting and already-queued jobs are left alone; nothing is re-uploaded.
+    """
+    cfg = core.get_storage_config(s)
+    if not cfg.enabled or not cfg.target_url:
+        raise DomainError("archive.not_configured", "Nextcloud / WebDAV is not enabled.")
+    queued = 0
+    for inv in s.scalars(select(Invoice).where(Invoice.status != "draft")):
+        if not inv.local_pdf_sha256 or not inv.invoice_number:
+            continue
+        job = next((j for j in inv.archive_jobs if j.is_current), None)
+        if job is not None and job.status != ArchiveStatus.failed:
+            continue
+        before = job.status if job else None
+        job = _make_job(s, cfg, inv)
+        if before == ArchiveStatus.failed or job.status == ArchiveStatus.pending:
+            queued += 1
+    if queued:
+        core.audit(s, "storage.archive_all_requested", queued=queued)
+    s.commit()
+    return queued
+
+
 def archive_status(s: Session, inv: Invoice) -> dict[str, Any]:
     cfg = core.get_storage_config(s)
     job = next((j for j in reversed(inv.archive_jobs) if j.is_current), None)

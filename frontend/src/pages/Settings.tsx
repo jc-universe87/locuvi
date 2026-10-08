@@ -3,7 +3,8 @@ import { ErrorAlert, Field } from "../components/ui";
 import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
-import { pct, ukDate } from "../lib/format";
+import { pct, todayLondon, ukDate } from "../lib/format";
+import { suggestYearPrefix } from "../lib/numbering";
 import type { Numbering, Policy, Profile, WebDavConfig } from "../lib/types";
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -149,6 +150,7 @@ function NumberingSection({ profile, onSaved }: { profile: Profile; onSaved: (p:
   }, []);
   if (!n) return null;
   const preview = `${n.prefix}${String(n.next_number).padStart(n.padding, "0")}`;
+  const suggested = suggestYearPrefix(n.prefix, Number(todayLondon().slice(0, 4)));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     void st.run(async () => {
@@ -173,6 +175,15 @@ function NumberingSection({ profile, onSaved }: { profile: Profile; onSaved: (p:
         </Field>
         <p className="span-2" style={{ margin: 0 }}><strong>{t("settings.number_preview", { number: preview })}</strong></p>
         <div />
+        {suggested && (
+          <div className="alert info span-2" role="status" style={{ margin: 0 }}>
+            {t("settings.year_prefix_hint", { prefix: suggested })}{" "}
+            <button type="button" className="btn secondary small"
+              onClick={() => setN({ ...n, prefix: suggested, next_number: 1 })}>
+              {t("settings.year_prefix_apply", { number: `${suggested}${"1".padStart(n.padding, "0")}` })}
+            </button>
+          </div>
+        )}
         <Field id="n-terms" label={t("settings.terms")}>
           <input id="n-terms" type="number" min={0} max={365} value={terms} onChange={(e) => setTerms(e.target.value)} />
         </Field>
@@ -361,6 +372,46 @@ function StorageSection() {
           </div>
         </div>
       </form>
+      {cfg.enabled && cfg.password_set && <ArchiveBacklog />}
     </Section>
+  );
+}
+
+interface Backlog {
+  not_archived: number;
+  pending: number;
+  synced: number;
+  failed: number;
+  conflict: number;
+}
+
+function ArchiveBacklog() {
+  const { t } = useT();
+  const [b, setB] = useState<Backlog | null>(null);
+  const [queued, setQueued] = useState<number | null>(null);
+  const st = useSaveState();
+  useEffect(() => {
+    api.get<Backlog>("/storage/webdav/backlog").then(setB, () => undefined);
+  }, []);
+  if (!b) return null;
+  const todo = b.not_archived + b.failed;
+  const run = () =>
+    void st.run(async () => {
+      const res = await api.post<{ queued: number; backlog: Backlog }>("/storage/webdav/archive-all");
+      setQueued(res.queued);
+      setB(res.backlog);
+    });
+  return (
+    <div style={{ marginTop: "1.25rem" }}>
+      <h3>{t("settings.archive_all_title")}</h3>
+      <p className="hint" style={{ marginTop: 0 }}>
+        {t("settings.archive_all_counts", { synced: b.synced, pending: b.pending, todo, conflict: b.conflict })}
+      </p>
+      {queued !== null && <div className="alert ok" role="status">{t("settings.archive_all_queued", { n: queued })}</div>}
+      <ErrorAlert error={st.error} />
+      <button type="button" className="btn secondary" onClick={run} disabled={st.busy || todo === 0}>
+        {t("settings.archive_all_button", { n: todo })}
+      </button>
+    </div>
   );
 }

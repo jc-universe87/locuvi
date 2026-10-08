@@ -141,7 +141,8 @@ names). Uploads happen in the background after issue, are verified by downloadin
 comparing SHA-256, and are retried automatically with backoff. Locuvi never overwrites a
 different remote file (status **conflict**) and never deletes remote files. Wrong
 credentials pause retries until you fix the settings; each invoice page shows the true
-status with a *Retry* button.
+status with a *Retry* button. Invoices issued before you connected Nextcloud can be sent in
+one go with **Settings → Storage → Archive past invoices**.
 
 **Private Nextcloud (Tailscale/LAN)**: by default only public HTTPS addresses are allowed
 (SSRF protection). To allow your own private server, set in `.env`:

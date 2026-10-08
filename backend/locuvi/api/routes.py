@@ -627,6 +627,19 @@ def test_webdav(body: S.WebDavTestIn, request: Request, s: DB) -> dict[str, Any]
     )
 
 
+@api.get("/storage/webdav/backlog")
+def webdav_backlog(s: DB) -> dict[str, int]:
+    return archive.archive_backlog(s)
+
+
+@api.post("/storage/webdav/archive-all")
+def webdav_archive_all(request: Request, s: DB) -> dict[str, Any]:
+    queued = archive.request_upload_all(s)
+    if state(request).worker is not None:
+        state(request).worker.wake()
+    return {"queued": queued, "backlog": archive.archive_backlog(s)}
+
+
 @api.get("/system/info")
 def system_info(request: Request) -> dict[str, Any]:
     st = state(request).settings

@@ -476,3 +476,100 @@ def test_backoff_bounded():
     assert archive.backoff_seconds(1) == 30
     assert archive.backoff_seconds(3) == 120
     assert archive.backoff_seconds(30) == archive.MAX_BACKOFF_SECONDS
+
+
+def test_archive_all_uploads_backlog_once(ctx, session, ready, dav):
+    # Two invoices issued while WebDAV was off, one voided: all three are issued documents.
+    a = issue(ctx, session, ready, "2026-09-03")
+    b = issue(ctx, db.new_session(), ready, "2026-10-01")
+    s = db.new_session()
+    svc.void(s, s.get(Invoice, b.id), "test void")
+    configure(db.new_session(), ctx, dav)
+    c = issue(ctx, db.new_session(), ready, "2026-10-02")  # auto-queued on issue
+    s = db.new_session()
+    assert archive.archive_backlog(s)["not_archived"] == 2
+    assert archive.request_upload_all(s) == 2
+    assert archive.request_upload_all(db.new_session()) == 0  # already queued: no duplicates
+    assert sorted(archive.run_due_jobs(ctx).values()) == ["synced"] * 3
+    for inv in (a, b, c):
+        assert job_for(inv.id).status == "synced"
+    backlog = archive.archive_backlog(db.new_session())
+    assert backlog["synced"] == 3 and backlog["not_archived"] == 0
+    assert archive.request_upload_all(db.new_session()) == 0  # synced files never re-uploaded
+
+
+def test_archive_all_requires_enabled(ctx, session):
+    with pytest.raises(DomainError):
+        archive.request_upload_all(session)
+
+
+def test_tls_certificate_verification_enforced(local_settings, engine, session, ready, tmp_path):
+    """A self-signed HTTPS WebDAV server must be rejected even when allowlisted."""
+    import datetime as dt
+    import ssl
+    import threading
+
+    from cheroot import wsgi
+    from cheroot.ssl.builtin import BuiltinSSLAdapter
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = dt.datetime.now(dt.UTC)
+    import ipaddress
+
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - dt.timedelta(days=1))
+        .not_valid_after(now + dt.timedelta(days=1))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    cert_file, key_file = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_file.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    plain = DavServer(tmp_path / "tlsroot")
+    plain.server.stop()
+    server = wsgi.Server(("127.0.0.1", 0), plain.app)
+    server.ssl_adapter = BuiltinSSLAdapter(str(cert_file), str(key_file))
+    server.prepare()
+    port = server.bind_addr[1]
+    threading.Thread(target=server.serve, daemon=True).start()
+    try:
+        tls_ctx = archive.ArchiveContext(local_settings, SecretBox(local_settings))
+        archive.save_config(
+            session,
+            tls_ctx,
+            enabled=True,
+            target_url=f"https://127.0.0.1:{port}/remote.php/dav/files/{USER}/",
+            username=USER,
+            base_path="Locuvi",
+            auto_upload=True,
+            password=PASSWORD,
+        )
+        res = archive.test_connection(
+            session, tls_ctx, target_url=None, username=None, base_path=None, password=None
+        )
+        assert res == {"ok": False, "error_class": "tls_error"}
+        inv = issue(tls_ctx, db.new_session(), ready)
+        assert list(archive.run_due_jobs(tls_ctx).values()) == ["failed"]
+        assert job_for(inv.id).last_error_class == "tls_error"
+        assert ssl.create_default_context().verify_mode == ssl.CERT_REQUIRED
+    finally:
+        server.stop()

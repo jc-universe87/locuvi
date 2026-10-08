@@ -52,14 +52,17 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 
 ## Part 3 — Product roadmap
 
-### v0.1.x — Polish from real use — 🔜 next
-Small fixes after issuing real invoices. Candidates already known:
-- Native translations reviewed for DE/KO/FR/ES/PT (currently navigation only).
-- "Upload all past invoices" to Nextcloud after enabling it (today: per invoice).
-- Password change without editing the secret file; optional session timeout setting.
-- Annual prefix helper (suggest `LOC-2027-` in January; never automatic).
-- Automated test against a WebDAV server with an invalid TLS certificate.
-- Keep the 2027/28 employer rate up to date (add a new effective-dated rate each April).
+### v0.1.x — Polish from real use — 🔜 in progress
+Small fixes after issuing real invoices.
+- ✅ "Upload all past invoices" to Nextcloud (Settings → Storage → Archive past invoices);
+  queues only invoices with no archive copy or a failed one; never re-uploads synced files.
+- ✅ Annual prefix helper: Settings suggests `LOC-<this year>-` starting at 1 when the prefix
+  has an older year; applied only when the owner clicks and saves.
+- ✅ Automated test: a self-signed HTTPS WebDAV server is rejected (`tls_error`) even when allowlisted.
+- 🔜 Owner feedback after the first real invoices (to be listed here).
+- 🧭 Native translations reviewed for DE/KO/FR/ES/PT (currently navigation only).
+- 🧭 Password change without editing the secret file; optional session timeout setting.
+- 🧭 Each April: add the new employer contribution rate (Settings → Pension) after checking NHSBSA.
 
 ### v0.2 — Payments (getting paid) — 🧭
 Original exclusion "payment tracking/reconciliation" — first module after v0.1.
