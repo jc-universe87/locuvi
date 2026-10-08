@@ -42,6 +42,21 @@ def backup(settings: Settings, dest: Path) -> dict:
         ).fetchall()
         src.close()
         dst.close()
+        from locuvi.storage.local import sha256_file
+
+        # Never write a backup that restore() would later reject: every issued PDF must
+        # exist and match its recorded checksum.
+        bad = [
+            rel
+            for rel, sha in rows
+            if not (settings.data_dir / rel).is_file()
+            or sha256_file(settings.data_dir / rel) != sha
+        ]
+        if bad:
+            raise SystemExit(
+                f"backup aborted: {len(bad)} issued PDF(s) missing or altered "
+                f"(e.g. {bad[0]}); run `locuvi verify` and restore them first"
+            )
         manifest = {
             "created_at": datetime.now(UTC).isoformat(),
             "issued_invoices": len(rows),
@@ -53,9 +68,7 @@ def backup(settings: Settings, dest: Path) -> dict:
             tar.add(snap, arcname="locuvi.db")
             tar.add(Path(tmp) / MANIFEST, arcname=MANIFEST)
             for rel, _ in rows:
-                f = settings.data_dir / rel
-                if f.is_file():
-                    tar.add(f, arcname=rel)
+                tar.add(settings.data_dir / rel, arcname=rel)
         partial.chmod(0o600)
         partial.replace(dest)
     return manifest

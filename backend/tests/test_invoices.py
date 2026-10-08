@@ -267,3 +267,11 @@ def test_policy_versioning_new_rate(settings, session, ready):
     assert inv.employer_contribution == Decimal("81.00")  # 540 * 0.15
     old = draft(session, ready, lines=[line("2027-03-05")])
     assert old.employer_contribution == Decimal("77.65")
+
+
+def test_split_keeps_due_date_override(session, ready):
+    inv = draft(
+        session, ready, lines=[line("2026-10-30"), line("2026-11-02")], due_date=date(2026, 12, 31)
+    )
+    parts = svc.split_by_month(session, inv)
+    assert [p.due_date for p in parts] == [date(2026, 12, 31)] * 2

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Dialog, ErrorAlert, Field, SavedIndicator, Toggle, useIssueText } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
-import { api, downloadBlob, newIdempotencyKey, openBlob } from "../lib/api";
+import { api, downloadBlob, newIdempotencyKey, openPendingTab } from "../lib/api";
 import { addDays, gbp, pct, todayLondon } from "../lib/format";
 import type { Analysis, InvoiceDetail, Line, Numbering, Practice, Profile, Unit } from "../lib/types";
 
@@ -215,12 +215,17 @@ export default function InvoiceEditor() {
   }, [dirty, form, saved, busy, save]);
 
   const preview = async () => {
+    const tab = openPendingTab(); // must happen before any await
     const d = dirty || !saved ? await save() : saved;
-    if (!d) return;
+    if (!d) {
+      tab.close();
+      return;
+    }
     setBusy("preview");
     try {
-      openBlob(await api.blob("POST", `/invoices/${d.id}/preview`));
+      tab.show(await api.blob("POST", `/invoices/${d.id}/preview`));
     } catch (e) {
+      tab.close();
       setError(e);
     } finally {
       setBusy(null);
@@ -256,7 +261,13 @@ export default function InvoiceEditor() {
       setError(e);
       setConfirmIssue(false);
       try {
-        setSaved(await api.get<InvoiceDetail>(`/invoices/${saved.id}`));
+        // The issue may have committed even though the response was lost: if so, go to it.
+        const fresh = await api.get<InvoiceDetail>(`/invoices/${saved.id}`);
+        if (fresh.status !== "draft") {
+          nav(`/invoices/${fresh.id}`, { replace: true, state: { issued: fresh.invoice_number } });
+          return;
+        }
+        setSaved(fresh);
       } catch {
         /* ignore */
       }

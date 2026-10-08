@@ -93,6 +93,22 @@ const summary = page.locator("aside.summary");
 await summary.getByText("£2,032.96").waitFor(); // 1800 -> 1620 -> 232.956 -> 232.96
 await shot("06-editor");
 
+step("preview opens in a new tab (not blocked as a pop-up)");
+// Headless Chromium has no PDF viewer, so the PDF either renders (blob: URL) or downloads.
+// Listen before clicking: the preview can arrive very quickly.
+const previewShown = new Promise((resolve) => {
+  ctx.once("page", (pg) => {
+    pg.once("download", resolve);
+    pg.waitForURL(/^blob:/, { waitUntil: "commit" }).then(resolve, () => {});
+  });
+});
+const [popup] = await Promise.all([
+  page.waitForEvent("popup"),
+  page.getByRole("button", { name: "Preview PDF" }).click(),
+]);
+await Promise.race([previewShown, page.waitForTimeout(15000).then(() => fail("preview did not open"))]);
+await popup.close().catch(() => {});
+
 step("issue & download");
 await page.getByRole("button", { name: "Issue & download" }).first().click();
 const dialog = page.getByRole("dialog");

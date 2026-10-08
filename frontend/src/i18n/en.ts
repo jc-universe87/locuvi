@@ -553,6 +553,7 @@ const en = {
   "error.email.incomplete": "Fill in your email, the server and the password first.",
   "error.email.host_blocked": "That mail server address isn't allowed.",
   "error.email.bad_host": "Enter the mail server name, e.g. smtp.example.com.",
+  "error.practice.name_required": "Enter the practice name.",
   "error.pension.no_work": "No pensionable invoices for that month.",
   "error.profile.employee_rate_range": "Enter your tier as a fraction, e.g. 0.098.",
 } as const;

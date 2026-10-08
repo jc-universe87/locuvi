@@ -282,6 +282,8 @@ def _practice_out(p: Practice) -> dict[str, Any]:
 
 
 def _apply_practice(p: Practice, data: dict[str, Any]) -> None:
+    if "name" in data and not (data["name"] or "").strip():
+        raise DomainError("practice.name_required", "Enter the practice name.")
     for k, v in data.items():
         if k == "default_rate":
             v = Decimal(v) if v not in (None, "") else None
@@ -476,6 +478,8 @@ def list_invoices(
             or_(
                 Invoice.invoice_number.ilike(like),
                 Practice.name.ilike(like),
+                # Issued invoices show the frozen billed-to name; search it too.
+                func.json_extract(Invoice.immutable_snapshot_json, "$.bill_to.name").ilike(like),
                 Invoice.reference.ilike(like),
             )
         )

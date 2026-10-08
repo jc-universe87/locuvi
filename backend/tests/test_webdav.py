@@ -573,3 +573,21 @@ def test_tls_certificate_verification_enforced(local_settings, engine, session, 
         assert ssl.create_default_context().verify_mode == ssl.CERT_REQUIRED
     finally:
         server.stop()
+
+
+def test_conflict_moves_to_new_destination_on_config_change(ctx, session, ready, dav):
+    configure(session, ctx, dav)
+    inv = issue(ctx, session, ready)
+    target = dav.root / "Locuvi/Invoices/2026/10/LOC-2026-0001.pdf"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"someone else's file")
+    assert list(archive.run_due_jobs(ctx).values()) == ["conflict"]
+    # Saving with the same destination leaves the conflict alone
+    configure(db.new_session(), ctx, dav, password=None)
+    assert job_for(inv.id).status == "conflict"
+    # Changing the folder retargets it and it uploads
+    configure(db.new_session(), ctx, dav, base_path="Locuvi/Archive", password=None)
+    assert job_for(inv.id).status == "pending"
+    assert list(archive.run_due_jobs(ctx).values()) == ["synced"]
+    assert (dav.root / "Locuvi/Archive/2026/10/LOC-2026-0001.pdf").exists()
+    assert target.read_bytes() == b"someone else's file"

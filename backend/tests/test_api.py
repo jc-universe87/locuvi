@@ -335,3 +335,19 @@ def test_security_headers_and_no_docs(api):
     assert r.headers["x-frame-options"] == "DENY"
     assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
     assert api.get("/api/docs").status_code == 404
+
+
+def test_whitespace_practice_name_rejected(api):
+    r = api.post("/api/v1/practices", {"name": "   ", "billing_address": "x"})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "practice.name_required"
+    pid = api.post("/api/v1/practices", {"name": "Example Medical Practice"}).json()["id"]
+    assert api.patch(f"/api/v1/practices/{pid}", {"name": "  "}).status_code == 400
+
+
+def test_search_finds_frozen_practice_name_after_rename(api):
+    pid = setup_owner_and_practice(api)
+    inv = api.post("/api/v1/invoices", two_october_sessions(pid)).json()
+    api.post(f"/api/v1/invoices/{inv['id']}/issue", headers={"Idempotency-Key": uuid.uuid4().hex})
+    api.patch(f"/api/v1/practices/{pid}", {"name": "Renamed Surgery"})
+    assert api.get("/api/v1/invoices?q=Example%20Medical").json()["total"] == 1
+    assert api.get("/api/v1/invoices?q=Renamed").json()["total"] == 1

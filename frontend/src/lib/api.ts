@@ -87,10 +87,24 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(href), 10_000);
 }
 
-export function openBlob(blob: Blob) {
-  const href = URL.createObjectURL(blob);
-  window.open(href, "_blank", "noopener");
-  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+/**
+ * Open a tab synchronously inside the click handler (before any await), so browsers
+ * don't block it as a pop-up; fill it once the content is ready.
+ */
+export function openPendingTab(): { show: (blob: Blob) => void; close: () => void } {
+  const w = window.open("", "_blank");
+  if (w) w.opener = null;
+  return {
+    show(blob: Blob) {
+      const href = URL.createObjectURL(blob);
+      if (w && !w.closed) w.location.href = href;
+      else window.location.assign(href); // pop-ups fully blocked: show in this tab
+      setTimeout(() => URL.revokeObjectURL(href), 60_000);
+    },
+    close() {
+      if (w && !w.closed) w.close();
+    },
+  };
 }
 
 export function newIdempotencyKey(): string {

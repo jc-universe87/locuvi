@@ -56,3 +56,17 @@ def test_example_pdf_is_fictional(tmp_path):
 
     text = PdfReader(str(out)).pages[0].extract_text()
     assert "FICTIONAL EXAMPLE" in text and "£1,692.77" in text and "Page 1 of 1" in text
+
+
+def test_backup_aborts_on_missing_or_altered_pdf(settings, session, ready, tmp_path):
+    inv = svc.save_draft(session, None, practice_id=ready.id, lines=[line("2026-10-08")])
+    issued = svc.issue(settings, inv.id, uuid.uuid4().hex).invoice
+    pdf = settings.data_dir / issued.local_pdf_path
+    dest = tmp_path / "b.tar.gz"
+    pdf.write_bytes(b"altered")
+    with pytest.raises(SystemExit):
+        cli.backup(settings, dest)
+    pdf.unlink()
+    with pytest.raises(SystemExit):
+        cli.backup(settings, dest)
+    assert not dest.exists() and not list(tmp_path.glob("*.partial"))

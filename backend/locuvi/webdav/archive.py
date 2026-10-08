@@ -154,13 +154,16 @@ def save_config(
 def _retarget_unsynced_jobs(s: Session, cfg: StorageConfig) -> None:
     """After a config change, unsynced jobs move to the new destination and resume.
 
-    Synced jobs and conflicts keep their history; synced files are not re-uploaded.
+    Synced jobs keep their history and are not re-uploaded. A conflict stays a conflict at
+    the same destination, but moves to the new destination when the owner changes it.
     """
     now = datetime.now(UTC)
     jobs = s.scalars(
         select(ArchiveJob).where(
             ArchiveJob.is_current.is_(True),
-            ArchiveJob.status.in_([ArchiveStatus.pending, ArchiveStatus.failed]),
+            ArchiveJob.status.in_(
+                [ArchiveStatus.pending, ArchiveStatus.failed, ArchiveStatus.conflict]
+            ),
         )
     ).all()
     for job in jobs:
@@ -169,6 +172,8 @@ def _retarget_unsynced_jobs(s: Session, cfg: StorageConfig) -> None:
             continue
         dest = destination_for(cfg, inv)
         if dest[0] == job.destination_key:
+            if job.status == ArchiveStatus.conflict:
+                continue
             job.next_retry_at = now
             job.status = ArchiveStatus.pending
             job.last_error_class = None

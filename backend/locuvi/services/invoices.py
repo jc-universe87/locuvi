@@ -429,6 +429,7 @@ def split_by_month(s: Session, inv: Invoice) -> list[Invoice]:
             reference=inv.reference,
             notes=inv.notes,
             invoice_date=inv.invoice_date,
+            due_date=inv.due_date,
             practice_id=inv.practice_id,
         )
         new.practice = inv.practice
