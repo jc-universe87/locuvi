@@ -229,8 +229,13 @@ def test_self_assessment_figures(settings, session, ready):
     p = core.get_profile(session)
     p.employee_rate = Decimal("0.098")
     session.commit()
-    sa = reports.summary(session, 2026)["self_assessment"]
+    # unpaid: nothing on the cash basis (HMRC default) ...
+    cash = reports.summary(session, 2026, "cash")["self_assessment"]
+    assert cash["basis"] == "cash" and cash["fees"] == "0.00"
+    # ... but on the invoiced (accruals) basis the invoice counts
+    sa = reports.summary(session, 2026, "accruals")["self_assessment"]
     assert sa == {
+        "basis": "accruals",
         "fees": "600.00",
         "employer_contributions": "77.65",
         "pensionable_pay": "540.00",

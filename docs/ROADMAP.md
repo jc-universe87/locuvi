@@ -59,7 +59,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 |---|---|
 | Form B by month fees were **received** (payments apportioned per invoice, exact across partial/late payments); Form A one per invoice for the work month (migration 0015 re-keys) | ✅ |
 | Pension deadlines: 10-week rule per engagement (incl. work not yet invoiced / unpaid / Form A unsigned / not on a submitted Form B) and Form B 7th-of-month due/overdue | ✅ |
-| Cash-basis and invoiced-income reports; 12 tax months | 🔜 |
+| Cash-basis (default, HMRC) and invoiced-income reports, switchable and remembered; payments-received CSV in the year pack; 12 tax months (6th–5th) instead of 13 calendar months | ✅ |
 | Atomic multi-invoice bank matching (all payments + "matched" in one transaction; failure-injection tests) | ✅ |
 | Refund owed after a credit note on a paid invoice | 🔜 |
 | AI attachments only with explicit approval; stronger redaction | 🔜 |

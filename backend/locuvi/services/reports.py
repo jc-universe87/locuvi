@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from locuvi.config import Settings
-from locuvi.models import Invoice, InvoiceStatus, Practice, WorkSession
+from locuvi.models import Invoice, InvoiceStatus, Payment, Practice, WorkSession
 from locuvi.money import ZERO, round_money
 from locuvi.services import core, diary, payments, pension
 from locuvi.storage.local import resolve
@@ -43,56 +43,113 @@ def _issued_in(s: Session, start: date, end: date) -> list[Invoice]:
     )
 
 
-def summary(s: Session, year: int) -> dict[str, Any]:
-    start, end = tax_year_bounds(year)
-    invs = _issued_in(s, start, end)
-    by_month: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    by_practice: dict[str, dict[str, Any]] = {}
-    totals = {
-        "invoiced": ZERO,
-        "fees": ZERO,
-        "employer": ZERO,
-        "paid": ZERO,
-        "outstanding": ZERO,
-        "pensionable_pay": ZERO,
-    }
-    for inv in invs:
-        gt = inv.grand_total or ZERO
-        assert inv.invoice_date is not None
-        by_month[f"{inv.invoice_date.year:04d}-{inv.invoice_date.month:02d}"] += gt
-        name = (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name", "")
-        p = by_practice.setdefault(name, {"practice": name, "invoices": 0, "total": ZERO})
-        p["invoices"] += 1
-        p["total"] += gt
-        paid = payments.paid_total(inv)
-        totals["invoiced"] += gt
-        totals["fees"] += inv.fee_subtotal or ZERO
-        totals["employer"] += inv.employer_contribution or ZERO
-        totals["pensionable_pay"] += inv.pensionable_pay or ZERO
-        totals["paid"] += paid
-        totals["outstanding"] += payments.outstanding(inv)
-    # Credit notes reduce income in the tax year of the credit note's date.
+def tax_month(d: date) -> str:
+    """Tax months run 6th → 5th; labelled by the calendar month they start in."""
+    shifted = d - timedelta(days=5)
+    return f"{shifted.year:04d}-{shifted.month:02d}"
+
+
+def _tax_months(year: int) -> list[str]:
+    return [f"{year + (m < 4):04d}-{m:02d}" for m in (4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3)]
+
+
+def receipts_in(s: Session, start: date, end: date) -> list[dict[str, Any]]:
+    """Every payment (and refund) dated in the period, split into fee / employer / pensionable."""
+    out = []
+    invs = {p.invoice_id for p in s.scalars(
+        select(Payment).where(Payment.paid_on >= start, Payment.paid_on <= end))}  # fmt: skip
+    for inv_id in invs:
+        inv = s.get(Invoice, inv_id)
+        if inv is None:
+            continue
+        by_payment = {r["payment_id"]: r for r in pension.receipts(inv)}
+        for p in inv.payments:
+            if not (start <= p.paid_on <= end):
+                continue
+            r = by_payment.get(p.id, {})
+            employer = Decimal(r.get("employer", "0"))
+            out.append({
+                "paid_on": p.paid_on, "invoice_number": inv.invoice_number,
+                "practice": (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name", ""),
+                "amount": p.amount, "employer": employer, "fees": round_money(p.amount - employer),
+                "pensionable_pay": Decimal(r.get("pensionable_pay", "0")),
+                "method": p.method, "reference": p.reference or "",
+            })  # fmt: skip
+    return sorted(out, key=lambda r: (r["paid_on"], r["invoice_number"] or ""))
+
+
+def summary(s: Session, year: int, basis: str | None = None) -> dict[str, Any]:
+    """Tax-year report on the chosen basis.
+
+    - ``cash`` (HMRC default for most sole traders): income when the money is received.
+    - ``accruals`` (traditional): income when invoiced; credit notes when issued.
+    Both views are always computed; ``basis`` picks which one is the headline.
+    """
     from locuvi.models import CreditNote
 
-    totals["credited"] = ZERO
+    basis = basis or core.get_profile(s).accounting_basis or "cash"
+    if basis not in {"cash", "accruals"}:
+        basis = "cash"
+    start, end = tax_year_bounds(year)
+    invs = _issued_in(s, start, end)
+    acc: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    acc_month: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    acc_practice: dict[str, dict[str, Any]] = {}
+    outstanding = ZERO
+    for inv in invs:
+        gt = inv.grand_total or ZERO
+        acc_month[tax_month(inv.invoice_date or start)] += gt
+        name = (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name", "")
+        pr = acc_practice.setdefault(name, {"practice": name, "invoices": 0, "total": ZERO})
+        pr["invoices"] += 1
+        pr["total"] += gt
+        acc["income"] += gt
+        acc["fees"] += inv.fee_subtotal or ZERO
+        acc["employer"] += inv.employer_contribution or ZERO
+        acc["pensionable_pay"] += inv.pensionable_pay or ZERO
+        outstanding += payments.outstanding(inv)
+    credited = ZERO
     for cn in s.scalars(
         select(CreditNote).where(CreditNote.credit_date >= start, CreditNote.credit_date <= end)
     ):
-        totals["credited"] += cn.grand_total
-        totals["invoiced"] -= cn.grand_total
-        totals["fees"] -= cn.fee_subtotal
-        totals["employer"] -= cn.employer_contribution
-        totals["pensionable_pay"] -= cn.pensionable_pay
-        by_month[f"{cn.credit_date.year:04d}-{cn.credit_date.month:02d}"] -= cn.grand_total
+        credited += cn.grand_total
+        acc["income"] -= cn.grand_total
+        acc["fees"] -= cn.fee_subtotal
+        acc["employer"] -= cn.employer_contribution
+        acc["pensionable_pay"] -= cn.pensionable_pay
+        acc_month[tax_month(cn.credit_date)] -= cn.grand_total
         name = cn.snapshot_json.get("bill_to", {}).get("name", "")
-        if name in by_practice:
-            by_practice[name]["total"] -= cn.grand_total
-    months = []
-    d = start.replace(day=1)
-    while d <= end:
-        key = f"{d.year:04d}-{d.month:02d}"
-        months.append({"month": key, "total": str(round_money(by_month.get(key, ZERO)))})
-        d = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+        if name in acc_practice:
+            acc_practice[name]["total"] -= cn.grand_total
+
+    cash: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    cash_month: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    cash_practice: dict[str, dict[str, Any]] = {}
+    received = receipts_in(s, start, end)
+    for r in received:
+        cash["income"] += r["amount"]
+        cash["fees"] += r["fees"]
+        cash["employer"] += r["employer"]
+        cash["pensionable_pay"] += r["pensionable_pay"]
+        cash_month[tax_month(r["paid_on"])] += r["amount"]
+        pr = cash_practice.setdefault(r["practice"], {"practice": r["practice"], "invoices": 0,
+                                                       "total": ZERO})  # fmt: skip
+        pr["invoices"] += 1
+        pr["total"] += r["amount"]
+
+    head, by_month, by_practice = (
+        (cash, cash_month, cash_practice) if basis == "cash" else (acc, acc_month, acc_practice)
+    )
+    totals = {
+        "income": head["income"],
+        "invoiced": acc["income"],
+        "paid": cash["income"],  # money received in the tax year
+        "outstanding": outstanding,
+        "credited": credited,
+        "fees": head["fees"],
+        "employer": head["employer"],
+        "pensionable_pay": head["pensionable_pay"],
+    }
     current = tax_year_of(core.today_london())
     first = min(
         (
@@ -105,15 +162,17 @@ def summary(s: Session, year: int) -> dict[str, Any]:
     rate = core.get_profile(s).employee_rate
     self_assessment = {
         # Figures for the owner's accountant — not tax advice.
-        "fees": str(round_money(totals["fees"])),
-        "employer_contributions": str(round_money(totals["employer"])),
-        "pensionable_pay": str(round_money(totals["pensionable_pay"])),
+        "basis": basis,
+        "fees": str(round_money(head["fees"])),
+        "employer_contributions": str(round_money(head["employer"])),
+        "pensionable_pay": str(round_money(head["pensionable_pay"])),
         "employee_rate": str(rate) if rate is not None else None,
         "employee_contributions_estimate": (
-            str(round_money(totals["pensionable_pay"] * rate)) if rate is not None else None
+            str(round_money(head["pensionable_pay"] * rate)) if rate is not None else None
         ),
     }
     return {
+        "basis": basis,
         "self_assessment": self_assessment,
         "tax_year": year,
         "label": f"{year}/{str(year + 1)[-2:]}",
@@ -121,14 +180,31 @@ def summary(s: Session, year: int) -> dict[str, Any]:
         "end": end.isoformat(),
         "available_years": list(range(current, first - 1, -1)),
         "invoice_count": len(invs),
+        "receipt_count": len(received),
         "totals": {k: str(round_money(v)) for k, v in totals.items()},
-        "months": months,
+        "months": [
+            {"month": m, "total": str(round_money(by_month.get(m, ZERO)))}
+            for m in _tax_months(year)
+        ],
         "practices": sorted(
             ({**p, "total": str(round_money(p["total"]))} for p in by_practice.values()),
             key=lambda p: Decimal(p["total"]),
             reverse=True,
         ),
     }
+
+
+RECEIPT_FIELDS = ["paid_on", "invoice_number", "practice", "amount", "fees", "employer",
+                  "pensionable_pay", "method", "reference"]  # fmt: skip
+
+
+def receipts_csv(s: Session, start: date, end: date) -> str:
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=RECEIPT_FIELDS)
+    w.writeheader()
+    for r in receipts_in(s, start, end):
+        w.writerow({k: r[k] for k in RECEIPT_FIELDS})
+    return buf.getvalue()
 
 
 CSV_FIELDS = [
@@ -197,6 +273,15 @@ def year_pack(s: Session, settings: Settings, year: int) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr(f"locuvi-invoices-{year}-{year + 1}.csv", invoices_csv(s, start, end))
+        z.writestr(f"locuvi-receipts-{year}-{year + 1}.csv", receipts_csv(s, start, end))
+        from locuvi.models import CreditNote
+
+        for cn in s.scalars(
+            select(CreditNote).where(CreditNote.credit_date >= start, CreditNote.credit_date <= end)
+        ):
+            cpath = resolve(settings.data_dir, cn.local_pdf_path)
+            if cpath.is_file():
+                z.write(cpath, f"credit-notes/{cn.number}.pdf")
         for inv in s.scalars(
             select(Invoice).where(
                 Invoice.status != InvoiceStatus.draft,

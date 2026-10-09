@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { ErrorAlert, Icon, PageHead } from "../components/ui";
+import { ErrorAlert, Icon, PageHead, Segmented } from "../components/ui";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
 import { gbp, gbpRound, monthLabel, monthShort } from "../lib/format";
 
+type Basis = "cash" | "accruals";
+
 interface Summary {
+  basis: Basis;
   self_assessment: {
     fees: string;
     employer_contributions: string;
@@ -16,7 +19,7 @@ interface Summary {
   label: string;
   available_years: number[];
   invoice_count: number;
-  totals: { invoiced: string; fees: string; employer: string; paid: string; outstanding: string };
+  totals: { income: string; invoiced: string; fees: string; employer: string; paid: string; outstanding: string; credited: string };
   months: { month: string; total: string }[];
   practices: { practice: string; invoices: number; total: string }[];
 }
@@ -24,12 +27,20 @@ interface Summary {
 export default function ReportsPage() {
   const { t, tn } = useT();
   const [year, setYear] = useState<number | null>(null);
+  const [basis, setBasis] = useState<Basis | null>(null);
   const [s, setS] = useState<Summary | null>(null);
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
-    api.get<Summary>(`/reports/summary${year ? `?tax_year=${year}` : ""}`).then(setS, setError);
-  }, [year]);
+    const q = new URLSearchParams();
+    if (year) q.set("tax_year", String(year));
+    if (basis) q.set("basis", basis);
+    api.get<Summary>(`/reports/summary?${q}`).then(setS, setError);
+  }, [year, basis]);
+  const chooseBasis = (b: Basis) => {
+    setBasis(b);
+    void api.patch("/settings/profile", { accounting_basis: b }).catch(() => undefined); // remembered
+  };
 
   if (error && !s) return <ErrorAlert error={error} />;
   if (!s) return null;
@@ -53,7 +64,15 @@ export default function ReportsPage() {
           </select>
         )}
       </PageHead>
-      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("reports.lead", { year: s.label })}</p>
+      <div className="row wrap" style={{ marginBottom: "0.5rem" }}>
+        <Segmented<Basis> value={s.basis} onChange={chooseBasis} label={t("reports.basis")} options={[
+          { value: "cash", label: t("reports.basis_cash") },
+          { value: "accruals", label: t("reports.basis_accruals") },
+        ]} />
+      </div>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {t(s.basis === "cash" ? "reports.lead_cash" : "reports.lead_accruals", { year: s.label })}
+      </p>
       <ErrorAlert error={error} />
 
       <div className="stats">
@@ -64,7 +83,7 @@ export default function ReportsPage() {
       </div>
 
       <section className="card" aria-labelledby="h-chart">
-        <h2 id="h-chart">{t("reports.by_month")}</h2>
+        <h2 id="h-chart">{s.basis === "cash" ? t("reports.by_month_cash") : t("reports.by_month")}</h2>
         <div className="bars" role="list">
           {s.months.map((m) => {
             const v = Number(m.total);
@@ -103,7 +122,7 @@ export default function ReportsPage() {
               <li key={p.practice}>
                 <span className="list-main">
                   <span className="list-title">{p.practice}</span>
-                  <span className="list-sub">{tn("reports.invoice_count", p.invoices)}</span>
+                  <span className="list-sub">{s.basis === "cash" ? tn("reports.payment_count", p.invoices) : tn("reports.invoice_count", p.invoices)}</span>
                 </span>
                 <span className="money">{gbp(p.total)}</span>
               </li>
@@ -113,7 +132,7 @@ export default function ReportsPage() {
       )}
 
       <section className="card" aria-labelledby="h-sa">
-        <h2 id="h-sa">{t("reports.sa_title")}</h2>
+        <h2 id="h-sa">{t("reports.sa_title")} · {s.basis === "cash" ? t("reports.basis_cash") : t("reports.basis_accruals")}</h2>
         <dl className="kv">
           <dt>{t("reports.sa_fees")}</dt><dd className="money">{gbp(s.self_assessment.fees)}</dd>
           <dt>{t("reports.sa_employer")}</dt><dd className="money">{gbp(s.self_assessment.employer_contributions)}</dd>
@@ -121,7 +140,7 @@ export default function ReportsPage() {
           <dt>{t("reports.sa_employee")}</dt>
           <dd className="money">{s.self_assessment.employee_contributions_estimate ? gbp(s.self_assessment.employee_contributions_estimate) : t("common.none")}</dd>
         </dl>
-        <p className="hint" style={{ marginBottom: 0 }}>{t("reports.sa_note")}</p>
+        <p className="hint" style={{ marginBottom: 0 }}>{s.basis === "cash" ? t("reports.sa_note_cash") : t("reports.sa_note")}</p>
       </section>
 
       <section className="card">
@@ -130,6 +149,9 @@ export default function ReportsPage() {
         <div className="actions">
           <button className="btn secondary" onClick={() => dl(`/reports/invoices.csv?tax_year=${s.tax_year}`, `locuvi-invoices-${s.tax_year}-${s.tax_year + 1}.csv`)}>
             <Icon name="download" size={18} /> {t("reports.csv")}
+          </button>
+          <button className="btn secondary" onClick={() => dl(`/reports/receipts.csv?tax_year=${s.tax_year}`, `locuvi-receipts-${s.tax_year}.csv`)}>
+            <Icon name="download" size={18} /> {t("reports.receipts_csv")}
           </button>
           <button className="btn secondary" onClick={() => dl(`/reports/year-pack.zip?tax_year=${s.tax_year}`, `locuvi-${s.tax_year}-${s.tax_year + 1}.zip`)}>
             <Icon name="download" size={18} /> {t("reports.pack")}

@@ -154,6 +154,7 @@ def _profile_out(p: Any) -> dict[str, Any]:
         employee_rate=str(p.employee_rate) if p.employee_rate is not None else None,
         setup_completed=p.setup_completed,
         digest_enabled=p.digest_enabled,
+        accounting_basis=p.accounting_basis or "cash",
         last_digest_sent_at=p.last_digest_sent_at.isoformat() if p.last_digest_sent_at else None,
     ).model_dump()
 
@@ -172,7 +173,7 @@ def put_profile(body: S.ProfileIn, s: DB) -> dict[str, Any]:
     acct = data.pop("bank_account_number", None)
     nullable = {"trading_name", "phone", "professional_number", "pension_ref"}
     for k, v in data.items():
-        if k in {"setup_completed", "digest_enabled"} and v is None:
+        if k in {"setup_completed", "digest_enabled", "accounting_basis"} and v is None:
             continue
         if k == "employee_rate":
             v = Decimal(v) if v not in (None, "") else None
@@ -1140,9 +1141,21 @@ def _check_month(month: str) -> None:
 
 
 @api.get("/reports/summary")
-def report_summary(s: DB, tax_year: int | None = None) -> dict[str, Any]:
+def report_summary(s: DB, tax_year: int | None = None, basis: str | None = None) -> dict[str, Any]:
+    if basis not in (None, "cash", "accruals"):
+        raise DomainError("reports.bad_basis", "Basis must be cash or accruals.")
     year = tax_year or reports.tax_year_of(core.today_london())
-    return reports.summary(s, year)
+    return reports.summary(s, year, basis)
+
+
+@api.get("/reports/receipts.csv")
+def report_receipts_csv(s: DB, tax_year: int) -> Response:
+    start, end = reports.tax_year_bounds(tax_year)
+    return Response(
+        reports.receipts_csv(s, start, end),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="locuvi-receipts-{tax_year}.csv"'},
+    )
 
 
 @api.get("/reports/invoices.csv")

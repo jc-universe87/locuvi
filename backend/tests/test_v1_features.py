@@ -181,13 +181,38 @@ def test_summary_csv_pack(settings, session, ready):
     payments.record_payment(s, s.get(Invoice, inv.id))
     year = reports.tax_year_of(inv.invoice_date)
     summ = reports.summary(s, year)
+    assert summ["basis"] == "cash"  # default
     assert summ["totals"]["invoiced"] == "677.65" and summ["totals"]["paid"] == "677.65"
-    assert summ["totals"]["employer"] == "77.65" and len(summ["months"]) == 13  # 6 Apr – 5 Apr
+    assert summ["totals"]["employer"] == "77.65" and len(summ["months"]) == 12  # tax months
     start, end = reports.tax_year_bounds(year)
     csv_text = reports.invoices_csv(s, start, end)
     assert "LOC-2026-0001" in csv_text and "677.65" in csv_text and "00000000" not in csv_text
     z = zipfile.ZipFile(io.BytesIO(reports.year_pack(s, settings, year)))
     assert "invoices/LOC-2026-0001.pdf" in z.namelist()
+    assert f"locuvi-receipts-{year}-{year + 1}.csv" in z.namelist()
+
+
+def test_cash_and_invoiced_bases_across_tax_years(settings, session, ready):
+    """Invoiced 30 March 2026, paid 10 April 2026: 2025/26 invoiced, 2026/27 received."""
+    add(session, ready, date(2026, 3, 2), pensionable=False)
+    d = diary.invoice_month(session, ready.id, "2026-03")
+    d.invoice_date = date(2026, 3, 30)
+    session.commit()
+    inv = issue(settings, d.id)
+    s = db.new_session()
+    payments.record_payment(s, s.get(Invoice, inv.id), paid_on=date(2026, 4, 10))
+    old_acc = reports.summary(s, 2025, "accruals")
+    old_cash = reports.summary(s, 2025, "cash")
+    new_cash = reports.summary(s, 2026, "cash")
+    new_acc = reports.summary(s, 2026, "accruals")
+    assert old_acc["totals"]["income"] == "600.00" and old_cash["totals"]["income"] == "0.00"
+    assert new_cash["totals"]["income"] == "600.00" and new_acc["totals"]["income"] == "0.00"
+    assert new_cash["self_assessment"]["fees"] == "600.00"
+    # 10 April falls in the first tax month (6 Apr – 5 May) of 2026/27
+    assert new_cash["months"][0] == {"month": "2026-04", "total": "600.00"}
+    assert [m["month"] for m in new_cash["months"]][-1] == "2027-03"
+    assert len(old_acc["months"]) == 12
+    assert reports.tax_month(date(2026, 4, 5)) == "2026-03"  # 5 April is still March's
 
 
 def test_today_overview(settings, session, ready):

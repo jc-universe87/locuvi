@@ -64,6 +64,7 @@ class ProfileIn(Strict):
     employee_rate: DecStr | None = None
     setup_completed: bool | None = None
     digest_enabled: bool | None = None
+    accounting_basis: Literal["cash", "accruals"] | None = None
 
 
 class ProfileOut(BaseModel):
@@ -86,6 +87,7 @@ class ProfileOut(BaseModel):
     employee_rate: str | None
     setup_completed: bool
     digest_enabled: bool
+    accounting_basis: str
     last_digest_sent_at: str | None
 
 

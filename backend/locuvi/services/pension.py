@@ -45,8 +45,13 @@ def _pension_invoices(s: Session) -> list[Invoice]:
 
 
 def work_month(inv: Invoice) -> str:
-    """The Form A month: when the pensionable work was done (invoices are one month)."""
-    return _ym(min(ln.service_date for ln in inv.lines if ln.pensionable))
+    """The Form A month: when the pensionable work was done (invoices are one month).
+
+    For an invoice without pensionable lines, the month of its first line."""
+    dates = [ln.service_date for ln in inv.lines if ln.pensionable] or [
+        ln.service_date for ln in inv.lines
+    ]
+    return _ym(min(dates)) if dates else ""
 
 
 def last_session(inv: Invoice) -> date:
@@ -92,6 +97,7 @@ def receipts(inv: Invoice) -> list[dict[str, Any]]:
             part[k], taken[k] = upto - taken[k], upto
         paid_before = paid_after
         out.append({
+            "payment_id": p.id,
             "invoice_id": inv.id,
             "invoice_number": inv.invoice_number,
             "practice": (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name", ""),

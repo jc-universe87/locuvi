@@ -130,6 +130,8 @@ class OwnerProfile(TimestampMixin, Base):
     employee_rate: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
     setup_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     digest_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Self Assessment basis: "cash" (HMRC default for sole traders) or "accruals" (invoiced)
+    accounting_basis: Mapped[str] = mapped_column(String(10), default="cash")
     last_digest_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
