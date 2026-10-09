@@ -75,6 +75,18 @@ export function monthLabel(ym: string): string {
   const d = isoDate(ym + "-01");
   return d ? new Intl.DateTimeFormat(displayLocale(), { month: "long", year: "numeric", timeZone: "UTC" }).format(d) : ym;
 }
+/** Day and month without the year, in the interface language (e.g. "8 Oct", "8/10", "10월 8일"). */
+export function dayMonth(iso: string): string {
+  const d = isoDate(iso);
+  return d ? new Intl.DateTimeFormat(displayLocale(), { day: "numeric", month: "short", timeZone: "UTC" }).format(d) : iso;
+}
+
+/** Shortest month label for charts, in the interface language ("O", "10월"). Never truncate it. */
+export function monthNarrow(ym: string): string {
+  const d = isoDate(ym + "-01");
+  return d ? new Intl.DateTimeFormat(displayLocale(), { month: "narrow", timeZone: "UTC" }).format(d) : ym;
+}
+
 export function monthShort(ym: string): string {
   const d = isoDate(ym + "-01");
   return d ? new Intl.DateTimeFormat(displayLocale(), { month: "short", timeZone: "UTC" }).format(d) : ym;

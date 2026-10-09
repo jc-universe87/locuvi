@@ -1,4 +1,5 @@
-import { addDays, gbp, pct, period, ukDate, monthLabel, monthShort, weekdayDate } from "./format";
+import { afterEach, describe, expect, it } from "vitest";
+import { addDays, dayMonth, gbp, monthNarrow, pct, period, ukDate, monthLabel, monthShort, weekdayDate } from "./format";
 
 describe("format", () => {
   it("formats GBP strings exactly", () => {
@@ -39,5 +40,24 @@ describe("format", () => {
     expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
     expect(addDays("2026-03-28", 1)).toBe("2026-03-29"); // across BST change
     } finally { document.documentElement.lang = original; }
+  });
+});
+
+describe("locale-safe short dates", () => {
+  afterEach(() => {
+    document.documentElement.lang = "en-GB";
+  });
+  it("drops the year without mangling other languages", () => {
+    document.documentElement.lang = "en-GB";
+    expect(dayMonth("2026-10-08")).toBe("8 Oct");
+    for (const lang of ["pt", "ko", "de", "fr", "es"]) {
+      document.documentElement.lang = lang;
+      expect(dayMonth("2026-10-08")).not.toMatch(/2026|de$/);
+    }
+  });
+  it("gives distinct chart labels for every month in Korean", () => {
+    document.documentElement.lang = "ko";
+    const labels = ["2026-10", "2026-11", "2026-12"].map(monthNarrow);
+    expect(new Set(labels).size).toBe(3);
   });
 });

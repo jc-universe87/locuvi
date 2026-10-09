@@ -248,7 +248,7 @@ await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
 step("invoice shows its correspondence (remittance linked by number)");
 await page.getByRole("link", { name: "Invoices" }).first().click();
 await page.getByRole("link", { name: new RegExp(invoiceNumber) }).first().click();
-await page.getByRole("heading", { name: "Emails sent" }).waitFor();
+await page.getByRole("heading", { name: "Emails and payment documents" }).waitFor();
 await page.getByRole("link", { name: /remittance\.txt/ }).click();
 await page.getByRole("dialog").getByText("BACS payment").waitFor();
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();

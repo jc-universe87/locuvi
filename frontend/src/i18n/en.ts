@@ -973,7 +973,7 @@ const en = {
   "calendar.copy": "Copy link",
   "calendar.new_link": "Replace link",
   "calendar.private": "Anyone with this link can see your booked work. Your calendar app must be able to connect to Locuvi through your home network or Tailscale. If you share the link by mistake, replace it. The old link will stop working.",
-  "corr.title": "Emails sent",
+  "corr.title": "Emails and payment documents",
   "corr.sent": "Invoice email",
   "corr.sent_to": "Sent to {to} · {when}",
   "corr.invoice": "Invoice",
