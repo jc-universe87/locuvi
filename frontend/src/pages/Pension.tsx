@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useToast } from "../components/ui";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
-import { gbp, monthLabel, pct, ukDate } from "../lib/format";
+import { dayMonth, gbp, monthLabel, pct, ukDate } from "../lib/format";
 import type { PensionMonth } from "../lib/types";
 
 interface FormBItem {
@@ -206,7 +206,7 @@ export default function PensionPage() {
                 </span>
               </div>
               <dl className="kv">
-                <dt>{t("pension.sessions")}</dt><dd>{a.session_dates.map((d) => ukDate(d).replace(/ \d{4}$/, "")).join(", ")}</dd>
+                <dt>{t("pension.sessions")}</dt><dd>{a.session_dates.map((d) => dayMonth(d)).join(", ")}</dd>
                 <dt>{t("pension.fees")}</dt><dd className="money">{gbp(a.fees)}</dd>
                 <dt>{t("pension.pay")}</dt><dd className="money">{gbp(a.pensionable_pay)}</dd>
                 <dt>{t("pension.employer")}</dt><dd className="money">{gbp(a.employer)}</dd>

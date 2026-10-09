@@ -114,7 +114,10 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
   then the normal rules; the agreed rate is kept on the session, invoice line, snapshot and
   PDF note, and any penny rounding against the agreed total is shown before issuing
   (migration 0019). A session rate is never used as an hourly rate.
-- 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
+- ✅ Plain-English en-GB wording across the app (`docs/PLAIN_ENGLISH_UX.md`) and native DE/ES/FR/KO/PT
+  translations of the main screens, with dates in the chosen language (Oct 2026).
+- 🧭 Translate the remaining ~40% (mostly error messages and the newest screens: rates,
+  invoice appearance), and re-check older translations against the new English wording.
 - ✅ Password change without editing the secret file (Settings › Password): scrypt hash in the
   database overrides the secret file; changing it signs out every other device (session epoch);
   `python -m locuvi.cli reset-password` falls back to the secret file if forgotten.

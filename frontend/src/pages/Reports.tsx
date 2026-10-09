@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ErrorAlert, Icon, PageHead, Segmented } from "../components/ui";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
-import { gbp, gbpRound, monthLabel, monthShort } from "../lib/format";
+import { gbp, gbpRound, monthLabel, monthNarrow } from "../lib/format";
 
 type Basis = "cash" | "accruals";
 
@@ -97,7 +97,7 @@ export default function ReportsPage() {
           })}
         </div>
         <div className="bar-labels" aria-hidden="true">
-          {s.months.map((m) => <span key={m.month}>{monthShort(m.month).slice(0, 1)}</span>)}
+          {s.months.map((m) => <span key={m.month}>{monthNarrow(m.month)}</span>)}
         </div>
         <details className="more" style={{ marginTop: "0.75rem" }}>
           <summary>{t("reports.show_table")}</summary>

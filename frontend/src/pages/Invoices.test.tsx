@@ -33,8 +33,8 @@ describe("InvoicesPage", () => {
     );
     expect(await screen.findByText(/LOC-2026-0001/)).toBeInTheDocument();
     expect(screen.getByText("£1,411.78")).toBeInTheDocument();
-    expect(screen.getByText("Overdue 3d")).toBeInTheDocument();
-    expect(screen.getByText("Nextcloud backup pending")).toBeInTheDocument();
+    expect(screen.getByText("3 days late")).toBeInTheDocument();
+    expect(screen.getByText("Waiting to save a copy to Nextcloud")).toBeInTheDocument();
     expect(screen.getAllByText("Draft").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /New invoice/ })).toHaveAttribute("href", "/invoices/new");
   });

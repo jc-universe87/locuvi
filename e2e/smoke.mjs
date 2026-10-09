@@ -76,49 +76,49 @@ if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() =>
 }
 
 step("welcome wizard (3 steps)");
-await page.getByRole("heading", { name: "Let's get you set up" }).waitFor();
+await page.getByRole("heading", { name: "Let's set up your invoices" }).waitFor();
 await shot("01-welcome");
 await page.getByLabel("Legal name").fill("Dr Alex Example");
 await page.getByLabel("Address").fill("1 Sample Street\nExampletown");
 await page.getByLabel("Postcode").fill("ex1 1aa");
 await page.getByLabel("Email").fill("alex@example.invalid");
 await page.getByRole("button", { name: "Continue" }).click();
-await page.getByRole("heading", { name: "Getting paid" }).waitFor();
-if ((await page.getByLabel("Account name").inputValue()) !== "Dr Alex Example") await fail("account name not prefilled");
+await page.getByRole("heading", { name: "Where practices should pay you" }).waitFor();
+if ((await page.getByLabel("Name on bank account").inputValue()) !== "Dr Alex Example") await fail("account name not prefilled");
 await page.getByLabel("Sort code").fill("00-00-00");
 await page.getByLabel("Account number").fill("00000000");
 await page.getByRole("button", { name: "Continue" }).click();
-await page.getByRole("heading", { name: "Your first practice" }).waitFor();
+await page.getByRole("heading", { name: "Add your first practice" }).waitFor();
 await page.getByLabel("Practice name").fill("Example Medical Practice");
 await page.getByLabel("Billing address").fill("2 Test Road\nSampleford\nSF1 2BB");
-await page.getByLabel("Session rate (£)").fill("600.00");
+await page.getByLabel("Agreed fee per session (£)").fill("600.00");
 await shot("02-welcome-practice");
-await page.getByRole("button", { name: "Start using Locuvi" }).click();
+await page.getByRole("button", { name: "Get started" }).click();
 
 step("today: greeting and caught up");
 await page.getByRole("heading", { name: /Alex$/ }).waitFor();
-await page.getByText("You're all caught up").waitFor();
+await page.getByText("Nothing needs your attention").waitFor();
 await shot("03-today-empty");
 
 step("diary: tap three days last month");
 await page.getByRole("link", { name: "Diary" }).first().click();
-await page.getByText(/Tap a day to log/).waitFor();
+await page.getByText(/Tap a day to add/).waitFor();
 await page.getByRole("button", { name: "Previous month" }).click();
 const prevMonth = await page.locator(".month-nav h2").innerText();
 const cell = (d) => page.locator(".day:not(.out)").nth(d - 1);
 await cell(1).click();
 await page.getByText(/^Added AM/).waitFor();
 await cell(8).click();
-await page.getByRole("group", { name: "Session" }).getByRole("button", { name: "PM" }).click();
+await page.getByRole("group", { name: "Type of work" }).getByRole("button", { name: "PM" }).click();
 await page.getByRole("button", { name: /£600.00/ }).waitFor(); // remembered rate
 await cell(9).click();
 await page.locator("#h-month").waitFor();
-await page.getByText("3 sessions · £1,800.00 · not invoiced yet").waitFor();
+await page.getByText("3 sessions · £1,800.00 · not yet invoiced").waitFor();
 await shot("04-diary");
 
 step("today: month ready to invoice -> create invoice");
 await page.getByRole("link", { name: "Today" }).first().click();
-await page.getByText(`${prevMonth} is ready to invoice`).waitFor();
+await page.getByText(`You can invoice for ${prevMonth}`).waitFor();
 await shot("05-today-ready");
 await page.getByRole("button", { name: "Create invoice" }).click();
 await page.getByRole("heading", { name: "Draft invoice" }).waitFor();
@@ -137,15 +137,15 @@ const previewShown = new Promise((resolve) => {
 });
 const [popup] = await Promise.all([
   page.waitForEvent("popup"),
-  page.getByRole("button", { name: "Preview PDF" }).click(),
+  page.getByRole("button", { name: "View PDF before issuing" }).click(),
 ]);
 await Promise.race([previewShown, page.waitForTimeout(15000).then(() => fail("preview did not open"))]);
 await popup.close().catch(() => {});
 
 step("issue & download");
-await page.getByRole("button", { name: "Issue & download" }).first().click();
+await page.getByRole("button", { name: "Issue invoice and download" }).first().click();
 const dialog = page.getByRole("dialog");
-await dialog.getByText("Number to be allocated: LOC-").waitFor();
+await dialog.getByText("Invoice number: LOC-").waitFor();
 const [download] = await Promise.all([
   page.waitForEvent("download"),
   dialog.getByRole("button", { name: "Issue invoice" }).click(),
@@ -153,18 +153,18 @@ const [download] = await Promise.all([
 if (!/^LOC-\d{4}-0001\.pdf$/.test(download.suggestedFilename())) await fail(`bad filename ${download.suggestedFilename()}`);
 const invoiceNumber = download.suggestedFilename().replace(/\.pdf$/, "");
 await page.locator(".inv-hero .amount", { hasText: "£2,032.96" }).waitFor();
-await page.locator(".pill", { hasText: /^Due / }).waitFor();
+await page.locator(".pill", { hasText: /^Payment due / }).waitFor();
 await shot("07-detail");
 
 step("mark paid (one tap, undo available)");
-await page.getByRole("button", { name: "Mark paid" }).click();
-await page.getByRole("status").getByText(/marked as paid/).waitFor();
+await page.getByRole("button", { name: "Record as paid" }).click();
+await page.getByRole("status").getByText(/Payment recorded for/).waitFor();
 await page.locator(".inv-hero .pill", { hasText: "Paid" }).waitFor();
 await shot("08-paid");
 
 step("email sheet asks to set up email");
 await page.getByRole("button", { name: "Send" }).click();
-await page.getByRole("dialog").getByText("Connect your email account once").waitFor();
+await page.getByRole("dialog").getByText("Connect your email account once. Then you can email an invoice with one click.").waitFor();
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
 step("pension: Form A for the work month, Form B for the month the fee was received");
@@ -175,19 +175,19 @@ await row.click();
 await page.getByRole("dialog").getByText("£1,620.00").first().waitFor();
 const [ws] = await Promise.all([
   page.waitForEvent("download"),
-  page.getByRole("dialog").getByRole("button", { name: "Worksheet" }).click(),
+  page.getByRole("dialog").getByRole("button", { name: "Download figures" }).click(),
 ]);
 if (!ws.suggestedFilename().startsWith("nhs-pension-worksheet-")) await fail("worksheet name");
-await page.getByRole("dialog").getByRole("group", { name: "Form A status" }).getByRole("button", { name: "Signed" }).click();
-await page.getByRole("dialog").getByText(/^Signed \d/).waitFor();
-await page.getByRole("dialog").getByText("No pensionable fees were received this month.").waitFor();
+await page.getByRole("dialog").getByRole("group", { name: "Has the practice signed Form A?" }).getByRole("button", { name: "Signed by practice" }).click();
+await page.getByRole("dialog").getByText(/^Signed on \d/).waitFor();
+await page.getByRole("dialog").getByText("No payment for NHS pensionable work was recorded this month.").waitFor();
 await shot("09-pension-month");
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 await row.getByText(/1 signed/).waitFor();
 // paid today: this month's Form B lists it, with the 7th-of-next-month deadline
 const thisMonth = new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "Europe/London" });
 const recRow = page.locator(".list-row", { hasText: thisMonth });
-await recRow.getByText(/received £1,620\.00 · Form B due/).waitFor();
+await recRow.getByText(/Received £1,620\.00 · Form B due/).waitFor();
 
 step("reports");
 await page.getByRole("link", { name: "Reports" }).first().click();
@@ -197,31 +197,31 @@ await shot("10-reports");
 
 step("today shows findings (backup reminder after first invoice)");
 await page.getByRole("link", { name: "Today" }).first().click();
-await page.getByRole("heading", { name: "Needs attention" }).waitFor();
-await page.getByText(/No backup yet/).waitFor();
+await page.getByRole("heading", { name: "Things to check" }).waitFor();
+await page.getByText(/Your records haven't been backed up yet/).waitFor();
 await shot("10b-today-findings");
 if (await page.getByRole("button", { name: "Back up now" }).isVisible()) {
   await page.getByRole("button", { name: "Back up now" }).click();
   await page.getByText("Backup saved").waitFor();
-  await page.getByText(/No backup yet/).waitFor({ state: "detached" });
+  await page.getByText(/Your records haven't been backed up yet/).waitFor({ state: "detached" });
 }
 
 step("diary: paste a booking -> review -> add (rules engine, no AI)");
 await page.getByRole("link", { name: "Diary" }).first().click();
-await page.getByRole("button", { name: "Paste a booking" }).click();
+await page.getByRole("button", { name: "Add bookings from a message" }).click();
 const next = new Date(Date.now() + 40 * 86400000);
 const nm = next.toLocaleDateString("en-GB", { month: "long", timeZone: "Europe/London" });
-await page.getByLabel("Booking email or message").fill(
+await page.getByLabel("Email or message confirming your work").fill(
   `Hi Dr Example,\nConfirming locum cover at Example Medical Practice:\n20 ${nm} AM\n21 ${nm} 14:00-18:00\nFee £600 per session.`,
 );
-await page.getByRole("button", { name: "Read booking" }).click();
-await page.getByText("Found in the text — please check").waitFor();
+await page.getByRole("button", { name: "Find work dates" }).click();
+await page.getByText("Found in your message — please check the details").waitFor();
 await shot("10c-booking-review");
 await page.getByRole("dialog").getByRole("button", { name: "Add 2 sessions" }).click();
 await page.getByRole("status").getByText("Added 2 sessions").waitFor();
 
 step("diary: repeating booking (every Wednesday) with undo");
-await page.getByRole("button", { name: "Repeat…" }).click();
+await page.getByRole("button", { name: "Add repeating sessions…" }).click();
 await page.getByRole("dialog").getByRole("group", { name: "Days" }).getByRole("button", { name: "Wed" }).click();
 const addRepeat = page.getByRole("dialog").getByRole("button", { name: /^Add \d+ sessions?$/ });
 await addRepeat.waitFor();
@@ -236,11 +236,11 @@ await page.getByRole("heading", { name: "Inbox" }).waitFor();
 await page.locator("input[type=file]").setInputFiles({
   name: "remittance.txt", mimeType: "text/plain", buffer: Buffer.from(`Remittance advice: BACS payment £2,032.96 for ${invoiceNumber}`),
 });
-await page.getByText("Added 1 document").waitFor();
+await page.getByText("Added 1 file").waitFor();
 await page.getByRole("button", { name: /remittance\.txt/ }).click();
 await page.getByRole("dialog").getByText("BACS payment").waitFor();
 await shot("10d-inbox-doc");
-await page.getByRole("dialog").getByRole("button", { name: "Mark done" }).click();
+await page.getByRole("dialog").getByRole("button", { name: "I've dealt with this" }).click();
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 await page.getByRole("button", { name: "Done" }).click();
 await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
@@ -248,30 +248,30 @@ await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
 step("invoice shows its correspondence (remittance linked by number)");
 await page.getByRole("link", { name: "Invoices" }).first().click();
 await page.getByRole("link", { name: new RegExp(invoiceNumber) }).first().click();
-await page.getByRole("heading", { name: "Correspondence" }).waitFor();
+await page.getByRole("heading", { name: "Emails and payment documents" }).waitFor();
 await page.getByRole("link", { name: /remittance\.txt/ }).click();
 await page.getByRole("dialog").getByText("BACS payment").waitFor();
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
 step("payments in: import a bank statement, mark a non-invoice credit");
 await page.getByRole("link", { name: "Invoices" }).first().click();
-await page.getByRole("link", { name: "Payments in" }).click();
-await page.getByRole("heading", { name: "Payments in" }).waitFor();
+await page.getByRole("link", { name: "Check bank payments" }).click();
+await page.getByRole("heading", { name: "Check bank payments" }).waitFor();
 const today = new Date().toLocaleDateString("en-GB", { timeZone: "Europe/London" });
 await page.locator("input[type=file]").setInputFiles({
   name: "statement.csv", mimeType: "text/csv",
   buffer: Buffer.from(`Date,Description,Amount\n${today},TAX REFUND,50.00\n${today},COFFEE,-3.20\n`),
 });
-await page.getByText("1 new payment in imported").waitFor();
+await page.getByText("Found 1 new payment").waitFor();
 await page.getByText("TAX REFUND").waitFor();
 if (await page.getByText("COFFEE").count()) await fail("debit should not be stored");
 await shot("10e-bank");
-await page.getByRole("button", { name: "Not an invoice" }).click();
-await page.getByText("Nothing to match.").waitFor();
+await page.getByRole("button", { name: "Not payment for an invoice" }).click();
+await page.getByText("No new payments need checking.").waitFor();
 
 step("settings hub and sections");
 await page.getByRole("link", { name: "Settings" }).click();
-await page.getByRole("link", { name: /Bank details/ }).click();
+await page.getByRole("link", { name: /Bank account/ }).click();
 await page.getByLabel("Account number").waitFor();
 if ((await page.getByLabel("Account number").getAttribute("placeholder")) !== "••••0000") await fail("masked account");
 await page.getByRole("link", { name: "Settings" }).first().click();
@@ -280,28 +280,28 @@ await page.getByLabel("Telephone").fill("01234 567890");
 await page.getByText("✓ Saved").waitFor(); // autosave
 await shot("11-settings-you");
 await page.getByRole("link", { name: "Settings" }).first().click();
-await page.getByRole("link", { name: /Connected agents/ }).click();
-await page.getByRole("button", { name: "Create token" }).click();
-await page.getByText("Copy this token now").waitFor();
+await page.getByRole("link", { name: /Connect another AI assistant/ }).click();
+await page.getByRole("button", { name: "Create connection key" }).click();
+await page.getByText("Copy this connection key now").waitFor();
 await page.getByText(/Bevro · …/).waitFor();
 await shot("11b-agents");
 await page.getByRole("link", { name: "Settings" }).first().click();
-await page.getByRole("link", { name: /Phone calendar/ }).click();
-await page.getByRole("switch", { name: "Calendar link" }).click();
+await page.getByRole("link", { name: /Phone or computer calendar/ }).click();
+await page.getByRole("switch", { name: "Share bookings with my calendar" }).click();
 const icsUrl = (await page.locator("code").first().innerText()).trim();
 const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
 if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
 
 step("personalisation: logo, colour, footer line, sample preview");
 await page.getByRole("link", { name: "Settings" }).first().click();
-await page.getByRole("link", { name: /Personalisation/ }).click();
+await page.getByRole("link", { name: /Invoice appearance/ }).click();
 await page.getByText("No logo yet").waitFor();
 await page.locator("input[type=file]").setInputFiles({
   name: "logo.png", mimeType: "image/png", buffer: makePng(240, 80, [41, 77, 99]),
 });
 await page.getByRole("img", { name: "Your logo" }).waitFor();
 await page.getByRole("radio", { name: "Teal" }).click();
-await page.getByLabel(/Line at the bottom of every invoice/).fill("Thank you — GMC 0000000");
+await page.getByLabel(/Message at the bottom of each invoice/).fill("Thank you — GMC 0000000");
 await page.getByText("✓ Saved").waitFor();
 if ((await page.getByRole("radio", { name: "Teal" }).getAttribute("aria-checked")) !== "true") await fail("accent not selected");
 const sampleShown = new Promise((resolve) => {
@@ -322,21 +322,21 @@ step("credit note for one line (own number series, PDF downloads)");
 await page.getByRole("link", { name: "Invoices" }).first().click();
 await page.getByRole("link", { name: new RegExp(invoiceNumber) }).first().click();
 await page.getByRole("button", { name: "More" }).click();
-await page.getByRole("button", { name: "Issue credit note" }).click();
+await page.getByRole("button", { name: "Correct with a credit note" }).click();
 const creditSheet = page.getByRole("dialog");
 await creditSheet.getByRole("checkbox").first().check();
-await creditSheet.getByLabel("Reason").fill("Session cancelled by the practice");
+await creditSheet.getByLabel("Why does the invoice need correcting?").fill("Session cancelled by the practice");
 const [cnPdf] = await Promise.all([
   page.waitForEvent("download"),
-  creditSheet.getByRole("button", { name: /Issue credit note of £677\.65/ }).click(),
+  creditSheet.getByRole("button", { name: /Issue credit note for £677\.65/ }).click(),
 ]);
 if (cnPdf.suggestedFilename() !== "CN-0001.pdf") await fail(`credit note file ${cnPdf.suggestedFilename()}`);
-await page.getByRole("heading", { name: "Credit notes" }).waitFor();
+await page.getByRole("heading", { name: "Invoice corrections (credit notes)" }).waitFor();
 // the invoice was already paid: the credit makes a refund owed
-await page.locator(".inv-hero .pill", { hasText: "Refund owed" }).waitFor();
+await page.locator(".inv-hero .pill", { hasText: "Refund needed" }).waitFor();
 await shot("11c-credit-note");
-await page.getByRole("button", { name: "Record refund" }).click();
-await page.getByRole("status").getByText("Refund recorded").waitFor();
+await page.getByRole("button", { name: "Record a refund" }).click();
+await page.getByRole("status").getByText("Refund saved").waitFor();
 await page.locator(".inv-hero .pill", { hasText: "Paid" }).waitFor();
 
 step("mobile layout");
