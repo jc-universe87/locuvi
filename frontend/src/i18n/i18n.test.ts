@@ -62,6 +62,10 @@ describe("i18n catalogues", () => {
 
   it("falls back to English and interpolates", () => {
     expect(translate("de", "nav.invoices")).toBe("Rechnungen");
-    expect(translate("de", "issue.confirm_total", { total: "£1.00" })).toBe("Total: £1.00");
+    // a key without a German entry falls back to the current English wording
+    expect(translate("de", "issue.confirm_total", { total: "£1.00" })).toBe(
+      translate("en", "issue.confirm_total", { total: "£1.00" }),
+    );
+    expect(translate("en", "issue.confirm_total", { total: "£1.00" })).toContain("£1.00");
   });
 });
