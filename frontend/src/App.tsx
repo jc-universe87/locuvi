@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Icon, Logo, ToastProvider } from "./components/ui";
+import { ConfirmProvider, Icon, Logo, ToastProvider } from "./components/ui";
 import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
@@ -68,6 +68,7 @@ export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ToastProvider>
+      <ConfirmProvider>
         <a className="skip" href="#main">
           {t("app.skip")}
         </a>
@@ -120,6 +121,7 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
+      </ConfirmProvider>
       </ToastProvider>
     </BrowserRouter>
   );

@@ -69,8 +69,10 @@ export const api = {
   async patch<T>(url: string, body: unknown): Promise<T> {
     return (await request("PATCH", url, body)).json();
   },
-  async del(url: string): Promise<void> {
-    await request("DELETE", url);
+  /** Deletes answer with JSON (e.g. the Recently deleted id) or 204 No Content. */
+  async del<T = void>(url: string): Promise<T> {
+    const res = await request("DELETE", url);
+    return res.status === 204 ? (undefined as T) : res.json();
   },
   /** multipart upload (the browser sets the boundary) */
   async upload<T>(url: string, form: FormData): Promise<T> {

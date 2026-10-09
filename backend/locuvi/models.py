@@ -669,3 +669,20 @@ class AuthConfig(Base):
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_epoch: Mapped[int] = mapped_column(Integer, default=0)
     changed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class TrashItem(Base):
+    """Recently deleted: a JSON snapshot of deleted rows, restorable for 30 days.
+
+    ``payload_json`` holds the rows (decimals as strings, dates ISO); ``summary_json`` is
+    what the bin shows (the frontend words it). Purged automatically after 30 days.
+    """
+
+    __tablename__ = "trash_item"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(30))
+    label: Mapped[str] = mapped_column(String(300), default="")
+    deleted_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

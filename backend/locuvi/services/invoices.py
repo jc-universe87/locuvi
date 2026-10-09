@@ -453,14 +453,19 @@ def save_draft(
     return inv
 
 
-def delete_draft(s: Session, inv: Invoice) -> None:
+def delete_draft(s: Session, inv: Invoice) -> str:
+    """Delete a draft (it has no number). A copy goes to Recently deleted for 30 days."""
     _require_draft(inv)
+    from locuvi.services import trash
     from locuvi.services.diary import release_sessions
 
+    item = trash.bin_draft(s, inv)
+    core.audit(s, "invoice.draft_deleted", invoice_id=inv.id)
     release_sessions(s, inv.id)
     s.query(InvoiceEvent).filter(InvoiceEvent.invoice_id == inv.id).delete()
     s.delete(inv)
     s.commit()
+    return item.id
 
 
 def duplicate(s: Session, source: Invoice) -> Invoice:

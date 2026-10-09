@@ -110,6 +110,8 @@ a.list-row:hover, button.list-row:hover { background: #fafbfc; }
 .btn.ghost { background: transparent; color: var(--steel); }
 .btn.ghost:hover { background: var(--steel-soft); }
 .btn.danger { background: var(--err-soft); color: var(--err); }
+.btn.destructive { background: var(--err); color: #fff; }
+.btn.destructive:hover { background: #6e1a28; }
 .btn.small { padding: 0.3rem 0.8rem; min-height: 2.1rem; font-size: 0.88rem; }
 .btn.big { min-height: 3.2rem; font-size: 1.05rem; padding: 0.7rem 1.5rem; }
 .btn.block { width: 100%; }

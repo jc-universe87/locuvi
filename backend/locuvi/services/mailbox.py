@@ -54,7 +54,7 @@ _REMITTANCE_WORDS = re.compile(r"\b(remittance|payment advice|bacs|paid)\b", re.
 
 # --------------------------------------------------------------------- accounts
 
-PURGE_AFTER = timedelta(days=1)  # removed accounts (and their secrets) are kept this long
+PURGE_AFTER = timedelta(days=30)  # removed accounts (and their secrets) are kept this long
 
 
 def list_accounts(s: Session) -> list[MailboxConfig]:
@@ -169,7 +169,7 @@ def save_account(
 
 
 def remove_account(s: Session, account_id: int) -> MailboxConfig:
-    """Stop using an account. Undo is possible until it is purged (with its secrets)."""
+    """Stop using an account. It stays in Recently deleted until purged (with its secrets)."""
     acc = get_account(s, account_id)
     acc.deleted_at = utcnow()
     core.audit(s, "settings.mailbox_removed", account=acc.id)
