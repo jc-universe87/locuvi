@@ -4,7 +4,7 @@ import type { Catalogue } from "./index";
 
 const pt: Catalogue = {
   "app.tagline": "Cada substituição registada.",
-  "app.descriptor": "Faturação de substituições em medicina geral",
+  "app.descriptor": "Gestão de substituições em medicina geral",
   "app.skip": "Ir para o conteúdo",
   "app.loading": "A carregar…",
   "app.language": "Idioma",

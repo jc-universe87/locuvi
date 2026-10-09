@@ -4,7 +4,7 @@ import type { Catalogue } from "./index";
 
 const es: Catalogue = {
   "app.tagline": "Cada sustitución, bajo control.",
-  "app.descriptor": "Facturación de sustituciones en medicina de familia",
+  "app.descriptor": "Gestión de sustituciones en medicina de familia",
   "app.skip": "Ir al contenido",
   "app.loading": "Cargando…",
   "app.language": "Idioma",

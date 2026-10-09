@@ -4,7 +4,7 @@ import type { Catalogue } from "./index";
 
 const de: Catalogue = {
   "app.tagline": "Jeder Einsatz im Blick.",
-  "app.descriptor": "Rechnungen für hausärztliche Vertretungen",
+  "app.descriptor": "Verwaltung hausärztlicher Vertretungen",
   "app.skip": "Zum Inhalt springen",
   "app.loading": "Wird geladen…",
   "app.language": "Sprache",

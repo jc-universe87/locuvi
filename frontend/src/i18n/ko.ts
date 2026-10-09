@@ -4,7 +4,7 @@ import type { Catalogue } from "./index";
 
 const ko: Catalogue = {
   "app.tagline": "모든 근무 기록을 한눈에.",
-  "app.descriptor": "GP 대진 진료 청구 관리",
+  "app.descriptor": "GP 대진 근무 관리",
   "app.skip": "본문으로 건너뛰기",
   "app.loading": "불러오는 중…",
   "app.language": "언어",

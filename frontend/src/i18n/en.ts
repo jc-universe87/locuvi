@@ -2,7 +2,7 @@
 const en = {
   "app.name": "Locuvi",
   "app.tagline": "Every session accounted for.",
-  "app.descriptor": "GP Locum Invoicing",
+  "app.descriptor": "GP Locum Management",
   "app.skip": "Skip to content",
   "app.loading": "Loading…",
   "app.language": "Language",

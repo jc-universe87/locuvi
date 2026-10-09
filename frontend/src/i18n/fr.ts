@@ -4,7 +4,7 @@ import type { Catalogue } from "./index";
 
 const fr: Catalogue = {
   "app.tagline": "Chaque remplacement suivi.",
-  "app.descriptor": "Facturation des remplacements en médecine générale",
+  "app.descriptor": "Gestion des remplacements en médecine générale",
   "app.skip": "Aller au contenu",
   "app.loading": "Chargement…",
   "app.language": "Langue",
