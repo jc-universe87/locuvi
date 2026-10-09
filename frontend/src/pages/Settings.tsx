@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave } from "../components/ui";
+import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useToast } from "../components/ui";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, openPendingTab, setCsrf } from "../lib/api";
@@ -674,33 +674,135 @@ function mailKind(c: MailboxConfig): MailKind {
   return !c.host || c.host === "imap.gmail.com" ? "gmail" : "other";
 }
 
+const KIND_LABEL: Record<MailKind, MessageKey | null> = { gmail: null, outlook: "mailbox.kind_outlook", nhsmail: null, other: "mailbox.kind_other" };
+
+/** A blank account of the chosen kind (saved on the first Connect / Sign in). */
+function blankAccount(kind: MailKind, clientId: string): MailboxConfig {
+  const microsoft = kind === "outlook" || kind === "nhsmail";
+  return {
+    id: 0, label: "", enabled: false, provider: microsoft ? "microsoft" : "imap", ms_client_id: clientId,
+    ms_tenant: kind === "nhsmail" ? "organizations" : "common", ms_signed_in: false, folder_labels: {},
+    host: kind === "gmail" ? "imap.gmail.com" : "", port: 993, security: "ssl", username: "", password_set: false,
+    folders: [], since_days: 90, auto_scan: true, last_scan_at: null, last_error: null, last_result: null,
+  };
+}
+
+/** Booking emails: several mailboxes, each with its own folders and sign-in. */
 function MailboxSection() {
   const { t, tn } = useT();
-  const [cfg, setCfg] = useState<MailboxConfig | null>(null);
-  const [kind, setKind] = useState<MailKind>("gmail");
+  const toast = useToast();
+  const [accounts, setAccounts] = useState<MailboxConfig[] | null>(null);
+  const [open, setOpen] = useState<MailboxConfig | null>(null);
+  const [newKind, setNewKind] = useState<MailKind>("gmail");
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api.get<{ accounts: MailboxConfig[] }>("/settings/mailboxes").then((r) => setAccounts(r.accounts), setError);
+  useEffect(() => { void load(); }, []);
+  if (!accounts) return <ErrorAlert error={error} />;
+  const errText = (code: string | null) => code && hasKey(`error.${code}`) ? t(`error.${code}` as MessageKey) : code;
+  if (open) {
+    return (
+      <MailAccountEditor key={open.id || "new"} initial={open}
+        onBack={() => { setOpen(null); void load(); }}
+        onRemoved={(acc) => {
+          setOpen(null);
+          void load();
+          toast({ text: t("mailbox.removed", { name: acc.label || acc.username }), undo: () => void api.post(`/settings/mailboxes/${acc.id}/restore`).then(load) });
+        }} />
+    );
+  }
+  const scanAll = async () => {
+    setBusy(true); setError(null);
+    try {
+      const r = await api.post<ScanResult>("/mailbox/scan");
+      toast({ text: scanSummary(t, tn, r) });
+    } catch (e) { setError(e); } finally { setBusy(false); void load(); }
+  };
+  const clientId = accounts.find((a) => a.ms_client_id)?.ms_client_id ?? "";
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("mailbox.intro")}</p>
+      <ErrorAlert error={error} />
+      <div className="form-list">
+        {accounts.map((a) => {
+          const kind = mailKind(a);
+          const status = a.enabled && a.last_error
+            ? t("mailbox.last_failed", { reason: errText(a.last_error) ?? "" })
+            : a.enabled
+              ? (a.last_scan_at ? t("mailbox.last_scan", { when: dateTime(a.last_scan_at) }) : t("mailbox.on"))
+              : t("mailbox.off");
+          return (
+            <button key={a.id} type="button" className="list-row" onClick={() => setOpen(a)}>
+              <span className="list-main">
+                <span className="list-title">{a.label || a.username || t("mailbox.unnamed")}</span>
+                <span className="list-sub" style={a.enabled && a.last_error ? { color: "var(--warn)" } : undefined}>
+                  {KIND_LABEL[kind] ? t(KIND_LABEL[kind]!) : kind === "gmail" ? "Gmail" : "NHSmail"}
+                  {a.enabled ? ` · ${tn("mailbox.n_folders", a.folders.length)}` : ""} · {status}
+                </span>
+              </span>
+              <span className="chev"><Icon name="chevron" size={18} /></span>
+            </button>
+          );
+        })}
+        <div className="form-row">
+          <label htmlFor="m-new">{t("mailbox.add")}</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <select id="m-new" value={newKind} onChange={(e) => setNewKind(e.target.value as MailKind)}>
+              <option value="gmail">Gmail</option>
+              <option value="outlook">{t("mailbox.kind_outlook")}</option>
+              <option value="nhsmail">NHSmail</option>
+              <option value="other">{t("mailbox.kind_other")}</option>
+            </select>
+            <button className="btn secondary" onClick={() => setOpen(blankAccount(newKind, clientId))}>
+              <Icon name="plus" size={16} /> {t("mailbox.add_button")}
+            </button>
+          </div>
+        </div>
+      </div>
+      {accounts.some((a) => a.enabled) && (
+        <div className="actions" style={{ marginTop: "0.75rem" }}>
+          <button className="btn secondary" disabled={busy} onClick={() => void scanAll()}>{busy ? t("mailbox.checking") : t("mailbox.check_now")}</button>
+        </div>
+      )}
+      <h3>{t("mailbox.privacy_title")}</h3>
+      <ul className="muted bullets">
+        <li>{t("mailbox.privacy_1")}</li>
+        <li>{t("mailbox.privacy_2")}</li>
+        <li>{t("mailbox.privacy_3")}</li>
+        <li>{t("mailbox.privacy_4")}</li>
+      </ul>
+    </>
+  );
+}
+
+function MailAccountEditor({ initial, onBack, onRemoved }: {
+  initial: MailboxConfig; onBack: () => void; onRemoved: (acc: MailboxConfig) => void;
+}) {
+  const { t, tn } = useT();
+  const [cfg, setCfg] = useState<MailboxConfig>(initial);
+  const kind = mailKind(initial);
   const [password, setPassword] = useState("");
   const [folders, setFolders] = useState<Folder[] | null>(null);
   const [signin, setSignin] = useState<SignIn | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    api.get<MailboxConfig>("/settings/mailbox").then((c) => { setCfg(c); setKind(mailKind(c)); }, setError);
-  }, []);
+  const microsoft = cfg.provider === "microsoft";
+  const base = `/settings/mailboxes/${cfg.id}`;
   // While a Microsoft sign-in is waiting, ask the server every few seconds whether it was approved.
   useEffect(() => {
-    if (!signin) return;
+    if (!signin || !cfg.id) return;
     let stop = false;
     let timer = 0;
     let wait = signin.interval;
     const tick = async () => {
       try {
-        const r = await api.post<{ status: string; interval?: number; config?: MailboxConfig }>("/settings/mailbox/microsoft/poll");
+        const r = await api.post<{ status: string; interval?: number; account?: MailboxConfig }>(`/settings/mailboxes/${cfg.id}/microsoft/poll`);
         if (stop) return;
-        if (r.status === "done" && r.config) {
+        if (r.status === "done" && r.account) {
           setSignin(null);
-          setCfg(r.config);
-          setFolders((await api.post<{ folders: Folder[] }>("/settings/mailbox/folders")).folders);
+          setCfg(r.account);
+          setFolders((await api.post<{ folders: Folder[] }>(`/settings/mailboxes/${cfg.id}/folders`)).folders);
           return;
         }
         wait = r.interval ?? wait; // Microsoft may ask us to slow down
@@ -709,72 +811,84 @@ function MailboxSection() {
         if (!stop) { setSignin(null); setError(e); }
       }
     };
-    timer = window.setTimeout(tick, signin.interval * 1000);
+    timer = window.setTimeout(tick, wait * 1000);
     return () => { stop = true; window.clearTimeout(timer); };
-  }, [signin]);
-  if (!cfg) return <ErrorAlert error={error} />;
-  const microsoft = kind === "outlook" || kind === "nhsmail";
-  const sameAccount = microsoft ? cfg.provider === "microsoft" && mailKind(cfg) === kind : cfg.provider === "imap";
+  }, [signin, cfg.id]);
   const set = (patch: Partial<MailboxConfig>) => { setCfg({ ...cfg, ...patch }); setMsg(null); };
   const body = (over: Partial<MailboxConfig> = {}) => {
     const c = { ...cfg, ...over };
-    const gmail = kind === "gmail";
-    return { enabled: c.enabled, provider: microsoft ? "microsoft" : "imap",
-      host: gmail ? "imap.gmail.com" : c.host, port: gmail ? 993 : c.port, security: gmail ? "ssl" : c.security,
-      username: c.username, password: password || null, folders: c.folders, since_days: c.since_days, auto_scan: c.auto_scan };
+    return { enabled: c.enabled, provider: c.provider, label: c.label, ms_tenant: c.ms_tenant,
+      host: c.host, port: c.port, security: c.security, username: c.username, password: password || null,
+      folders: c.folders, since_days: c.since_days, auto_scan: c.auto_scan };
   };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError(null); setMsg(null);
     try { await fn(); } catch (e) { setError(e); } finally { setBusy(false); }
   };
-  const chooseKind = (k: MailKind) => { setKind(k); setFolders(null); setSignin(null); setMsg(null); setError(null); };
-  const loadFolders = async () => setFolders((await api.post<{ folders: Folder[] }>("/settings/mailbox/folders")).folders);
-  const connect = () => run(async () => {
-    setCfg(await api.put<MailboxConfig>("/settings/mailbox", body({ enabled: false })));
+  /** Save the account (creating it the first time) and return its id. */
+  const persist = async (over: Partial<MailboxConfig> = {}): Promise<MailboxConfig> => {
+    const saved = cfg.id
+      ? await api.put<MailboxConfig>(`/settings/mailboxes/${cfg.id}`, body(over))
+      : await api.post<MailboxConfig>("/settings/mailboxes", body(over));
+    setCfg(saved);
     setPassword("");
-    await loadFolders();
+    return saved;
+  };
+  const connect = () => run(async () => {
+    const saved = await persist({ enabled: false });
+    setFolders((await api.post<{ folders: Folder[] }>(`/settings/mailboxes/${saved.id}/folders`)).folders);
   });
   const startSignIn = () => run(async () => {
-    const r = await api.post<SignIn>("/settings/mailbox/microsoft/start",
-      { client_id: cfg.ms_client_id.trim(), tenant: kind === "nhsmail" ? "organizations" : "common" });
-    setSignin(r);
+    const saved = await persist({ enabled: false }); // keep edits made before signing in
+    setCfg({ ...saved, ms_client_id: cfg.ms_client_id });
+    setSignin(await api.post<SignIn>(`/settings/mailboxes/${saved.id}/microsoft/start`,
+      { client_id: cfg.ms_client_id.trim(), tenant: cfg.ms_tenant }));
   });
+  const reload = async () => {
+    const list = await api.get<{ accounts: MailboxConfig[] }>("/settings/mailboxes");
+    const me = list.accounts.find((a) => a.id === cfg.id);
+    if (me) setCfg(me);
+  };
   const signOut = () => run(async () => {
-    await api.del("/settings/mailbox/microsoft");
-    setCfg(await api.get<MailboxConfig>("/settings/mailbox"));
+    await api.del(`${base}/microsoft`);
+    await reload();
     setFolders(null);
   });
   const save = (enabled: boolean) => run(async () => {
-    setCfg(await api.put<MailboxConfig>("/settings/mailbox", body({ enabled })));
-    setPassword("");
+    await persist({ enabled });
     setMsg(enabled ? t("mailbox.on") : t("common.saved"));
   });
   const scan = () => run(async () => {
+    await persist();
     const r = await api.post<ScanResult>("/mailbox/scan");
     setMsg(scanSummary(t, tn, r));
-    setCfg(await api.get<MailboxConfig>("/settings/mailbox"));
+    await reload();
+  });
+  const remove = () => run(async () => {
+    if (cfg.id) await api.del(base);
+    onRemoved(cfg);
   });
   const toggleFolder = (name: string, on: boolean) =>
     set({ folders: on ? [...cfg.folders, name] : cfg.folders.filter((f) => f !== name) });
-  const shown: Folder[] = folders ?? (sameAccount ? cfg.folders.map((f) => ({ name: f, label: cfg.folder_labels[f] ?? f })) : []);
+  const shown: Folder[] = folders ?? cfg.folders.map((f) => ({ name: f, label: cfg.folder_labels[f] ?? f }));
   const lastErr = cfg.last_error && hasKey(`error.${cfg.last_error}`) ? t(`error.${cfg.last_error}` as MessageKey) : cfg.last_error;
   const copy = (text: string) => void navigator.clipboard?.writeText(text).catch(() => undefined);
+  const kindName = KIND_LABEL[kind] ? t(KIND_LABEL[kind]!) : kind === "gmail" ? "Gmail" : "NHSmail";
   return (
     <>
-      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("mailbox.intro")}</p>
+      <button type="button" className="btn ghost" onClick={onBack} style={{ marginTop: "-0.5rem", paddingLeft: 0 }}>
+        ‹ {t("mailbox.all_accounts")}
+      </button>
+      <h3 style={{ marginTop: "0.25rem" }}>{cfg.id ? cfg.label || cfg.username || kindName : t("mailbox.new_account", { kind: kindName })}</h3>
       <ErrorAlert error={error} />
       {msg && <div className="alert ok" role="status">{msg}</div>}
-      {cfg.enabled && sameAccount && lastErr && <div className="alert warn" role="status">{t("mailbox.last_failed", { reason: lastErr })}</div>}
+      {cfg.enabled && lastErr && <div className="alert warn" role="status">{t("mailbox.last_failed", { reason: lastErr })}</div>}
       <div className="form-list">
-        <Row id="m-kind" label={t("mailbox.account")}>
-          <select id="m-kind" value={kind} onChange={(e) => chooseKind(e.target.value as MailKind)}>
-            <option value="gmail">Gmail</option>
-            <option value="outlook">{t("mailbox.kind_outlook")}</option>
-            <option value="nhsmail">NHSmail</option>
-            <option value="other">{t("mailbox.kind_other")}</option>
-          </select>
+        <Row id="m-label" label={t("mailbox.label")} hint={t("mailbox.label_hint")}>
+          <input id="m-label" type="text" value={cfg.label} maxLength={100} placeholder={cfg.username || kindName}
+            onChange={(e) => set({ label: e.target.value })} />
         </Row>
-        {!microsoft && kind === "other" && (
+        {kind === "other" && (
           <>
             <Row id="m-host" label={t("mailbox.host")} hint={t("mailbox.host_hint")}>
               <input id="m-host" type="text" autoCapitalize="none" spellCheck={false} value={cfg.host} placeholder="imap.example.com"
@@ -797,12 +911,12 @@ function MailboxSection() {
               <input id="m-user" type="email" autoCapitalize="none" value={cfg.username} onChange={(e) => set({ username: e.target.value.trim() })} />
             </Row>
             <Row id="m-pass" label={t("mailbox.password")} hint={t(kind === "gmail" ? "mailbox.gmail_hint" : "mailbox.password_hint")}>
-              <input id="m-pass" type="password" autoComplete="new-password" placeholder={cfg.password_set && sameAccount ? "••••••••" : ""}
+              <input id="m-pass" type="password" autoComplete="new-password" placeholder={cfg.password_set ? "••••••••" : ""}
                 value={password} onChange={(e) => setPassword(e.target.value)} />
             </Row>
           </>
         )}
-        {microsoft && !(sameAccount && cfg.ms_signed_in) && (
+        {microsoft && !cfg.ms_signed_in && (
           <Row id="m-app" label={t("mailbox.ms_app_id")} hint={t("mailbox.ms_app_id_hint")}>
             <input id="m-app" type="text" autoCapitalize="none" spellCheck={false} placeholder="00000000-0000-0000-0000-000000000000"
               value={cfg.ms_client_id} onChange={(e) => set({ ms_client_id: e.target.value.trim() })} />
@@ -829,16 +943,16 @@ function MailboxSection() {
         </div>
       ) : (
         <div className="actions" style={{ marginTop: "0.5rem" }}>
-          {microsoft && sameAccount && cfg.ms_signed_in ? (
+          {microsoft && cfg.ms_signed_in ? (
             <>
               <span className="muted">{t("mailbox.ms_signed_in", { email: cfg.username })}</span>
-              <button className="btn secondary" disabled={busy} onClick={() => run(loadFolders)}>{t("mailbox.choose_folders")}</button>
+              <button className="btn secondary" disabled={busy} onClick={() => run(async () => setFolders((await api.post<{ folders: Folder[] }>(`${base}/folders`)).folders))}>{t("mailbox.choose_folders")}</button>
               <button className="btn ghost" disabled={busy} onClick={signOut}>{t("mailbox.ms_sign_out")}</button>
             </>
           ) : microsoft ? (
             <button className="btn secondary" disabled={busy || !cfg.ms_client_id.trim()} onClick={startSignIn}>{t("mailbox.ms_sign_in")}</button>
           ) : (
-            <button className="btn secondary" disabled={busy || (kind === "other" && !cfg.host) || !cfg.username || (!password && !(cfg.password_set && sameAccount))} onClick={connect}>
+            <button className="btn secondary" disabled={busy || (kind === "other" && !cfg.host) || !cfg.username || (!password && !cfg.password_set)} onClick={connect}>
               {busy && !folders ? t("mailbox.connecting") : t("mailbox.connect")}
             </button>
           )}
@@ -875,13 +989,11 @@ function MailboxSection() {
           {cfg.last_scan_at && <p className="form-foot">{t("mailbox.last_scan", { when: dateTime(cfg.last_scan_at) })}</p>}
         </>
       )}
-      <h3>{t("mailbox.privacy_title")}</h3>
-      <ul className="muted bullets">
-        <li>{t("mailbox.privacy_1")}</li>
-        <li>{t("mailbox.privacy_2")}</li>
-        <li>{t("mailbox.privacy_3")}</li>
-        <li>{t("mailbox.privacy_4")}</li>
-      </ul>
+      {cfg.id > 0 && (
+        <div className="actions" style={{ marginTop: "1.5rem" }}>
+          <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--err)" }}>{t("mailbox.remove")}</button>
+        </div>
+      )}
     </>
   );
 }

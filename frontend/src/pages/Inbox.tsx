@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { useSearchParams } from "react-router-dom";
 import { BookingSheet, ProposalReview, useAssistant, usePractices } from "../components/Booking";
 import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useToast } from "../components/ui";
-import { useT } from "../i18n";
+import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, ApiError, downloadBlob } from "../lib/api";
 import { ukDate } from "../lib/format";
@@ -26,6 +26,10 @@ export function scanSummary(t: T, tn: TN, r: ScanResult): string {
   if (r.already_booked) parts.push(tn("mailbox.res_booked", r.already_booked));
   if (r.remittances) parts.push(tn("mailbox.res_remittances", r.remittances));
   if (r.checked && !r.to_review && !r.already_booked && !r.remittances) parts.push(t("mailbox.res_nothing"));
+  for (const e of r.errors ?? []) {
+    const reason = hasKey(`error.${e.error}`) ? t(`error.${e.error}` as MessageKey) : e.error;
+    parts.push(t("mailbox.res_failed", { name: e.label, reason }));
+  }
   return parts.join(" · ");
 }
 
@@ -53,7 +57,8 @@ export default function InboxPage() {
   const [mailboxOn, setMailboxOn] = useState(false);
   const [scanning, setScanning] = useState(false);
   useEffect(() => {
-    api.get<MailboxConfig>("/settings/mailbox").then((m) => setMailboxOn(m.enabled), () => undefined);
+    api.get<{ accounts: MailboxConfig[] }>("/settings/mailboxes")
+      .then((r) => setMailboxOn(r.accounts.some((a) => a.enabled)), () => undefined);
   }, []);
   const checkEmail = async () => {
     setScanning(true);

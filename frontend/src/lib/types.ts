@@ -355,9 +355,13 @@ export interface ScanResult {
   to_review: number;
   unread: number;
   folder_errors: number;
+  /** accounts that couldn't be checked (the others still were) */
+  errors?: { account_id: number; label: string; error: string }[];
 }
 
 export interface MailboxConfig {
+  id: number;
+  label: string;
   enabled: boolean;
   provider: "imap" | "microsoft";
   ms_client_id: string;

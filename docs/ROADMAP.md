@@ -227,7 +227,9 @@ Each item is useful on its own and gives the AI something reliable to work with.
   only, refresh token encrypted and rotated, per-folder delta links (messages filed later are
   still read). NHSmail needs its administrators' approval of
   the app; until then, forwarding booking emails to Gmail is the documented route
-  (`docs/EMAIL_SETUP.md`).
+  (`docs/EMAIL_SETUP.md`). **Several accounts** (owner request 9 Oct 2026): each with its
+  own type, folders, progress and status; one failing account doesn't stop the others;
+  remove with undo (purged with its secrets after a day).
 - ✅ "Prepare all outstanding invoices for September" → drafts made by the deterministic
   engine from confirmed sessions; inconsistent rates are flagged. (B)
 - ✅ Draft invoice emails and polite reminders in the right tone; always reviewed and sent with

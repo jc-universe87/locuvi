@@ -378,11 +378,17 @@ def _inbox(s: Session, today: date) -> list[Finding]:
             key="bank_unmatched", kind="bank_unmatched", severity="info",
             params={"n": bank_waiting}, action={"type": "open_bank"}, dismissible=False,
         ))  # fmt: skip
-    mbox = s.get(MailboxConfig, 1)
-    if mbox is not None and mbox.enabled and mbox.last_error:
+    failing = s.scalars(
+        select(MailboxConfig).where(
+            MailboxConfig.deleted_at.is_(None),
+            MailboxConfig.enabled.is_(True),
+            MailboxConfig.last_error.is_not(None),
+        )
+    )
+    for mbox in failing:
         out.append(Finding(
-            key="mailbox_failed", kind="mailbox_failed", severity="warn",
-            params={"error": mbox.last_error},
+            key=f"mailbox_failed:{mbox.id}", kind="mailbox_failed", severity="warn",
+            params={"error": mbox.last_error, "account": mbox.label or mbox.username},
             action={"type": "open_settings", "section": "mailbox"}, dismissible=False,
         ))  # fmt: skip
     if old:

@@ -243,9 +243,18 @@ class DigestScheduler:
             from locuvi.services import mailbox
 
             with db.new_session() as s:
-                if mailbox.auto_scan_due(mailbox.get_config(s)):
+                mailbox.purge_removed(s)
+                if mailbox.auto_scan_due(s):
                     provider = providers.provider_for(s, self.settings, self.box)
-                    mailbox.scan(s, self.settings, self.box, provider=provider)
+                    for acc in mailbox.list_accounts(s):
+                        if acc.enabled and acc.auto_scan:
+                            try:
+                                mailbox.scan(
+                                    s, self.settings, self.box, provider=provider,
+                                    account_id=acc.id,
+                                )  # fmt: skip
+                            except DomainError as exc:
+                                log.warning("mail account %s not checked: %s", acc.id, exc.code)
         except DomainError as exc:
             log.warning("mail folder scan not made: %s", exc.code)
         except Exception:  # noqa: BLE001

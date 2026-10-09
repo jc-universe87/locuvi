@@ -29,6 +29,7 @@ from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from locuvi.assistant import rules
@@ -51,121 +52,188 @@ _BOOKING_WORDS = re.compile(
 _REMITTANCE_WORDS = re.compile(r"\b(remittance|payment advice|bacs|paid)\b", re.I)
 
 
-# ----------------------------------------------------------------------- config
+# --------------------------------------------------------------------- accounts
+
+PURGE_AFTER = timedelta(days=1)  # removed accounts (and their secrets) are kept this long
 
 
-def get_config(s: Session) -> MailboxConfig:
-    cfg = s.get(MailboxConfig, 1)
-    if cfg is None:
-        cfg = MailboxConfig(id=1, folders=[])
-        s.add(cfg)
-        s.flush()
-    return cfg
+def list_accounts(s: Session) -> list[MailboxConfig]:
+    return list(
+        s.scalars(
+            select(MailboxConfig)
+            .where(MailboxConfig.deleted_at.is_(None))
+            .order_by(MailboxConfig.id)
+        )
+    )
 
 
-def config_public(cfg: MailboxConfig) -> dict[str, Any]:
-    labels = cfg.folder_labels or {}
+def get_account(s: Session, account_id: int, *, deleted: bool = False) -> MailboxConfig:
+    acc = s.get(MailboxConfig, account_id)
+    if acc is None or (acc.deleted_at is not None) != deleted:
+        raise DomainError("mailbox.not_found", "That email account no longer exists.")
+    return acc
+
+
+def account_public(acc: MailboxConfig) -> dict[str, Any]:
+    labels = acc.folder_labels or {}
     return {
-        "enabled": cfg.enabled,
-        "provider": cfg.provider or "imap",
-        "ms_client_id": cfg.ms_client_id or "",
-        "ms_tenant": cfg.ms_tenant or "common",
-        "ms_signed_in": bool(cfg.ms_token_ciphertext),
-        "folder_labels": {f: labels.get(f, f) for f in cfg.folders or []},
-        "host": cfg.host,
-        "port": cfg.port,
-        "security": cfg.security,
-        "username": cfg.username,
-        "password_set": bool(cfg.password_ciphertext),
-        "folders": list(cfg.folders or []),
-        "since_days": cfg.since_days,
-        "auto_scan": cfg.auto_scan,
-        "last_scan_at": cfg.last_scan_at,
-        "last_error": cfg.last_error,
-        "last_result": cfg.last_result_json,
+        "id": acc.id,
+        "label": acc.label or acc.username or acc.host,
+        "enabled": acc.enabled,
+        "provider": acc.provider or "imap",
+        "ms_client_id": acc.ms_client_id or "",
+        "ms_tenant": acc.ms_tenant or "common",
+        "ms_signed_in": bool(acc.ms_token_ciphertext),
+        "folder_labels": {f: labels.get(f, f) for f in acc.folders or []},
+        "host": acc.host,
+        "port": acc.port,
+        "security": acc.security,
+        "username": acc.username,
+        "password_set": bool(acc.password_ciphertext),
+        "folders": list(acc.folders or []),
+        "since_days": acc.since_days,
+        "auto_scan": acc.auto_scan,
+        "last_scan_at": acc.last_scan_at,
+        "last_error": acc.last_error,
+        "last_result": acc.last_result_json,
     }
 
 
-def save_config(s: Session, box: SecretBox, data: dict[str, Any]) -> MailboxConfig:
-    cfg = get_config(s)
-    provider = data.get("provider") or cfg.provider or "imap"
+def create_account(s: Session, box: SecretBox, data: dict[str, Any]) -> MailboxConfig:
+    provider = data.get("provider") or "imap"
     if provider not in {"imap", "microsoft"}:
         raise DomainError("mailbox.failed", "Unknown email account type.")
-    switched = switch_provider(s, cfg, provider)
+    acc = MailboxConfig(provider=provider, folders=[], enabled=False)
+    if provider == "microsoft":
+        acc.ms_tenant = _tenant(data.get("ms_tenant"))
+    s.add(acc)
+    s.flush()
+    return save_account(s, box, acc, data)
+
+
+def _tenant(value: Any) -> str:
+    tenant = str(value or "common").strip().lower()
+    return tenant if re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,63}", tenant) else "common"
+
+
+def save_account(
+    s: Session, box: SecretBox, acc: MailboxConfig, data: dict[str, Any]
+) -> MailboxConfig:
+    """Update one account. Its type (IMAP or Microsoft) is fixed: add another to change it."""
+    provider = acc.provider or "imap"
+    if data.get("provider") not in (None, provider):
+        raise DomainError(
+            "mailbox.type_fixed", "Add a separate email account to use a different type."
+        )
     host = (data.get("host") or "").strip().lower()
     if host and not re.fullmatch(r"[a-z0-9.-]{1,200}", host):
         raise DomainError("mailbox.bad_host", "Enter the IMAP server name, e.g. imap.example.com.")
     if data.get("security", "ssl") not in {"ssl", "starttls"}:
         raise DomainError("mailbox.bad_security", "Choose SSL/TLS or STARTTLS.")
     folders = [str(f)[:300] for f in (data.get("folders") or []) if str(f).strip()][:20]
-    if switched:  # folder names from the previous account don't exist in this one
-        folders = []
-    elif provider == "microsoft":  # only folders Microsoft listed for this account
-        folders = [f for f in folders if f in (cfg.folder_labels or {})]
+    if provider == "microsoft":  # only folders Microsoft listed for this account
+        folders = [f for f in folders if f in (acc.folder_labels or {})]
     pw = data.get("password")
-    if pw is not None:
-        cfg.password_ciphertext = box.encrypt(pw) if pw else None
-    old_folders = set(cfg.folders or [])
-    cfg.host = host
-    cfg.port = int(data.get("port") or 993)
-    cfg.security = data.get("security", "ssl")
-    cfg.username = (data.get("username") or "").strip()[:200]
-    cfg.folders = folders
-    cfg.since_days = max(1, min(int(data.get("since_days") or 90), 730))
-    cfg.auto_scan = bool(data.get("auto_scan", True))
-    cfg.enabled = bool(data.get("enabled"))
-    if cfg.enabled and provider == "microsoft" and not cfg.ms_token_ciphertext:
+    if pw is not None and provider == "imap":
+        acc.password_ciphertext = box.encrypt(pw) if pw else None
+    old_folders = set(acc.folders or [])
+    if provider == "imap":
+        acc.host = host
+        acc.port = int(data.get("port") or 993)
+        acc.security = data.get("security", "ssl")
+        acc.username = (data.get("username") or "").strip()[:200]
+    acc.label = (data.get("label") or "").strip()[:100]
+    acc.folders = folders
+    acc.since_days = max(1, min(int(data.get("since_days") or 90), 730))
+    acc.auto_scan = bool(data.get("auto_scan", True))
+    acc.enabled = bool(data.get("enabled"))
+    if acc.enabled and provider == "microsoft" and not acc.ms_token_ciphertext:
         raise DomainError("mailbox.ms_signed_out", "Sign in to Microsoft again.")
     if (
-        cfg.enabled
+        acc.enabled
         and provider == "imap"
-        and not (cfg.host and cfg.username and cfg.password_ciphertext)
+        and not (acc.host and acc.username and acc.password_ciphertext)
     ):
         raise DomainError("mailbox.incomplete", "Fill in server, username and password first.")
-    if cfg.enabled and not folders:
+    if acc.enabled and not folders:
         raise DomainError("mailbox.no_folders", "Choose at least one folder to read.")
     for gone in old_folders - set(folders):  # forget progress of folders no longer chosen
-        st = s.get(MailFolderState, gone)
+        st = s.get(MailFolderState, (acc.id, gone))
         if st is not None:
             s.delete(st)
-    core.audit(s, "settings.mailbox_saved", enabled=cfg.enabled, folders=len(folders),
-               provider=provider, password_changed=pw is not None)  # fmt: skip
+    core.audit(s, "settings.mailbox_saved", account=acc.id, enabled=acc.enabled,
+               folders=len(folders), provider=provider,
+               password_changed=pw is not None)  # fmt: skip
     s.commit()
-    return cfg
+    return acc
 
 
-def switch_provider(s: Session, cfg: MailboxConfig, provider: str) -> bool:
-    """Folders of one account mean nothing in another: forget them when the account type changes."""
-    if (cfg.provider or "imap") == provider:
-        return False
-    cfg.provider, cfg.enabled, cfg.folders, cfg.folder_labels = provider, False, [], None
-    s.query(MailFolderState).delete()
-    return True
+def remove_account(s: Session, account_id: int) -> MailboxConfig:
+    """Stop using an account. Undo is possible until it is purged (with its secrets)."""
+    acc = get_account(s, account_id)
+    acc.deleted_at = utcnow()
+    core.audit(s, "settings.mailbox_removed", account=acc.id)
+    s.commit()
+    return acc
 
 
-def ms_start(client_id: str, tenant: str, transport: Any = None) -> dict[str, Any]:
-    return mail_microsoft.start_sign_in(client_id, tenant, transport)
+def restore_account(s: Session, account_id: int) -> MailboxConfig:
+    acc = get_account(s, account_id, deleted=True)
+    acc.deleted_at = None
+    core.audit(s, "settings.mailbox_restored", account=acc.id)
+    s.commit()
+    return acc
 
 
-def ms_poll(s: Session, box: SecretBox, transport: Any = None) -> dict[str, Any]:
-    cfg = get_config(s)
-    before = (cfg.provider or "imap", (cfg.username or "").lower())
-    result = mail_microsoft.poll_sign_in(cfg, box, transport)
+def purge_removed(s: Session, now: datetime | None = None) -> int:
+    cutoff = (now or utcnow()) - PURGE_AFTER
+    gone = list(
+        s.scalars(
+            select(MailboxConfig).where(
+                MailboxConfig.deleted_at.is_not(None), MailboxConfig.deleted_at < cutoff
+            )
+        )
+    )
+    for acc in gone:
+        s.query(MailFolderState).filter(MailFolderState.account_id == acc.id).delete()
+        s.delete(acc)
+    if gone:
+        s.commit()
+    return len(gone)
+
+
+def _forget_folders(s: Session, acc: MailboxConfig) -> None:
+    acc.enabled, acc.folders, acc.folder_labels = False, [], None
+    s.query(MailFolderState).filter(MailFolderState.account_id == acc.id).delete()
+
+
+def ms_start(
+    s: Session, account_id: int, client_id: str, tenant: str, transport: Any = None
+) -> dict[str, Any]:
+    acc = get_account(s, account_id)
+    if acc.provider != "microsoft":
+        raise DomainError("mailbox.type_fixed", "This is not a Microsoft account.")
+    return mail_microsoft.start_sign_in(client_id, _tenant(tenant), transport, acc.id)
+
+
+def ms_poll(s: Session, box: SecretBox, account_id: int, transport: Any = None) -> dict[str, Any]:
+    acc = get_account(s, account_id)
+    before = (acc.username or "").lower()
+    result = mail_microsoft.poll_sign_in(acc, box, transport, acc.id)
     if result["status"] == "done":
-        if before != ("microsoft", cfg.username.lower()):  # another account: start afresh
-            cfg.provider = before[0] if before[0] != "microsoft" else "imap"
-            switch_provider(s, cfg, "microsoft")
-        core.audit(s, "settings.mailbox_microsoft_signed_in")
+        if before and before != acc.username.lower():  # another mailbox: start afresh
+            _forget_folders(s, acc)
+        core.audit(s, "settings.mailbox_microsoft_signed_in", account=acc.id)
         s.commit()
     return result
 
 
-def ms_sign_out(s: Session) -> MailboxConfig:
-    cfg = get_config(s)
-    mail_microsoft.sign_out(cfg)
-    core.audit(s, "settings.mailbox_microsoft_signed_out")
+def ms_sign_out(s: Session, account_id: int) -> MailboxConfig:
+    acc = get_account(s, account_id)
+    mail_microsoft.sign_out(acc)
+    core.audit(s, "settings.mailbox_microsoft_signed_out", account=acc.id)
     s.commit()
-    return cfg
+    return acc
 
 
 # ------------------------------------------------------------------ connection
@@ -250,9 +318,9 @@ def _quote(folder: str) -> str:
 
 
 def list_folders(
-    s: Session, settings: Settings, box: SecretBox, factory: Any = None
+    s: Session, settings: Settings, box: SecretBox, account_id: int, factory: Any = None
 ) -> list[dict[str, str]]:
-    cfg = get_config(s)
+    cfg = get_account(s, account_id)
     if cfg.provider == "microsoft":
         graph = mail_microsoft.GraphMail(cfg, box, factory)
         try:
@@ -326,6 +394,7 @@ def _scan_folder(
     s: Session,
     settings: Settings,
     conn: Any,
+    account_id: int,
     folder: str,
     since_days: int,
     provider: Any,
@@ -337,7 +406,9 @@ def _scan_folder(
         totals["folder_errors"] += 1
         return
     validity = _uidvalidity(conn)
-    state = s.get(MailFolderState, folder) or MailFolderState(folder=folder, uidvalidity=0)
+    state = s.get(MailFolderState, (account_id, folder)) or MailFolderState(
+        account_id=account_id, folder=folder, uidvalidity=0, last_uid=0
+    )
     if state.uidvalidity != validity:
         state.uidvalidity, state.last_uid = validity, 0
         s.add(state)
@@ -370,6 +441,7 @@ def _scan_graph_folder(
     s: Session,
     settings: Settings,
     graph: mail_microsoft.GraphMail,
+    account_id: int,
     folder: str,
     since_days: int,
     provider: Any,
@@ -378,8 +450,8 @@ def _scan_graph_folder(
 ) -> None:
     """Like ``_scan_folder`` for Microsoft: progress is the folder's delta link, so messages
     moved into the folder later are read too (their received date may be old)."""
-    state = s.get(MailFolderState, folder) or MailFolderState(
-        folder=folder, uidvalidity=-1, last_uid=0
+    state = s.get(MailFolderState, (account_id, folder)) or MailFolderState(
+        account_id=account_id, folder=folder, uidvalidity=-1, last_uid=0
     )
     if state.uidvalidity != -1:
         state.uidvalidity, state.last_uid, state.cursor = -1, 0, None
@@ -428,20 +500,6 @@ def _read_changes(
             return
 
 
-def _scan_microsoft(
-    s: Session, settings: Settings, box: SecretBox, provider: Any, transport: Any,
-    today: date, totals: dict[str, int],
-) -> None:  # fmt: skip
-    cfg = get_config(s)
-    graph = mail_microsoft.GraphMail(cfg, box, transport)
-    s.commit()  # keep the rotated sign-in token even if reading fails below
-    try:
-        for folder in list(cfg.folders or []):
-            _scan_graph_folder(s, settings, graph, folder, cfg.since_days, provider, today, totals)
-    finally:
-        graph.close()
-
-
 def _import_message(
     s: Session,
     settings: Settings,
@@ -482,6 +540,47 @@ def _import_message(
         totals["to_review"] += 1
 
 
+def _scan_account(
+    s: Session, settings: Settings, box: SecretBox, acc: MailboxConfig, provider: Any,
+    factory: Any, transport: Any, today: date, totals: dict[str, int],
+) -> None:  # fmt: skip
+    """Read one account's chosen folders, recording its own result or error."""
+    mine = dict.fromkeys(totals, 0)
+    account_id = acc.id
+    try:
+        if acc.provider == "microsoft":
+            graph = mail_microsoft.GraphMail(acc, box, transport)
+            s.commit()  # keep the rotated sign-in token even if reading fails below
+            try:
+                for folder in list(acc.folders or []):
+                    _scan_graph_folder(s, settings, graph, account_id, folder, acc.since_days,
+                                       provider, today, mine)  # fmt: skip
+            finally:
+                graph.close()
+        else:
+            conn = connect(acc, box, settings, factory)
+            try:
+                for folder in list(acc.folders or []):
+                    _scan_folder(s, settings, conn, account_id, folder, acc.since_days,
+                                 provider, today, mine)  # fmt: skip
+            except (imaplib.IMAP4.error, OSError):
+                raise DomainError("mailbox.failed", "Reading the mail folders failed.") from None
+            finally:
+                _logout(conn)
+    except DomainError as exc:
+        s.rollback()
+        acc = get_account(s, account_id)
+        acc.last_error, acc.last_scan_at = exc.code, utcnow()
+        s.commit()
+        raise
+    finally:
+        for k, v in mine.items():
+            totals[k] += v
+    acc = get_account(s, account_id)
+    acc.last_error, acc.last_scan_at, acc.last_result_json = None, utcnow(), mine
+    s.commit()
+
+
 def scan(
     s: Session,
     settings: Settings,
@@ -489,62 +588,41 @@ def scan(
     *,
     provider: Any = None,
     factory: Any = None,
+    transport: Any = None,
     today: date | None = None,
+    account_id: int | None = None,
 ) -> dict[str, Any]:
-    """Read new messages in the chosen folders. Safe to call repeatedly (resumes by UID)."""
-    cfg = get_config(s)
-    if not cfg.enabled:
+    """Read new messages in every switched-on account (or just one). Safe to call repeatedly:
+    each folder resumes where it stopped. One account failing doesn't stop the others; if
+    all of them fail, the first error is raised."""
+    accounts = [a for a in list_accounts(s) if a.enabled]
+    if account_id is not None:
+        accounts = [a for a in accounts if a.id == account_id]
+    if not accounts:
         raise DomainError("mailbox.not_configured", "Set up email folders in Settings first.")
     if not _scan_lock.acquire(blocking=False):
         raise DomainError("mailbox.busy", "Already checking your email.")
     today = today or core.today_london()
     totals = {k: 0 for k in ("checked", "skipped", "already_seen", "bookings", "remittances",
                              "already_booked", "to_review", "unread", "folder_errors")}  # fmt: skip
+    errors: list[dict[str, Any]] = []
+    first: DomainError | None = None
     try:
-        if cfg.provider == "microsoft":
+        for acc in accounts:
+            label = acc.label or acc.username or acc.host
             try:
-                _scan_microsoft(s, settings, box, provider, factory, today, totals)
+                _scan_account(s, settings, box, acc, provider, factory, transport, today, totals)
             except DomainError as exc:
-                s.rollback()
-                cfg = get_config(s)
-                cfg.last_error = exc.code
-                cfg.last_scan_at = utcnow()
-                s.commit()
-                raise
-            return _finish_scan(s, totals)
-        try:
-            conn = connect(cfg, box, settings, factory)
-        except DomainError as exc:
-            cfg.last_error = exc.code
-            cfg.last_scan_at = utcnow()
-            s.commit()
-            raise
-        try:
-            for folder in cfg.folders or []:
-                _scan_folder(s, settings, conn, folder, cfg.since_days, provider, today, totals)
-        except (imaplib.IMAP4.error, OSError):
-            s.rollback()
-            cfg = get_config(s)
-            cfg.last_error = "mailbox.failed"
-            cfg.last_scan_at = utcnow()
-            s.commit()
-            raise DomainError("mailbox.failed", "Reading the mail folders failed.") from None
-        finally:
-            _logout(conn)
-        return _finish_scan(s, totals)
+                first = first or exc
+                errors.append({"account_id": acc.id, "label": label, "error": exc.code})
+        if first is not None and len(errors) == len(accounts):
+            raise first
+        core.audit(s, "mailbox.scanned", accounts=len(accounts), failed=len(errors), **totals)
+        s.commit()
+        return {**totals, "errors": errors}
     finally:
         _scan_lock.release()
 
 
-def _finish_scan(s: Session, totals: dict[str, int]) -> dict[str, Any]:
-    cfg = get_config(s)
-    cfg.last_error = None
-    cfg.last_scan_at = utcnow()
-    cfg.last_result_json = totals
-    core.audit(s, "mailbox.scanned", **totals)
-    s.commit()
-    return totals
-
-
-def auto_scan_due(cfg: MailboxConfig) -> bool:
-    return bool(cfg.enabled and cfg.auto_scan)
+def auto_scan_due(s: Session) -> bool:
+    return any(a.enabled and a.auto_scan for a in list_accounts(s))

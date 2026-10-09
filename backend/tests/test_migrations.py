@@ -145,3 +145,76 @@ def test_upgrade_rolls_back_on_broken_reference(tmp_path):
     with eng.connect() as c:  # nothing was applied
         assert c.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0018"
     eng.dispose()
+
+
+def test_0022_single_mailbox_becomes_first_account_with_progress(tmp_path):
+    eng = db.init_engine(tmp_path / "m.db")
+    upgrade(eng, "0021")
+    with eng.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO mailbox_config (id, enabled, provider, ms_tenant, host, port, security,"
+                " username, password_ciphertext, folders, since_days, auto_scan, updated_at)"
+                " VALUES (1, 1, 'imap', 'common', 'imap.example.invalid', 993, 'ssl',"
+                " 'alex@example.invalid', 'enc', '[\"Locum\"]', 90, 1, '2026-10-01 00:00:00')"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO mail_folder_state (folder, uidvalidity, last_uid)"
+                " VALUES ('Locum', 7, 42)"
+            )
+        )
+    upgrade(eng)
+    with eng.connect() as c:
+        acc = c.execute(text("SELECT id, label, enabled, deleted_at FROM mailbox_config")).all()
+        progress = c.execute(text("SELECT * FROM mail_folder_progress")).all()
+    assert acc == [(1, "alex@example.invalid", 1, None)]
+    assert [tuple(r)[:4] for r in progress] == [(1, "Locum", 7, 42)]
+    eng.dispose()
+
+
+def test_0022_unused_mailbox_row_is_dropped(tmp_path):
+    eng = db.init_engine(tmp_path / "e.db")
+    upgrade(eng, "0021")
+    with eng.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO mailbox_config (id, enabled, provider, ms_tenant, host, port, security,"
+                " username, folders, since_days, auto_scan, updated_at) VALUES (1, 0, 'imap',"
+                " 'common', '', 993, 'ssl', '', '[]', 90, 1, '2026-10-01 00:00:00')"
+            )
+        )
+    upgrade(eng)
+    with eng.connect() as c:
+        assert c.execute(text("SELECT COUNT(*) FROM mailbox_config")).scalar() == 0
+    eng.dispose()
+
+
+def test_0022_keeps_a_signed_out_microsoft_mailbox(tmp_path):
+    eng = db.init_engine(tmp_path / "s.db")
+    upgrade(eng, "0021")
+    with eng.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO mailbox_config (id, enabled, provider, ms_client_id, ms_tenant, host,"
+                " port, security, username, folders, since_days, auto_scan, updated_at) VALUES"
+                " (1, 0, 'microsoft', '00000000-0000-0000-0000-000000000000', 'common', '', 993,"
+                " 'ssl', 'alex@example.invalid', '[\"f1\"]', 90, 1, '2026-10-01 00:00:00')"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO mail_folder_state (folder, uidvalidity, last_uid, cursor)"
+                " VALUES ('f1', -1, 0, 'https://graph.microsoft.com/v1.0/delta?x')"
+            )
+        )
+    upgrade(eng)
+    with eng.connect() as c:
+        assert c.execute(text("SELECT username FROM mailbox_config")).all() == [
+            ("alex@example.invalid",)
+        ]
+        assert c.execute(text("SELECT account_id, cursor FROM mail_folder_progress")).all() == [
+            (1, "https://graph.microsoft.com/v1.0/delta?x")
+        ]
+    eng.dispose()

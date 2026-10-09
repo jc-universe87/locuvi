@@ -2,6 +2,8 @@
 
 Locuvi can check chosen email folders for locum bookings and payment notices
 (Settings › Booking emails). It only reads: nothing is marked as read, moved, sent or deleted.
+You can add several accounts (for example a Gmail and an Outlook address); each has its own
+folders, sign-in and status, and "Check for bookings now" checks them all.
 
 | Account | How Locuvi connects | What you need |
 | --- | --- | --- |

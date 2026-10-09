@@ -97,9 +97,13 @@ def _post_login(http: httpx.Client, tenant: str, path: str, form: dict[str, str]
 
 
 def start_sign_in(
-    client_id: str, tenant: str, transport: httpx.BaseTransport | None = None
+    client_id: str,
+    tenant: str,
+    transport: httpx.BaseTransport | None = None,
+    account_id: int | None = None,
 ) -> dict[str, Any]:
-    """Ask Microsoft for a sign-in code; returns what the owner needs to see."""
+    """Ask Microsoft for a sign-in code for one account; returns what the owner needs to see.
+    One sign-in runs at a time: starting another replaces it."""
     client_id, tenant = _check_ids(client_id, tenant)
     with client(transport) as http:
         data = _post_login(http, tenant, "devicecode", {"client_id": client_id, "scope": SCOPES})
@@ -110,6 +114,7 @@ def start_sign_in(
         _pending.clear()
         _pending.update(
             device_code=data["device_code"], client_id=client_id, tenant=tenant,
+            account_id=account_id,
             expires_at=time.monotonic() + expires, interval=int(data.get("interval") or 5),
         )  # fmt: skip
     return {
@@ -121,11 +126,16 @@ def start_sign_in(
 
 
 def poll_sign_in(
-    cfg: MailboxConfig, box: SecretBox, transport: httpx.BaseTransport | None = None
+    cfg: MailboxConfig,
+    box: SecretBox,
+    transport: httpx.BaseTransport | None = None,
+    account_id: int | None = None,
 ) -> dict[str, Any]:
     """Check whether the owner has approved the sign-in yet. On success, keep the token."""
     with _pending_lock:
         pending = dict(_pending)
+    if pending and pending.get("account_id") != account_id:  # a sign-in for another account
+        raise DomainError("mailbox.ms_expired", "The sign-in code expired. Start again.")
     if not pending or time.monotonic() > pending["expires_at"]:
         _forget(pending)
         raise DomainError("mailbox.ms_expired", "The sign-in code expired. Start again.")
@@ -156,7 +166,6 @@ def poll_sign_in(
                 "Your organisation must approve Locuvi before it can read this mailbox.",
             )
         me = _get_json(http, data["access_token"], f"{GRAPH}/me?$select=mail,userPrincipalName")
-    cfg.provider = "microsoft"
     cfg.ms_client_id, cfg.ms_tenant = pending["client_id"], pending["tenant"]
     cfg.ms_token_ciphertext = box.encrypt(data["refresh_token"])
     cfg.username = str(me.get("mail") or me.get("userPrincipalName") or "")[:200]
