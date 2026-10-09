@@ -664,34 +664,83 @@ function AssistantSection() {
 }
 
 type Folder = { name: string; label: string };
+type MailKind = "gmail" | "outlook" | "nhsmail" | "other";
+type SignIn = { user_code: string; verification_uri: string; interval: number };
+
+const GUIDE = "https://github.com/jc-universe87/GP-Locum-Manager/blob/main/docs/EMAIL_SETUP.md";
+
+function mailKind(c: MailboxConfig): MailKind {
+  if (c.provider === "microsoft") return c.ms_tenant === "organizations" ? "nhsmail" : "outlook";
+  return !c.host || c.host === "imap.gmail.com" ? "gmail" : "other";
+}
 
 function MailboxSection() {
   const { t, tn } = useT();
   const [cfg, setCfg] = useState<MailboxConfig | null>(null);
+  const [kind, setKind] = useState<MailKind>("gmail");
   const [password, setPassword] = useState("");
   const [folders, setFolders] = useState<Folder[] | null>(null);
+  const [signin, setSignin] = useState<SignIn | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api.get<MailboxConfig>("/settings/mailbox").then(setCfg, setError);
+    api.get<MailboxConfig>("/settings/mailbox").then((c) => { setCfg(c); setKind(mailKind(c)); }, setError);
   }, []);
+  // While a Microsoft sign-in is waiting, ask the server every few seconds whether it was approved.
+  useEffect(() => {
+    if (!signin) return;
+    let stop = false;
+    let timer = 0;
+    const tick = async () => {
+      try {
+        const r = await api.post<{ status: string; config?: MailboxConfig }>("/settings/mailbox/microsoft/poll");
+        if (stop) return;
+        if (r.status === "done" && r.config) {
+          setSignin(null);
+          setCfg(r.config);
+          setFolders((await api.post<{ folders: Folder[] }>("/settings/mailbox/folders")).folders);
+          return;
+        }
+        timer = window.setTimeout(tick, signin.interval * 1000);
+      } catch (e) {
+        if (!stop) { setSignin(null); setError(e); }
+      }
+    };
+    timer = window.setTimeout(tick, signin.interval * 1000);
+    return () => { stop = true; window.clearTimeout(timer); };
+  }, [signin]);
   if (!cfg) return <ErrorAlert error={error} />;
+  const microsoft = kind === "outlook" || kind === "nhsmail";
+  const sameAccount = microsoft ? cfg.provider === "microsoft" && mailKind(cfg) === kind : cfg.provider === "imap";
   const set = (patch: Partial<MailboxConfig>) => { setCfg({ ...cfg, ...patch }); setMsg(null); };
   const body = (over: Partial<MailboxConfig> = {}) => {
     const c = { ...cfg, ...over };
-    return { enabled: c.enabled, host: c.host, port: c.port, security: c.security, username: c.username,
-      password: password || null, folders: c.folders, since_days: c.since_days, auto_scan: c.auto_scan };
+    const gmail = kind === "gmail";
+    return { enabled: c.enabled, provider: microsoft ? "microsoft" : "imap",
+      host: gmail ? "imap.gmail.com" : c.host, port: gmail ? 993 : c.port, security: gmail ? "ssl" : c.security,
+      username: c.username, password: password || null, folders: c.folders, since_days: c.since_days, auto_scan: c.auto_scan };
   };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError(null); setMsg(null);
     try { await fn(); } catch (e) { setError(e); } finally { setBusy(false); }
   };
+  const chooseKind = (k: MailKind) => { setKind(k); setFolders(null); setSignin(null); setMsg(null); setError(null); };
+  const loadFolders = async () => setFolders((await api.post<{ folders: Folder[] }>("/settings/mailbox/folders")).folders);
   const connect = () => run(async () => {
     setCfg(await api.put<MailboxConfig>("/settings/mailbox", body({ enabled: false })));
     setPassword("");
-    const r = await api.post<{ folders: Folder[] }>("/settings/mailbox/folders");
-    setFolders(r.folders);
+    await loadFolders();
+  });
+  const startSignIn = () => run(async () => {
+    const r = await api.post<SignIn>("/settings/mailbox/microsoft/start",
+      { client_id: cfg.ms_client_id.trim(), tenant: kind === "nhsmail" ? "organizations" : "common" });
+    setSignin(r);
+  });
+  const signOut = () => run(async () => {
+    await api.del("/settings/mailbox/microsoft");
+    setCfg(await api.get<MailboxConfig>("/settings/mailbox"));
+    setFolders(null);
   });
   const save = (enabled: boolean) => run(async () => {
     setCfg(await api.put<MailboxConfig>("/settings/mailbox", body({ enabled })));
@@ -705,41 +754,94 @@ function MailboxSection() {
   });
   const toggleFolder = (name: string, on: boolean) =>
     set({ folders: on ? [...cfg.folders, name] : cfg.folders.filter((f) => f !== name) });
-  const shown: Folder[] = folders ?? cfg.folders.map((f) => ({ name: f, label: f }));
+  const shown: Folder[] = folders ?? (sameAccount ? cfg.folders.map((f) => ({ name: f, label: cfg.folder_labels[f] ?? f })) : []);
   const lastErr = cfg.last_error && hasKey(`error.${cfg.last_error}`) ? t(`error.${cfg.last_error}` as MessageKey) : cfg.last_error;
+  const copy = (text: string) => void navigator.clipboard?.writeText(text).catch(() => undefined);
   return (
     <>
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("mailbox.intro")}</p>
       <ErrorAlert error={error} />
       {msg && <div className="alert ok" role="status">{msg}</div>}
-      {cfg.enabled && lastErr && <div className="alert warn" role="status">{t("mailbox.last_failed", { reason: lastErr })}</div>}
+      {cfg.enabled && sameAccount && lastErr && <div className="alert warn" role="status">{t("mailbox.last_failed", { reason: lastErr })}</div>}
       <div className="form-list">
-        <Row id="m-host" label={t("mailbox.host")} hint={t("mailbox.host_hint")}>
-          <input id="m-host" type="text" autoCapitalize="none" spellCheck={false} value={cfg.host} placeholder="imap.gmail.com"
-            onChange={(e) => set({ host: e.target.value.trim() })} />
-        </Row>
-        <Row id="m-security" label={t("mailbox.security")}>
-          <select id="m-security" value={cfg.security} onChange={(e) => {
-            const security = e.target.value as "ssl" | "starttls";
-            set({ security, port: security === "ssl" ? 993 : 143 });
-          }}>
-            <option value="ssl">SSL/TLS (993)</option>
-            <option value="starttls">STARTTLS (143)</option>
+        <Row id="m-kind" label={t("mailbox.account")}>
+          <select id="m-kind" value={kind} onChange={(e) => chooseKind(e.target.value as MailKind)}>
+            <option value="gmail">Gmail</option>
+            <option value="outlook">{t("mailbox.kind_outlook")}</option>
+            <option value="nhsmail">NHSmail</option>
+            <option value="other">{t("mailbox.kind_other")}</option>
           </select>
         </Row>
-        <Row id="m-user" label={t("mailbox.username")}>
-          <input id="m-user" type="email" autoCapitalize="none" value={cfg.username} onChange={(e) => set({ username: e.target.value.trim() })} />
-        </Row>
-        <Row id="m-pass" label={t("mailbox.password")} hint={t("mailbox.password_hint")}>
-          <input id="m-pass" type="password" autoComplete="new-password" placeholder={cfg.password_set ? "••••••••" : ""}
-            value={password} onChange={(e) => setPassword(e.target.value)} />
-        </Row>
+        {!microsoft && kind === "other" && (
+          <>
+            <Row id="m-host" label={t("mailbox.host")} hint={t("mailbox.host_hint")}>
+              <input id="m-host" type="text" autoCapitalize="none" spellCheck={false} value={cfg.host} placeholder="imap.example.com"
+                onChange={(e) => set({ host: e.target.value.trim() })} />
+            </Row>
+            <Row id="m-security" label={t("mailbox.security")}>
+              <select id="m-security" value={cfg.security} onChange={(e) => {
+                const security = e.target.value as "ssl" | "starttls";
+                set({ security, port: security === "ssl" ? 993 : 143 });
+              }}>
+                <option value="ssl">SSL/TLS (993)</option>
+                <option value="starttls">STARTTLS (143)</option>
+              </select>
+            </Row>
+          </>
+        )}
+        {!microsoft && (
+          <>
+            <Row id="m-user" label={t("mailbox.username")}>
+              <input id="m-user" type="email" autoCapitalize="none" value={cfg.username} onChange={(e) => set({ username: e.target.value.trim() })} />
+            </Row>
+            <Row id="m-pass" label={t("mailbox.password")} hint={t(kind === "gmail" ? "mailbox.gmail_hint" : "mailbox.password_hint")}>
+              <input id="m-pass" type="password" autoComplete="new-password" placeholder={cfg.password_set && sameAccount ? "••••••••" : ""}
+                value={password} onChange={(e) => setPassword(e.target.value)} />
+            </Row>
+          </>
+        )}
+        {microsoft && !(sameAccount && cfg.ms_signed_in) && (
+          <Row id="m-app" label={t("mailbox.ms_app_id")} hint={t("mailbox.ms_app_id_hint")}>
+            <input id="m-app" type="text" autoCapitalize="none" spellCheck={false} placeholder="00000000-0000-0000-0000-000000000000"
+              value={cfg.ms_client_id} onChange={(e) => set({ ms_client_id: e.target.value.trim() })} />
+          </Row>
+        )}
       </div>
-      <div className="actions" style={{ marginTop: "0.5rem" }}>
-        <button className="btn secondary" disabled={busy || !cfg.host || !cfg.username || (!password && !cfg.password_set)} onClick={connect}>
-          {busy && !folders ? t("mailbox.connecting") : t("mailbox.connect")}
-        </button>
-      </div>
+      {kind === "gmail" && (
+        <p className="hint"><a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">{t("mailbox.gmail_link")}</a></p>
+      )}
+      {microsoft && (
+        <p className="hint"><a href={GUIDE} target="_blank" rel="noreferrer">{t("mailbox.ms_guide")}</a></p>
+      )}
+      {kind === "nhsmail" && <div className="alert info" role="note">{t("mailbox.nhs_note")}</div>}
+
+      {signin ? (
+        <div className="card" role="status" style={{ marginTop: "0.5rem" }}>
+          <p style={{ marginTop: 0 }}>{t("mailbox.ms_code_lead")}</p>
+          <p style={{ fontSize: "1.6rem", fontWeight: 600, letterSpacing: "0.1em", margin: "0.25rem 0" }}>{signin.user_code}</p>
+          <div className="actions">
+            <a className="btn" href={signin.verification_uri} target="_blank" rel="noreferrer" onClick={() => copy(signin.user_code)}>{t("mailbox.ms_open")}</a>
+            <button className="btn ghost" onClick={() => setSignin(null)}>{t("common.cancel")}</button>
+          </div>
+          <p className="form-foot">{t("mailbox.ms_waiting")}</p>
+        </div>
+      ) : (
+        <div className="actions" style={{ marginTop: "0.5rem" }}>
+          {microsoft && sameAccount && cfg.ms_signed_in ? (
+            <>
+              <span className="muted">{t("mailbox.ms_signed_in", { email: cfg.username })}</span>
+              <button className="btn secondary" disabled={busy} onClick={() => run(loadFolders)}>{t("mailbox.choose_folders")}</button>
+              <button className="btn ghost" disabled={busy} onClick={signOut}>{t("mailbox.ms_sign_out")}</button>
+            </>
+          ) : microsoft ? (
+            <button className="btn secondary" disabled={busy || !cfg.ms_client_id.trim()} onClick={startSignIn}>{t("mailbox.ms_sign_in")}</button>
+          ) : (
+            <button className="btn secondary" disabled={busy || (kind === "other" && !cfg.host) || !cfg.username || (!password && !(cfg.password_set && sameAccount))} onClick={connect}>
+              {busy && !folders ? t("mailbox.connecting") : t("mailbox.connect")}
+            </button>
+          )}
+        </div>
+      )}
 
       {shown.length > 0 && (
         <>

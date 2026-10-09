@@ -222,10 +222,34 @@ def mailbox_folders(request: Request, s: DB) -> dict[str, Any]:
     from locuvi.services import mailbox
 
     folders = mailbox.list_folders(
-        s, state(request).settings, state(request).secrets,
-        factory=getattr(state(request), "imap_factory", None),
+        s, state(request).settings, state(request).secrets, factory=_mail_factory(request, s),
     )  # fmt: skip
     return {"folders": folders}
+
+
+@api.post("/settings/mailbox/microsoft/start")
+def mailbox_ms_start(body: S.MicrosoftSignInIn, request: Request) -> dict[str, Any]:
+    """Begin a Microsoft sign-in: returns a short code to enter at microsoft.com/devicelogin."""
+    from locuvi.services import mailbox
+
+    return mailbox.ms_start(
+        body.client_id, body.tenant, getattr(state(request), "ms_transport", None)
+    )
+
+
+@api.post("/settings/mailbox/microsoft/poll")
+def mailbox_ms_poll(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    r = mailbox.ms_poll(s, state(request).secrets, getattr(state(request), "ms_transport", None))
+    return {**r, "config": mailbox.config_public(mailbox.get_config(s))}
+
+
+@api.delete("/settings/mailbox/microsoft")
+def mailbox_ms_sign_out(s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    return mailbox.config_public(mailbox.ms_sign_out(s))
 
 
 @api.post("/mailbox/scan")
@@ -237,8 +261,17 @@ def mailbox_scan(request: Request, s: DB) -> dict[str, Any]:
         state(request).settings,
         state(request).secrets,
         provider=_provider(request, s),
-        factory=getattr(state(request), "imap_factory", None),
+        factory=_mail_factory(request, s),
     )
+
+
+def _mail_factory(request: Request, s: Any) -> Any:
+    """Test hook: a fake IMAP server, or a fake Microsoft transport for Microsoft accounts."""
+    from locuvi.services import mailbox
+
+    if mailbox.get_config(s).provider == "microsoft":
+        return getattr(state(request), "ms_transport", None)
+    return getattr(state(request), "imap_factory", None)
 
 
 # ------------------------------------------------------------------------ bank

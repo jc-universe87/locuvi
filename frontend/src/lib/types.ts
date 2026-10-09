@@ -359,6 +359,11 @@ export interface ScanResult {
 
 export interface MailboxConfig {
   enabled: boolean;
+  provider: "imap" | "microsoft";
+  ms_client_id: string;
+  ms_tenant: string;
+  ms_signed_in: boolean;
+  folder_labels: Record<string, string>;
   host: string;
   port: number;
   security: "ssl" | "starttls";
