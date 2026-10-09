@@ -271,7 +271,7 @@ export interface Doc {
   proposals?: Proposal[];
 }
 
-export type ProposalFlag = "needs_practice" | "needs_rate" | "duplicate" | "clash" | "not_in_diary" | "invoiced";
+export type ProposalFlag = "needs_practice" | "needs_rate" | "duplicate" | "rate_differs" | "clash" | "not_in_diary" | "invoiced";
 
 export interface ProposalItem {
   date: string;
@@ -285,6 +285,7 @@ export interface ProposalItem {
   note: string | null;
   flags: ProposalFlag[];
   clash_with: string | null;
+  diary_rate: string | null;
   session_id: string | null;
   past: boolean;
   selected: boolean;
@@ -294,7 +295,7 @@ export interface Proposal {
   id: string;
   kind: string;
   document_id: string | null;
-  status: "pending" | "accepted" | "partial" | "rejected";
+  status: "pending" | "accepted" | "partial" | "rejected" | "verified";
   engine: string;
   ai: boolean;
   summary: string;
@@ -311,4 +312,31 @@ export interface AssistantConfig {
   key_saved: boolean;
   key_from_server: boolean;
   ready: boolean;
+}
+
+export interface ScanResult {
+  checked: number;
+  skipped: number;
+  already_seen: number;
+  bookings: number;
+  remittances: number;
+  already_booked: number;
+  to_review: number;
+  unread: number;
+  folder_errors: number;
+}
+
+export interface MailboxConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  security: "ssl" | "starttls";
+  username: string;
+  password_set: boolean;
+  folders: string[];
+  since_days: number;
+  auto_scan: boolean;
+  last_scan_at: string | null;
+  last_error: string | null;
+  last_result: ScanResult | null;
 }

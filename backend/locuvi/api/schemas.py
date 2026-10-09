@@ -339,3 +339,17 @@ class ProposalChoice(Strict):
 
 class ProposalAcceptIn(Strict):
     items: Annotated[list[ProposalChoice], Field(min_length=1, max_length=62)]
+
+
+class MailboxIn(Strict):
+    enabled: bool = False
+    host: Annotated[str, StringConstraints(max_length=200)] = ""
+    port: Annotated[int, Field(ge=1, le=65535)] = 993
+    security: Literal["ssl", "starttls"] = "ssl"
+    username: Short = ""
+    password: Annotated[str, StringConstraints(max_length=500)] | None = None
+    folders: Annotated[
+        list[Annotated[str, StringConstraints(max_length=300)]], Field(max_length=20)
+    ] = []
+    since_days: Annotated[int, Field(ge=1, le=730)] = 90
+    auto_scan: bool = True

@@ -84,6 +84,7 @@ def clean_item(
     rate_source = "text" if rate is not None else None
     session_id: str | None = None
     clash_with: str | None = None
+    diary_rate: str | None = None
     same_day = _active_on(s, day)
     if practice is None:
         flags.append("needs_practice")
@@ -104,6 +105,9 @@ def clean_item(
             ):
                 flags.append("duplicate")
                 session_id = w.id
+                if rate_source == "text" and rate is not None and w.unit == unit and rate != w.rate:
+                    flags.append("rate_differs")  # booked, but the email states another fee
+                    diary_rate = str(w.rate)
                 break
             if overlaps and clash_with is None:
                 clash_with = w.practice.name
@@ -140,6 +144,7 @@ def clean_item(
         "note": (str(raw.get("note") or "").strip()[:200] or None),
         "flags": flags,
         "clash_with": clash_with,
+        "diary_rate": diary_rate,
         "session_id": session_id,
         "past": day < today,
         "selected": selectable and "duplicate" not in flags,
@@ -174,8 +179,14 @@ def build(
             "questions": questions,
         },
     )
+    if items and all(i["action"] == "add" and i["flags"] == ["duplicate"] for i in items):
+        # Everything in it is already in the diary, at the same rate: nothing to decide.
+        prop.status = "verified"
+        prop.decided_at = utcnow()
+        if document is not None:
+            document.status = "done"
     s.add(prop)
-    core.audit(s, "proposal.created", engine=engine, items=len(items))
+    core.audit(s, "proposal.created", engine=engine, items=len(items), status=prop.status)
     s.commit()
     return prop
 

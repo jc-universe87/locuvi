@@ -4,15 +4,16 @@ import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave } from "../compon
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
-import { pct, todayLondon, ukDate } from "../lib/format";
+import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
-import type { AssistantConfig, EmailConfig, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
+import type { AssistantConfig, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
 import { PracticeSheet } from "./Diary";
+import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "assistant"] as const;
+const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "mailbox", "assistant"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", assistant: "sparkle",
+  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", mailbox: "inbox", assistant: "sparkle",
 };
 
 export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
@@ -32,6 +33,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         {section === "pension" && <PensionSection />}
         {section === "email" && <EmailSection />}
         {section === "storage" && <StorageSection />}
+        {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
       </>
     );
@@ -543,6 +545,125 @@ function AssistantSection() {
         <li>{t("assistant.privacy_4")}</li>
       </ul>
       <p className="form-foot">{t("assistant.model", { model: cfg.model })}</p>
+    </>
+  );
+}
+
+type Folder = { name: string; label: string };
+
+function MailboxSection() {
+  const { t, tn } = useT();
+  const [cfg, setCfg] = useState<MailboxConfig | null>(null);
+  const [password, setPassword] = useState("");
+  const [folders, setFolders] = useState<Folder[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api.get<MailboxConfig>("/settings/mailbox").then(setCfg, setError);
+  }, []);
+  if (!cfg) return <ErrorAlert error={error} />;
+  const set = (patch: Partial<MailboxConfig>) => { setCfg({ ...cfg, ...patch }); setMsg(null); };
+  const body = (over: Partial<MailboxConfig> = {}) => {
+    const c = { ...cfg, ...over };
+    return { enabled: c.enabled, host: c.host, port: c.port, security: c.security, username: c.username,
+      password: password || null, folders: c.folders, since_days: c.since_days, auto_scan: c.auto_scan };
+  };
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true); setError(null); setMsg(null);
+    try { await fn(); } catch (e) { setError(e); } finally { setBusy(false); }
+  };
+  const connect = () => run(async () => {
+    setCfg(await api.put<MailboxConfig>("/settings/mailbox", body({ enabled: false })));
+    setPassword("");
+    const r = await api.post<{ folders: Folder[] }>("/settings/mailbox/folders");
+    setFolders(r.folders);
+  });
+  const save = (enabled: boolean) => run(async () => {
+    setCfg(await api.put<MailboxConfig>("/settings/mailbox", body({ enabled })));
+    setPassword("");
+    setMsg(enabled ? t("mailbox.on") : t("common.saved"));
+  });
+  const scan = () => run(async () => {
+    const r = await api.post<ScanResult>("/mailbox/scan");
+    setMsg(scanSummary(t, tn, r));
+    setCfg(await api.get<MailboxConfig>("/settings/mailbox"));
+  });
+  const toggleFolder = (name: string, on: boolean) =>
+    set({ folders: on ? [...cfg.folders, name] : cfg.folders.filter((f) => f !== name) });
+  const shown: Folder[] = folders ?? cfg.folders.map((f) => ({ name: f, label: f }));
+  const lastErr = cfg.last_error && hasKey(`error.${cfg.last_error}`) ? t(`error.${cfg.last_error}` as MessageKey) : cfg.last_error;
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("mailbox.intro")}</p>
+      <ErrorAlert error={error} />
+      {msg && <div className="alert ok" role="status">{msg}</div>}
+      {cfg.enabled && lastErr && <div className="alert warn" role="status">{t("mailbox.last_failed", { reason: lastErr })}</div>}
+      <div className="form-list">
+        <Row id="m-host" label={t("mailbox.host")} hint={t("mailbox.host_hint")}>
+          <input id="m-host" type="text" autoCapitalize="none" spellCheck={false} value={cfg.host} placeholder="imap.gmail.com"
+            onChange={(e) => set({ host: e.target.value.trim() })} />
+        </Row>
+        <Row id="m-security" label={t("mailbox.security")}>
+          <select id="m-security" value={cfg.security} onChange={(e) => {
+            const security = e.target.value as "ssl" | "starttls";
+            set({ security, port: security === "ssl" ? 993 : 143 });
+          }}>
+            <option value="ssl">SSL/TLS (993)</option>
+            <option value="starttls">STARTTLS (143)</option>
+          </select>
+        </Row>
+        <Row id="m-user" label={t("mailbox.username")}>
+          <input id="m-user" type="email" autoCapitalize="none" value={cfg.username} onChange={(e) => set({ username: e.target.value.trim() })} />
+        </Row>
+        <Row id="m-pass" label={t("mailbox.password")} hint={t("mailbox.password_hint")}>
+          <input id="m-pass" type="password" autoComplete="new-password" placeholder={cfg.password_set ? "••••••••" : ""}
+            value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Row>
+      </div>
+      <div className="actions" style={{ marginTop: "0.5rem" }}>
+        <button className="btn secondary" disabled={busy || !cfg.host || !cfg.username || (!password && !cfg.password_set)} onClick={connect}>
+          {busy && !folders ? t("mailbox.connecting") : t("mailbox.connect")}
+        </button>
+      </div>
+
+      {shown.length > 0 && (
+        <>
+          <h3>{t("mailbox.folders_title")}</h3>
+          <p className="muted" style={{ marginTop: 0 }}>{t("mailbox.folders_hint")}</p>
+          <div className="form-list">
+            {shown.map((f) => (
+              <label key={f.name} className="form-row" style={{ gridTemplateColumns: "auto 1fr", cursor: "pointer" }}>
+                <input type="checkbox" checked={cfg.folders.includes(f.name)} onChange={(e) => toggleFolder(f.name, e.target.checked)} />
+                <span>{f.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="form-list" style={{ marginTop: "1rem" }}>
+            <Row id="m-since" label={t("mailbox.since")}>
+              <select id="m-since" value={cfg.since_days} onChange={(e) => set({ since_days: Number(e.target.value) })}>
+                {[30, 90, 180, 365].map((d) => <option key={d} value={d}>{tn("mailbox.since_days", d)}</option>)}
+              </select>
+            </Row>
+            <SwitchRow label={t("mailbox.auto")} hint={t("mailbox.auto_hint")} checked={cfg.auto_scan} onChange={(v) => set({ auto_scan: v })} />
+          </div>
+          <div className="actions" style={{ marginTop: "0.75rem" }}>
+            <button className="btn" disabled={busy || cfg.folders.length === 0} onClick={() => save(true)}>
+              {cfg.enabled ? t("common.save") : t("mailbox.turn_on")}
+            </button>
+            {cfg.enabled && <button className="btn secondary" disabled={busy} onClick={scan}>{busy ? t("mailbox.checking") : t("mailbox.check_now")}</button>}
+            {cfg.enabled && <button className="btn ghost" disabled={busy} onClick={() => save(false)}>{t("mailbox.turn_off")}</button>}
+          </div>
+          {cfg.last_scan_at && <p className="form-foot">{t("mailbox.last_scan", { when: dateTime(cfg.last_scan_at) })}</p>}
+        </>
+      )}
+      <h3>{t("mailbox.privacy_title")}</h3>
+      <ul className="muted bullets">
+        <li>{t("mailbox.privacy_1")}</li>
+        <li>{t("mailbox.privacy_2")}</li>
+        <li>{t("mailbox.privacy_3")}</li>
+        <li>{t("mailbox.privacy_4")}</li>
+      </ul>
     </>
   );
 }

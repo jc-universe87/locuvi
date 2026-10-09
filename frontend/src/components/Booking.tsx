@@ -139,7 +139,7 @@ export function ProposalReview({
                     {it.action === "cancel" && <span className="pill overdue">{t("booking.flag_cancel")}</span>}
                     {it.flags.map((f) => (
                       <span key={f} className={`pill ${f === "duplicate" || f === "clash" ? "warn" : "draft"}`}>
-                        {t(`booking.flag_${f}` as MessageKey, { practice: it.clash_with ?? "" })}
+                        {t(`booking.flag_${f}` as MessageKey, { practice: it.clash_with ?? "", rate: gbp(it.diary_rate) })}
                       </span>
                     ))}
                     {it.rate_source === "remembered" && e.rate === it.rate && (

@@ -5,7 +5,7 @@ import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob } from "../lib/api";
 import { ukDate } from "../lib/format";
-import type { Doc, DocKind, Proposal } from "../lib/types";
+import type { Doc, DocKind, MailboxConfig, Proposal, ScanResult } from "../lib/types";
 
 const KINDS: DocKind[] = ["booking", "remittance", "statement", "pension", "other"];
 const KIND_ICON: Record<DocKind, string> = {
@@ -14,6 +14,19 @@ const KIND_ICON: Record<DocKind, string> = {
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.txt,.csv,.eml,application/pdf,image/png,image/jpeg,text/plain,text/csv,message/rfc822";
 
 type Filter = "new" | "done";
+
+type T = ReturnType<typeof useT>["t"];
+type TN = ReturnType<typeof useT>["tn"];
+
+/** "Checked 12 emails · 2 bookings to check · 1 already in your diary" */
+export function scanSummary(t: T, tn: TN, r: ScanResult): string {
+  const parts = [tn("mailbox.res_checked", r.checked)];
+  if (r.to_review) parts.push(tn("mailbox.res_review", r.to_review));
+  if (r.already_booked) parts.push(tn("mailbox.res_booked", r.already_booked));
+  if (r.remittances) parts.push(tn("mailbox.res_remittances", r.remittances));
+  if (r.checked && !r.to_review && !r.already_booked && !r.remittances) parts.push(t("mailbox.res_nothing"));
+  return parts.join(" · ");
+}
 
 export default function InboxPage() {
   const { t, tn } = useT();
@@ -29,6 +42,24 @@ export default function InboxPage() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [mailboxOn, setMailboxOn] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  useEffect(() => {
+    api.get<MailboxConfig>("/settings/mailbox").then((m) => setMailboxOn(m.enabled), () => undefined);
+  }, []);
+  const checkEmail = async () => {
+    setScanning(true);
+    setError(null);
+    try {
+      const r = await api.post<ScanResult>("/mailbox/scan");
+      toast({ text: scanSummary(t, tn, r) });
+      await load();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -78,6 +109,11 @@ export default function InboxPage() {
     <div onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}
       className={dragging ? "dropping" : undefined}>
       <PageHead title={t("inbox.title")}>
+        {mailboxOn && (
+          <button className="btn secondary small" disabled={scanning} onClick={checkEmail}>
+            <Icon name="send" size={16} /> {scanning ? t("mailbox.checking") : t("mailbox.check_now")}
+          </button>
+        )}
         <button className="btn secondary small" onClick={() => fileInput.current?.click()}>
           <Icon name="upload" size={16} /> {t("inbox.add_file")}
         </button>

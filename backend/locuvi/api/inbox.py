@@ -186,3 +186,46 @@ def put_assistant(body: S.AssistantIn, request: Request, s: DB) -> dict[str, Any
         clear_key=body.clear_key,
     )
     return providers.config_public(cfg, state(request).settings)
+
+
+# ------------------------------------------------------------------ mail folders
+
+
+@api.get("/settings/mailbox")
+def get_mailbox(s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    return mailbox.config_public(mailbox.get_config(s))
+
+
+@api.put("/settings/mailbox")
+def put_mailbox(body: S.MailboxIn, request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    cfg = mailbox.save_config(s, state(request).secrets, body.model_dump())
+    return mailbox.config_public(cfg)
+
+
+@api.post("/settings/mailbox/folders")
+def mailbox_folders(request: Request, s: DB) -> dict[str, Any]:
+    """Connect with the saved details and list folders, so the owner can tick which to read."""
+    from locuvi.services import mailbox
+
+    folders = mailbox.list_folders(
+        s, state(request).settings, state(request).secrets,
+        factory=getattr(state(request), "imap_factory", None),
+    )  # fmt: skip
+    return {"folders": folders}
+
+
+@api.post("/mailbox/scan")
+def mailbox_scan(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    return mailbox.scan(
+        s,
+        state(request).settings,
+        state(request).secrets,
+        provider=_provider(request, s),
+        factory=getattr(state(request), "imap_factory", None),
+    )

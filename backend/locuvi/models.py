@@ -420,6 +420,39 @@ class Document(TimestampMixin, Base):
         ForeignKey("practice.id"), nullable=True, index=True
     )
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    message_id: Mapped[str | None] = mapped_column(String(300), nullable=True, index=True)
+    mail_folder: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class MailboxConfig(Base):
+    """Singleton (id 1): read-only IMAP access to folders the owner chose. Password encrypted."""
+
+    __tablename__ = "mailbox_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    host: Mapped[str] = mapped_column(String(200), default="")
+    port: Mapped[int] = mapped_column(Integer, default=993)
+    security: Mapped[str] = mapped_column(String(10), default="ssl")  # ssl | starttls
+    username: Mapped[str] = mapped_column(String(200), default="")
+    password_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    folders: Mapped[list[str]] = mapped_column(JSON, default=list)
+    since_days: Mapped[int] = mapped_column(Integer, default=90)
+    auto_scan: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_scan_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    last_result_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class MailFolderState(Base):
+    """How far each chosen folder has been read (IMAP UIDVALIDITY + last UID seen)."""
+
+    __tablename__ = "mail_folder_state"
+
+    folder: Mapped[str] = mapped_column(String(300), primary_key=True)
+    uidvalidity: Mapped[int] = mapped_column(Integer, default=0)
+    last_uid: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class AssistantConfig(Base):

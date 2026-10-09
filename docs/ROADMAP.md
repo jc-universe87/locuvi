@@ -161,7 +161,14 @@ Each item is useful on its own and gives the AI something reliable to work with.
   fall back to the remembered rate, and duplicates, clashes, cancellations, unknown
   practices and missing rates are flagged against the Diary. Missing details become
   questions, not guesses. (A)
-- 🧭 Forward a booking by email (IMAP mailbox poll) into the inbox.
+- ✅ **Email folders** (`services/mailbox.py`, Settings › Email folders; owner request
+  9 Oct 2026): read-only IMAP access to **only the folders the owner ticks** (EXAMINE +
+  BODY.PEEK — nothing marked read, moved or deleted), hourly or on "Check email". Booking and
+  remittance emails (incl. PDF/text attachments) are kept in the inbox; everything else is
+  skipped and not stored. Bookings are read (rules, or the assistant if on) and **verified
+  against the Diary**: already booked → filed as verified, no action; booked but a different
+  fee → "rate differs"; new → suggestion to check. Resumes by UID; app password encrypted.
+  Microsoft 365 / NHSmail OAuth is not supported yet (💭).
 - 💭 "Prepare all outstanding invoices for September" → drafts made by the deterministic
   engine from confirmed sessions; inconsistent rates are flagged. (B)
 - 💭 Draft invoice emails and polite reminders in the right tone; always reviewed and sent with

@@ -25,6 +25,7 @@ from locuvi.models import (
     FindingDismissal,
     Invoice,
     InvoiceStatus,
+    MailboxConfig,
     Practice,
     Proposal,
     SessionStatus,
@@ -262,6 +263,13 @@ def _inbox(s: Session, today: date) -> list[Finding]:
             Document.status == "new", Document.deleted_at.is_(None), Document.created_at < cutoff
         )
     )
+    mbox = s.get(MailboxConfig, 1)
+    if mbox is not None and mbox.enabled and mbox.last_error:
+        out.append(Finding(
+            key="mailbox_failed", kind="mailbox_failed", severity="warn",
+            params={"error": mbox.last_error},
+            action={"type": "open_settings", "section": "mailbox"}, dismissible=False,
+        ))  # fmt: skip
     if old:
         out.append(Finding(
             key="inbox_waiting", kind="inbox_waiting", severity="info",

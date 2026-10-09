@@ -131,6 +131,13 @@ and nothing is added until you tap **Add N sessions** (undo available). The **in
 top right) keeps booking emails, remittances, statements and pension forms: drop files on it
 (PDF, images, .eml, text, CSV) or paste text; mark them done when dealt with.
 
+**Email folders (optional).** Settings → Email folders connects to your mailbox over IMAP with
+an app password and lists your folders; tick only the ones with locum mail (e.g. a "Locum"
+label). Locuvi checks them hourly (or tap **Check email** in the inbox), read-only, keeps only
+booking and remittance emails, and checks each booking against your diary: *already booked*,
+*booked at a different fee*, or new sessions to add with one tap. Gmail, iCloud, Fastmail and
+most providers work; Microsoft 365/NHSmail (OAuth only) does not yet.
+
 **Assistant (optional, off by default).** Without AI, Locuvi reads common booking formats
 itself. Settings → Assistant turns on an AI reader (Anthropic Claude) for free-form emails and
 scanned PDFs/photos: paste an API key (stored encrypted) or mount one as a Docker secret and

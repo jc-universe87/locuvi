@@ -13,7 +13,7 @@ never submit pension forms or send email without an explicit owner tap.
   analyse, issue, void, split), `services/diary.py`, `services/payments.py`,
   `services/pension.py`, `services/reports.py` (+ Today overview), `services/checks.py`
   (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,
-  audit), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM), `mail.py` (SMTP),
+  audit), `services/mailbox.py` (read-only IMAP, chosen folders only), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
 - `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Invoices, InvoiceEditor,

@@ -92,13 +92,7 @@ def extract_text(data: bytes, content_type: str) -> str:
             reader = PdfReader(io.BytesIO(data))
             text = "\n".join((p.extract_text() or "") for p in reader.pages[:30])
         elif content_type == "message/rfc822":
-            msg = email.message_from_bytes(data, policy=email.policy.default)
-            body = msg.get_body(preferencelist=("plain", "html"))
-            content = body.get_content() if body is not None else ""
-            if body is not None and body.get_content_type() == "text/html":
-                content = re.sub(r"<[^>]+>", " ", content)
-            head = f"From: {msg.get('from', '')}\nDate: {msg.get('date', '')}\n"
-            text = f"{head}Subject: {msg.get('subject', '')}\n\n{content}"
+            text = email_text(email.message_from_bytes(data, policy=email.policy.default))
         elif content_type.startswith("text/"):
             text = _decode(data)
         else:
@@ -108,6 +102,27 @@ def extract_text(data: bytes, content_type: str) -> str:
         text = ""
     text = re.sub(r"[ \t]+\n", "\n", text).strip()
     return text[:MAX_TEXT]
+
+
+def email_text(msg: email.message.EmailMessage) -> str:
+    """Headers, body (plain preferred) and the text of PDF/text attachments."""
+    body = msg.get_body(preferencelist=("plain", "html"))
+    content = body.get_content() if body is not None else ""
+    if body is not None and body.get_content_type() == "text/html":
+        content = re.sub(r"<[^>]+>", " ", content)
+    parts = [
+        f"From: {msg.get('from', '')}\nDate: {msg.get('date', '')}\n"
+        f"Subject: {msg.get('subject', '')}\n\n{content}"
+    ]
+    for att in list(msg.iter_attachments())[:5]:
+        ctype = att.get_content_type()
+        if ctype in {"application/pdf", "text/plain", "text/csv"}:
+            payload = att.get_payload(decode=True) or b""
+            if len(payload) <= MAX_BYTES:
+                extracted = extract_text(payload, ctype)
+                if extracted:
+                    parts.append(f"--- Attachment: {att.get_filename() or ctype} ---\n{extracted}")
+    return "\n\n".join(parts)
 
 
 def guess_kind(text: str, filename: str = "") -> str:

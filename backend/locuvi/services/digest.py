@@ -39,6 +39,7 @@ TEXT: dict[str, str] = {
     "backup_stale": "The last backup was {days} days ago.",
     "proposals_pending": "{n} suggested diary change(s) are waiting for you in the inbox.",
     "inbox_waiting": "{n} document(s) have been in your inbox for a few days.",
+    "mailbox_failed": "Checking your email folders failed — open Settings › Email folders.",
 }
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
           "September", "October", "November", "December"]  # fmt: skip
@@ -145,6 +146,18 @@ class DigestScheduler:
                 documents.purge_trash(s, self.settings)
         except Exception:  # noqa: BLE001
             log.exception("document trash purge failed")
+        try:
+            from locuvi.assistant import providers
+            from locuvi.services import mailbox
+
+            with db.new_session() as s:
+                if mailbox.auto_scan_due(mailbox.get_config(s)):
+                    provider = providers.provider_for(s, self.settings, self.box)
+                    mailbox.scan(s, self.settings, self.box, provider=provider)
+        except DomainError as exc:
+            log.warning("mail folder scan not made: %s", exc.code)
+        except Exception:  # noqa: BLE001
+            log.exception("mail folder scan failed")
         try:
             with db.new_session() as s:
                 if due(s):

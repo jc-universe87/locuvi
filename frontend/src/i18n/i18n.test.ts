@@ -31,7 +31,7 @@ describe("i18n catalogues", () => {
     for (const s of ["draft", "issued", "voided"]) expect(en).toHaveProperty(`status.${s}`);
     for (const s of ["pending", "uploading", "synced", "failed", "conflict", "not_configured"])
       expect(en).toHaveProperty(`archive.${s}`);
-    for (const s of ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "assistant"]) {
+    for (const s of ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "mailbox", "assistant"]) {
       expect(en).toHaveProperty(`settings.s_${s}`);
       expect(en).toHaveProperty(`settings.s_${s}_sub`);
     }
@@ -42,11 +42,11 @@ describe("i18n catalogues", () => {
     for (const k of ["uninvoiced_month", "uninvoiced_current", "draft_stale", "po_missing", "invoice_overdue",
       "invoice_due_soon", "invoice_awaiting", "session_duplicate", "session_overlap", "pension_due",
       "pension_changed", "pension_tier_missing", "practice_no_address", "archive_failed", "archive_conflict",
-      "backup_never", "backup_stale", "proposals_pending", "inbox_waiting"]) expect(en).toHaveProperty(`finding.${k}`);
-    for (const f of ["needs_practice", "needs_rate", "duplicate", "clash", "not_in_diary", "invoiced", "cancel"])
+      "backup_never", "backup_stale", "proposals_pending", "inbox_waiting", "mailbox_failed"]) expect(en).toHaveProperty(`finding.${k}`);
+    for (const f of ["needs_practice", "needs_rate", "duplicate", "rate_differs", "clash", "not_in_diary", "invoiced", "cancel"])
       expect(en).toHaveProperty(`booking.flag_${f}`);
     for (const k of ["booking", "remittance", "statement", "pension", "other"]) expect(en).toHaveProperty(`inbox.kind_${k}`);
-    for (const s of ["accepted", "partial", "rejected"]) expect(en).toHaveProperty(`inbox.proposal_${s}`);
+    for (const s of ["accepted", "partial", "rejected", "verified"]) expect(en).toHaveProperty(`inbox.proposal_${s}`);
   });
 
   it("other locales only contain known keys with the same placeholders", () => {
