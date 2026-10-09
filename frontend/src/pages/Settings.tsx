@@ -193,6 +193,10 @@ function PracticesSection() {
   );
 }
 
+// Not image-only on purpose: Android opens its photo picker for image-only lists, and that
+// picker hides SVG files. The XML types make it offer Files/Downloads/Drive as well.
+const LOGO_ACCEPT = "image/png,image/jpeg,image/webp,image/svg+xml,.svg,.png,.jpg,.jpeg,.webp,application/xml,text/xml";
+
 function LookSection() {
   const { t } = useT();
   const [b, setB] = useState<Branding | null>(null);
@@ -254,7 +258,7 @@ function LookSection() {
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <label className="btn secondary small" aria-disabled={busy}>
               <Icon name="upload" size={16} /> {b.has_logo ? t("look.replace_logo") : t("look.add_logo")}
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
+              <input type="file" accept={LOGO_ACCEPT} hidden disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
             {b.has_logo && <button type="button" className="btn ghost small" onClick={remove}>{t("look.remove_logo")}</button>}
           </div>
