@@ -146,3 +146,26 @@ def test_api_practice_rates_and_line_agreed_rate(settings, session, ready):
         }).json()  # fmt: skip
         line = inv["lines"][0]
         assert (line["agreed_rate"], line["unit_price"]) == ("95.00", "84.11")
+
+
+def test_mixed_invoice_has_no_false_rounding_warning(session, ready):
+    lines = [
+        svc.LineData(date(2026, 9, 1), "AM", "am", D("1"), D("600"), True, D("600.00")),
+        svc.LineData(date(2026, 9, 2), "AM", "am", D("1"), D("600"), True),  # on top
+    ]
+    a = svc.analyse(session, lines=lines, pension_enabled=True, practice=None)
+    assert a.unit_prices == (D("531.25"), D("600"))
+    assert not [w for w in a.warnings if w.code == "invoice.inclusive_rounding"]
+
+
+def test_preview_and_refresh_use_derived_price(session, ready):
+    p = inclusive(session, ready)
+    diary.add_sessions(session, [diary.SessionInput(p.id, date(2026, 9, 1))])
+    draft = diary.invoice_month(session, p.id, "2026-09")
+    draft.lines[0].unit_price = D("600.00")  # stale cache, e.g. straight after an upgrade
+    session.commit()
+    text = PdfReader(io.BytesIO(svc.preview_pdf(session, draft))).pages[0].extract_text()
+    assert "£531.25" in text
+    assert svc.refresh_drafts(session) == 1
+    session.expire_all()
+    assert svc.get_invoice(session, draft.id).lines[0].unit_price == D("531.25")

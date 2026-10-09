@@ -178,7 +178,7 @@ export default function InvoiceEditor() {
           service_date: todayLondon(),
           unit,
           description: t(`editor.default_desc_${unit}` as MessageKey),
-          quantity: "1",
+          quantity: (unit === "hours" ? practice?.default_hours : null) ?? "1",
           unit_price: (unit === "hours" ? practice?.hourly_rate : practice?.default_rate) ?? "",
           ...(practice?.rate_includes_pension
             ? { agreed_rate: (unit === "hours" ? practice?.hourly_rate : practice?.default_rate) ?? "" }

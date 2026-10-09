@@ -92,7 +92,12 @@ export default function DiaryPage() {
   useEffect(() => {
     api.get<Practice[]>("/practices").then((ps) => {
       setPractices(ps);
-      setPracticeId((cur) => (cur && ps.some((p) => p.id === cur) ? cur : ps[0]?.id ?? null));
+      const remembered = remember("locuvi.diary.practice");
+      const first = ps.find((p) => p.id === remembered) ?? ps[0];
+      setPracticeId(first?.id ?? null);
+      // the initial practice gets its own pay type too (hourly practices open on "hours")
+      if (first?.default_unit === "hours") setUnit("hours");
+      else if (first) setUnit((u) => (u === "hours" ? "am" : u));
     }, setError);
   }, []);
   useEffect(() => {

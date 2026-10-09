@@ -63,6 +63,9 @@ def create_app(
         upgrade(engine)
         with db.new_session() as s:
             core.ensure_singletons(s)
+            from locuvi.services import invoices as invoice_svc
+
+            invoice_svc.refresh_drafts(s)  # drafts follow current rules and rates
             app.state.integrity = integrity.check(s, settings)
             from locuvi.models import AuthConfig
 

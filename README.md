@@ -100,6 +100,9 @@ docker compose pull && docker compose up -d
 
 No `--build` needed. When an update changes the database, Locuvi first writes a backup
 (`backups/locuvi-…-before-NNNN.tar.gz`) and only then migrates; existing data upgrades in place.
+If that backup cannot be written (backup folder full or not writable, or an issued PDF
+altered), Locuvi refuses to start rather than migrate without a copy: fix the cause, or go back
+to the previous `LOCUVI_TAG`. `LOCUVI_UPGRADE_WITHOUT_BACKUP=1` overrides this deliberately.
 
 **Going back** to an earlier release: set `LOCUVI_TAG=sha-1a2b3c4` (the previous tag, from the
 package page) in `.env`, then restore the backup taken before the update, because database

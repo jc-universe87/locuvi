@@ -41,6 +41,17 @@ def upgrade() -> None:
         "AND (invoice_id IS NULL OR invoice_id IN "
         "(SELECT id FROM invoice WHERE status = 'draft'))"
     )
+    # Draft lines that were built from those sessions carry the agreed (inclusive) figure as
+    # their unit price: mark them, so the fee is derived instead of the pension being added
+    # twice. Lines typed by hand are left alone (the editor still warns about them).
+    op.execute(
+        "UPDATE invoice_line SET agreed_rate = unit_price "
+        "WHERE agreed_rate IS NULL AND pensionable = 1 "
+        "AND invoice_id IN (SELECT id FROM invoice WHERE status = 'draft') "
+        "AND EXISTS (SELECT 1 FROM work_session ws WHERE ws.invoice_id = invoice_line.invoice_id "
+        "AND ws.date = invoice_line.service_date AND ws.unit = invoice_line.unit "
+        "AND ws.rate = invoice_line.unit_price AND ws.rate_includes_pension = 1)"
+    )
 
 
 def downgrade() -> None:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -52,8 +53,9 @@ def backup_now(settings: Settings) -> dict:
 def before_upgrade(settings: Settings, engine: Any) -> Path | None:
     """Back up the database and PDFs before an update migrates them (needs BACKUP_DIR).
 
-    Never blocks start-up: if the copy cannot be made the reason is logged and the health
-    check / integrity findings show the underlying problem.
+    If the copy cannot be made the upgrade is refused (raises), so the database is never
+    migrated without a restorable copy. Go back to the previous image (LOCUVI_TAG) or fix the
+    cause; LOCUVI_UPGRADE_WITHOUT_BACKUP=1 overrides this once, deliberately.
     """
     from locuvi import cli, migrate
 
@@ -70,7 +72,13 @@ def before_upgrade(settings: Settings, engine: Any) -> Path | None:
         cli.backup(settings, dest)
     except (SystemExit, Exception) as exc:  # noqa: BLE001
         log.error("backup before upgrade %s -> %s failed: %s", current, head, exc)
-        return None
+        if os.environ.get("LOCUVI_UPGRADE_WITHOUT_BACKUP") == "1":
+            log.warning("LOCUVI_UPGRADE_WITHOUT_BACKUP=1: migrating without a backup")
+            return None
+        raise RuntimeError(
+            f"Refusing to upgrade the database ({current} -> {head}) without a backup: {exc}. "
+            "Fix the backup folder or the reported problem, or go back to the previous image."
+        ) from None
     log.info("backup before upgrade %s -> %s written: %s", current, head, dest.name)
     return dest
 

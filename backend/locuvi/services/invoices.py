@@ -190,8 +190,13 @@ def analyse(
         pension_enabled=pension_enabled,
         policy=core.policy_values(policy) if policy else None,
     )
-    agreed_lines = [ln for ln in lines if getattr(ln, "agreed_rate", None) is not None]
-    if agreed_lines and totals.employer_contribution > 0:
+    pension_lines = [ln for ln in lines if ln.pensionable]
+    all_agreed = bool(pension_lines) and all(
+        getattr(ln, "agreed_rate", None) is not None for ln in pension_lines
+    )
+    # Only meaningful when every pensionable line was agreed all-in: then the employer
+    # contribution is inside the agreed figures and the gap is pure penny rounding.
+    if all_agreed and totals.employer_contribution > 0:
         agreed_total = sum(
             (
                 line_amount(ln.quantity, ln.agreed_rate)  # type: ignore[arg-type]
@@ -382,6 +387,15 @@ def _refresh_draft_cache(s: Session, inv: Invoice) -> Analysis:
     inv.work_end_date = a.work_end
     inv.pension_policy_id = a.policy.id if a.policy else None
     return a
+
+
+def refresh_drafts(s: Session) -> int:
+    """Recalculate every draft's cached prices and totals (after an upgrade or rate change)."""
+    drafts = list(s.scalars(select(Invoice).where(Invoice.status == InvoiceStatus.draft)))
+    for inv in drafts:
+        _refresh_draft_cache(s, inv)
+    s.commit()
+    return len(drafts)
 
 
 def _practice(s: Session, practice_id: str | None) -> Practice | None:
@@ -631,12 +645,17 @@ def build_snapshot(
                 "description": ln.description,
                 "unit": ln.unit,
                 "quantity": str(ln.quantity),
-                "unit_price": str(ln.unit_price),
+                "unit_price": str(price),
                 "amount": str(amount),
                 "pensionable": ln.pensionable,
                 **({"agreed_rate": str(ln.agreed_rate)} if ln.agreed_rate is not None else {}),
             }
-            for ln, amount in zip(inv.lines, a.totals.line_amounts, strict=True)
+            for ln, price, amount in zip(
+                inv.lines,
+                a.unit_prices or [ln.unit_price for ln in inv.lines],
+                a.totals.line_amounts,
+                strict=True,
+            )  # fmt: skip
         ],
         "totals": a.totals.as_strings(),
         "pension": {
