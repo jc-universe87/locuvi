@@ -403,3 +403,9 @@ class IdsIn(Strict):
     ids: Annotated[
         list[Annotated[str, StringConstraints(max_length=36)]], Field(min_length=1, max_length=120)
     ]
+
+
+class CalendarIn(Strict):
+    enabled: bool = True
+    include_fees: bool = False
+    regenerate: bool = False

@@ -10,10 +10,10 @@ import type { AssistantConfig, EmailConfig, MailboxConfig, ScanResult, Numbering
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "mailbox", "assistant", "agents"] as const;
+const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", mailbox: "inbox", assistant: "sparkle", agents: "send",
+  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send",
 };
 
 export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
@@ -33,6 +33,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         {section === "pension" && <PensionSection />}
         {section === "email" && <EmailSection />}
         {section === "storage" && <StorageSection />}
+        {section === "calendar" && <CalendarSection />}
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
         {section === "agents" && <AgentsSection />}
@@ -756,6 +757,56 @@ function AgentsSection() {
         <li>{t("agents.safety_2")}</li>
         <li>{t("agents.safety_3")}</li>
       </ul>
+    </>
+  );
+}
+
+function CalendarSection() {
+  const { t } = useT();
+  const [cfg, setCfg] = useState<{ enabled: boolean; include_fees: boolean; path: string | null } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    api.get<typeof cfg>("/settings/calendar").then(setCfg, setError);
+  }, []);
+  if (!cfg) return <ErrorAlert error={error} />;
+  const put = async (body: { enabled: boolean; include_fees?: boolean; regenerate?: boolean }) => {
+    try {
+      setCfg(await api.put("/settings/calendar", { include_fees: cfg.include_fees, ...body }));
+      setCopied(false);
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const url = cfg.path ? `${window.location.origin}${cfg.path}` : "";
+  const webcal = url.replace(/^https?:/, "webcal:");
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("calendar.intro")}</p>
+      <ErrorAlert error={error} />
+      <div className="form-list">
+        <SwitchRow label={t("calendar.toggle")} checked={cfg.enabled} onChange={(v) => void put({ enabled: v })} />
+        {cfg.enabled && (
+          <SwitchRow label={t("calendar.fees")} hint={t("calendar.fees_hint")} checked={cfg.include_fees}
+            onChange={(v) => void put({ enabled: true, include_fees: v })} />
+        )}
+      </div>
+      {cfg.enabled && url && (
+        <>
+          <h3>{t("calendar.link")}</h3>
+          <div className="form-list">
+            <div className="form-row stacked"><code style={{ wordBreak: "break-all" }}>{url}</code></div>
+          </div>
+          <div className="actions" style={{ marginTop: "0.5rem" }}>
+            <a className="btn" href={webcal}>{t("calendar.subscribe")}</a>
+            <button className="btn secondary" onClick={() => {
+              void navigator.clipboard?.writeText(url).then(() => setCopied(true), () => undefined);
+            }}>{copied ? t("ask.copied") : t("calendar.copy")}</button>
+            <button className="btn ghost" onClick={() => void put({ enabled: true, regenerate: true })}>{t("calendar.new_link")}</button>
+          </div>
+          <p className="form-foot">{t("calendar.private")}</p>
+        </>
+      )}
     </>
   );
 }

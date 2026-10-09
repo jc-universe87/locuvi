@@ -124,6 +124,10 @@ NHSBSA/PCSE guidance. When it changes, add a new dated rate in Settings → Pens
 6. **Reports** — tax-year totals any time; at year end download the CSV or the ZIP pack for
    your accountant.
 
+**Phone calendar.** Settings → Phone calendar → turn on and tap **Subscribe**: booked sessions
+appear in your calendar app and stay up to date (your phone must reach Locuvi on the home
+network or Tailscale).
+
 ### Bookings and the inbox
 
 Got a booking email? **Diary → Paste a booking**, paste it, tap **Read booking**. Locuvi lists

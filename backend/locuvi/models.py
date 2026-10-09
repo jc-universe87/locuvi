@@ -567,3 +567,19 @@ class AgentToken(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class CalendarFeed(Base):
+    """Singleton (id 1): private ICS subscription link for booked sessions.
+
+    The secret is kept encrypted (so the link can be shown again) plus a hash for lookup.
+    """
+
+    __tablename__ = "calendar_feed"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    include_fees: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)

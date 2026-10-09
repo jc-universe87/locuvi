@@ -78,7 +78,9 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
 - ✅ Repeating bookings ("every Tuesday AM at X until December") in the Diary: Repeat… →
   weekdays, weekly/fortnightly, from/until, live preview; days already booked are skipped;
   one undo removes the whole series.
-- 🧭 Calendar subscription (ICS) of booked sessions for the phone calendar.
+- ✅ Calendar subscription (ICS) of booked sessions for the phone calendar (Settings › Phone
+  calendar): private secret link (encrypted at rest, regenerate/turn off), no fees unless
+  chosen, cancelled sessions marked cancelled, RFC 5545 folding/escaping.
 - 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
 - 🧭 Password change without editing the secret file.
 - 🧭 Each April: add the new employer rate and check your employee tier (Settings → Pension).

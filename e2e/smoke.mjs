@@ -239,6 +239,12 @@ await page.getByRole("button", { name: "Create token" }).click();
 await page.getByText("Copy this token now").waitFor();
 await page.getByText(/Bevro · …/).waitFor();
 await shot("11b-agents");
+await page.getByRole("link", { name: "Settings" }).first().click();
+await page.getByRole("link", { name: /Phone calendar/ }).click();
+await page.getByRole("switch", { name: "Calendar link" }).click();
+const icsUrl = (await page.locator("code").first().innerText()).trim();
+const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
+if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
 
 step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

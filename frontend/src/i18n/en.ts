@@ -902,6 +902,17 @@ const en = {
   "error.session.series_range": "Check the dates (up to about a year).",
   "error.session.series_weekdays": "Choose at least one weekday.",
   "error.session.series_too_long": "That's too many sessions at once.",
+  "settings.s_calendar": "Phone calendar",
+  "settings.s_calendar_sub": "See booked sessions in your calendar app",
+  "calendar.intro": "Subscribe once and your booked sessions appear in your phone or computer calendar, updating by themselves.",
+  "calendar.toggle": "Calendar link",
+  "calendar.fees": "Show fees in events",
+  "calendar.fees_hint": "Off by default — calendars are often shared or synced.",
+  "calendar.link": "Your private link",
+  "calendar.subscribe": "Subscribe",
+  "calendar.copy": "Copy link",
+  "calendar.new_link": "New link",
+  "calendar.private": "Anyone with this link can see your sessions. Your phone must be able to reach Locuvi (home network or Tailscale). If the link was shared by mistake, tap New link — the old one stops working.",
 } as const;
 
 export type MessageKey = keyof typeof en;

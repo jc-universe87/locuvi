@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import File, Form, Request, Response, UploadFile
+from fastapi import APIRouter, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -358,3 +358,50 @@ def revoke_agent_token(token_id: str, s: DB) -> Response:
 
     mcp.revoke_token(s, token_id)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- calendar feed
+
+feeds = APIRouter()
+
+
+@feeds.get("/calendar/{token}.ics", include_in_schema=False)
+def calendar_ics(token: str, request: Request) -> Response:
+    """Public by secret link (calendar apps can't sign in). Unknown link → 404."""
+    from locuvi import db
+    from locuvi.services import calendar
+
+    if len(token) > 100:
+        raise NotFound("calendar.not_found", "Not found.")
+    with db.new_session() as s:
+        feed = calendar.lookup(s, token)
+        if feed is None:
+            raise NotFound("calendar.not_found", "Not found.")
+        body = calendar.render(s, feed)
+    return Response(
+        body,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'inline; filename="locum.ics"',
+        },
+    )
+
+
+@api.get("/settings/calendar")
+def get_calendar(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import calendar
+
+    return calendar.public(calendar.get(s), state(request).secrets)
+
+
+@api.put("/settings/calendar")
+def put_calendar(body: S.CalendarIn, request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import calendar
+
+    if body.enabled:
+        calendar.enable(s, state(request).secrets, include_fees=body.include_fees,
+                        regenerate=body.regenerate)  # fmt: skip
+    else:
+        calendar.disable(s)
+    return calendar.public(calendar.get(s), state(request).secrets)

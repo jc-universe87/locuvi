@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from locuvi import __version__, db, integrity
-from locuvi.api import inbox as _inbox  # noqa: F401  (registers routes on `api`)
+from locuvi.api import inbox as _inbox  # registers routes on `api`; `feeds` is public
 from locuvi.api.auth import SessionManager
 from locuvi.api.mcp import router as mcp_router
 from locuvi.api.routes import api, public
@@ -147,6 +147,7 @@ def create_app(
     app.include_router(public)
     app.include_router(api)
     app.include_router(mcp_router)  # Bevro / external agents (token auth, not cookies)
+    app.include_router(_inbox.feeds)  # calendar feed by secret link
 
     static = settings.static_dir
     if static and (static / "index.html").is_file():
