@@ -221,7 +221,13 @@ Each item is useful on its own and gives the AI something reliable to work with.
   skipped and not stored. Bookings are read (rules, or the assistant if on) and **verified
   against the Diary**: already booked → filed as verified, no action; booked but a different
   fee → "rate differs"; new → suggestion to check. Resumes by UID; app password encrypted.
-  Microsoft 365 / NHSmail OAuth is not supported yet (💭).
+  **Account presets** (Gmail with app password; Outlook/Hotmail/Microsoft 365 and NHSmail via
+  Microsoft sign-in, `services/mail_microsoft.py`; owner request 9 Oct 2026): device-code
+  sign-in with the owner's own app registration, Graph with `Mail.Read` only, GET requests
+  only, refresh token encrypted and rotated, per-folder delta links (messages filed later are
+  still read). NHSmail needs its administrators' approval of
+  the app; until then, forwarding booking emails to Gmail is the documented route
+  (`docs/EMAIL_SETUP.md`).
 - ✅ "Prepare all outstanding invoices for September" → drafts made by the deterministic
   engine from confirmed sessions; inconsistent rates are flagged. (B)
 - ✅ Draft invoice emails and polite reminders in the right tone; always reviewed and sent with
@@ -260,7 +266,7 @@ Each item is useful on its own and gives the AI something reliable to work with.
   the top of the weekly digest email; the rule-based list stays underneath as the record, and
   any AI failure falls back to the plain digest.
 - 💭 Calendar connector (bookings from a calendar feed).
-- 💭 Microsoft 365 / NHSmail OAuth for the email connector.
+- ✅ Microsoft 365 / NHSmail sign-in for the email connector (read-only; see Email folders).
 - 💭 Optional local models for maximum privacy (the provider interface is ready).
 - 💭 Controlled execution of workflows the owner has approved in advance.
 

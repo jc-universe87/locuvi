@@ -360,6 +360,7 @@ class ProposalAcceptIn(Strict):
 
 class MailboxIn(Strict):
     enabled: bool = False
+    provider: Literal["imap", "microsoft"] | None = None
     host: Annotated[str, StringConstraints(max_length=200)] = ""
     port: Annotated[int, Field(ge=1, le=65535)] = 993
     security: Literal["ssl", "starttls"] = "ssl"
@@ -370,6 +371,11 @@ class MailboxIn(Strict):
     ] = []
     since_days: Annotated[int, Field(ge=1, le=730)] = 90
     auto_scan: bool = True
+
+
+class MicrosoftSignInIn(Strict):
+    client_id: Annotated[str, StringConstraints(max_length=64)]
+    tenant: Annotated[str, StringConstraints(max_length=64)] = "common"
 
 
 class BankAcceptIn(Strict):

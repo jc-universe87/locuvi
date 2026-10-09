@@ -1,4 +1,8 @@
-"""Read booking emails from mail folders the owner chose (IMAP, read-only).
+"""Read booking emails from mail folders the owner chose (read-only).
+
+Two ways in: IMAP with an app password (Gmail, iCloud, Fastmail, most providers) or a
+Microsoft sign-in for Outlook.com, Microsoft 365 and NHSmail (``mail_microsoft``: Graph with
+the read-only ``Mail.Read`` permission, because Microsoft no longer accepts IMAP passwords).
 
 Rules that keep this safe:
 - Only the folders the owner ticked are opened, never the whole mailbox.
@@ -21,7 +25,7 @@ import logging
 import re
 import ssl
 import threading
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any
 
@@ -32,7 +36,7 @@ from locuvi.config import Settings
 from locuvi.errors import DomainError
 from locuvi.models import Document, MailboxConfig, MailFolderState, utcnow
 from locuvi.secrets_store import SecretBox, SecretUnavailable
-from locuvi.services import core, documents, proposals
+from locuvi.services import core, documents, mail_microsoft, proposals
 from locuvi.webdav.urlguard import UrlBlocked, resolve_and_check
 
 log = logging.getLogger(__name__)
@@ -60,8 +64,14 @@ def get_config(s: Session) -> MailboxConfig:
 
 
 def config_public(cfg: MailboxConfig) -> dict[str, Any]:
+    labels = cfg.folder_labels or {}
     return {
         "enabled": cfg.enabled,
+        "provider": cfg.provider or "imap",
+        "ms_client_id": cfg.ms_client_id or "",
+        "ms_tenant": cfg.ms_tenant or "common",
+        "ms_signed_in": bool(cfg.ms_token_ciphertext),
+        "folder_labels": {f: labels.get(f, f) for f in cfg.folders or []},
         "host": cfg.host,
         "port": cfg.port,
         "security": cfg.security,
@@ -78,12 +88,20 @@ def config_public(cfg: MailboxConfig) -> dict[str, Any]:
 
 def save_config(s: Session, box: SecretBox, data: dict[str, Any]) -> MailboxConfig:
     cfg = get_config(s)
+    provider = data.get("provider") or cfg.provider or "imap"
+    if provider not in {"imap", "microsoft"}:
+        raise DomainError("mailbox.failed", "Unknown email account type.")
+    switched = switch_provider(s, cfg, provider)
     host = (data.get("host") or "").strip().lower()
     if host and not re.fullmatch(r"[a-z0-9.-]{1,200}", host):
         raise DomainError("mailbox.bad_host", "Enter the IMAP server name, e.g. imap.example.com.")
     if data.get("security", "ssl") not in {"ssl", "starttls"}:
         raise DomainError("mailbox.bad_security", "Choose SSL/TLS or STARTTLS.")
     folders = [str(f)[:300] for f in (data.get("folders") or []) if str(f).strip()][:20]
+    if switched:  # folder names from the previous account don't exist in this one
+        folders = []
+    elif provider == "microsoft":  # only folders Microsoft listed for this account
+        folders = [f for f in folders if f in (cfg.folder_labels or {})]
     pw = data.get("password")
     if pw is not None:
         cfg.password_ciphertext = box.encrypt(pw) if pw else None
@@ -96,7 +114,13 @@ def save_config(s: Session, box: SecretBox, data: dict[str, Any]) -> MailboxConf
     cfg.since_days = max(1, min(int(data.get("since_days") or 90), 730))
     cfg.auto_scan = bool(data.get("auto_scan", True))
     cfg.enabled = bool(data.get("enabled"))
-    if cfg.enabled and not (cfg.host and cfg.username and cfg.password_ciphertext):
+    if cfg.enabled and provider == "microsoft" and not cfg.ms_token_ciphertext:
+        raise DomainError("mailbox.ms_signed_out", "Sign in to Microsoft again.")
+    if (
+        cfg.enabled
+        and provider == "imap"
+        and not (cfg.host and cfg.username and cfg.password_ciphertext)
+    ):
         raise DomainError("mailbox.incomplete", "Fill in server, username and password first.")
     if cfg.enabled and not folders:
         raise DomainError("mailbox.no_folders", "Choose at least one folder to read.")
@@ -105,7 +129,41 @@ def save_config(s: Session, box: SecretBox, data: dict[str, Any]) -> MailboxConf
         if st is not None:
             s.delete(st)
     core.audit(s, "settings.mailbox_saved", enabled=cfg.enabled, folders=len(folders),
-               password_changed=pw is not None)  # fmt: skip
+               provider=provider, password_changed=pw is not None)  # fmt: skip
+    s.commit()
+    return cfg
+
+
+def switch_provider(s: Session, cfg: MailboxConfig, provider: str) -> bool:
+    """Folders of one account mean nothing in another: forget them when the account type changes."""
+    if (cfg.provider or "imap") == provider:
+        return False
+    cfg.provider, cfg.enabled, cfg.folders, cfg.folder_labels = provider, False, [], None
+    s.query(MailFolderState).delete()
+    return True
+
+
+def ms_start(client_id: str, tenant: str, transport: Any = None) -> dict[str, Any]:
+    return mail_microsoft.start_sign_in(client_id, tenant, transport)
+
+
+def ms_poll(s: Session, box: SecretBox, transport: Any = None) -> dict[str, Any]:
+    cfg = get_config(s)
+    before = (cfg.provider or "imap", (cfg.username or "").lower())
+    result = mail_microsoft.poll_sign_in(cfg, box, transport)
+    if result["status"] == "done":
+        if before != ("microsoft", cfg.username.lower()):  # another account: start afresh
+            cfg.provider = before[0] if before[0] != "microsoft" else "imap"
+            switch_provider(s, cfg, "microsoft")
+        core.audit(s, "settings.mailbox_microsoft_signed_in")
+        s.commit()
+    return result
+
+
+def ms_sign_out(s: Session) -> MailboxConfig:
+    cfg = get_config(s)
+    mail_microsoft.sign_out(cfg)
+    core.audit(s, "settings.mailbox_microsoft_signed_out")
     s.commit()
     return cfg
 
@@ -195,6 +253,15 @@ def list_folders(
     s: Session, settings: Settings, box: SecretBox, factory: Any = None
 ) -> list[dict[str, str]]:
     cfg = get_config(s)
+    if cfg.provider == "microsoft":
+        graph = mail_microsoft.GraphMail(cfg, box, factory)
+        try:
+            found = graph.folders()
+        finally:
+            graph.close()
+        cfg.folder_labels = {f["name"]: f["label"] for f in found}
+        s.commit()  # also keeps the rotated sign-in token
+        return found
     conn = connect(cfg, box, settings, factory)
     try:
         typ, data = conn.list()
@@ -299,6 +366,82 @@ def _scan_folder(
     s.commit()
 
 
+def _scan_graph_folder(
+    s: Session,
+    settings: Settings,
+    graph: mail_microsoft.GraphMail,
+    folder: str,
+    since_days: int,
+    provider: Any,
+    today: date,
+    totals: dict[str, int],
+) -> None:
+    """Like ``_scan_folder`` for Microsoft: progress is the folder's delta link, so messages
+    moved into the folder later are read too (their received date may be old)."""
+    state = s.get(MailFolderState, folder) or MailFolderState(
+        folder=folder, uidvalidity=-1, last_uid=0
+    )
+    if state.uidvalidity != -1:
+        state.uidvalidity, state.last_uid, state.cursor = -1, 0, None
+    s.add(state)
+    start = today - timedelta(days=since_days)
+    since = datetime(start.year, start.month, start.day, tzinfo=UTC)
+    try:
+        _read_changes(s, settings, graph, state, folder, since, provider, today, totals)
+    except DomainError as exc:
+        if exc.code != "mailbox.ms_resync" or not state.cursor:
+            raise
+        state.cursor = None  # Microsoft forgot the position: read again (duplicates skipped)
+        _read_changes(s, settings, graph, state, folder, since, provider, today, totals)
+    s.commit()
+
+
+def _read_changes(
+    s: Session,
+    settings: Settings,
+    graph: mail_microsoft.GraphMail,
+    state: MailFolderState,
+    folder: str,
+    since: datetime,
+    provider: Any,
+    today: date,
+    totals: dict[str, int],
+) -> None:
+    done = 0
+    for page, link in graph.changes(folder, state.cursor, since):
+        for m in page:
+            totals["checked"] += 1
+            message_id = str(m.get("internetMessageId") or "").strip()[:300]
+            if (
+                message_id
+                and s.query(Document.id).filter(Document.message_id == message_id).first()
+            ):
+                totals["already_seen"] += 1
+                continue
+            raw = graph.mime(str(m.get("id") or ""), MAX_MESSAGE_BYTES) if m.get("id") else None
+            if raw:
+                _import_message(s, settings, raw, folder, provider, today, totals)
+        done += len(page)
+        state.cursor = link
+        s.commit()
+        if done >= MAX_PER_FOLDER:  # the rest next time, from the saved link
+            return
+
+
+def _scan_microsoft(
+    s: Session, settings: Settings, box: SecretBox, provider: Any, transport: Any,
+    today: date, totals: dict[str, int],
+) -> None:  # fmt: skip
+    cfg = get_config(s)
+    graph = mail_microsoft.GraphMail(cfg, box, transport)
+    s.commit()  # keep the rotated sign-in token even if reading fails below
+    try:
+        for folder in list(cfg.folders or []):
+            _scan_graph_folder(s, settings, graph, folder, cfg.since_days, provider, today, totals)
+    finally:
+        graph.close()
+
+
 def _import_message(
     s: Session,
     settings: Settings,
@@ -358,6 +501,17 @@ def scan(
     totals = {k: 0 for k in ("checked", "skipped", "already_seen", "bookings", "remittances",
                              "already_booked", "to_review", "unread", "folder_errors")}  # fmt: skip
     try:
+        if cfg.provider == "microsoft":
+            try:
+                _scan_microsoft(s, settings, box, provider, factory, today, totals)
+            except DomainError as exc:
+                s.rollback()
+                cfg = get_config(s)
+                cfg.last_error = exc.code
+                cfg.last_scan_at = utcnow()
+                s.commit()
+                raise
+            return _finish_scan(s, totals)
         try:
             conn = connect(cfg, box, settings, factory)
         except DomainError as exc:
@@ -377,15 +531,19 @@ def scan(
             raise DomainError("mailbox.failed", "Reading the mail folders failed.") from None
         finally:
             _logout(conn)
-        cfg = get_config(s)
-        cfg.last_error = None
-        cfg.last_scan_at = utcnow()
-        cfg.last_result_json = totals
-        core.audit(s, "mailbox.scanned", **totals)
-        s.commit()
-        return totals
+        return _finish_scan(s, totals)
     finally:
         _scan_lock.release()
+
+
+def _finish_scan(s: Session, totals: dict[str, int]) -> dict[str, Any]:
+    cfg = get_config(s)
+    cfg.last_error = None
+    cfg.last_scan_at = utcnow()
+    cfg.last_result_json = totals
+    core.audit(s, "mailbox.scanned", **totals)
+    s.commit()
+    return totals
 
 
 def auto_scan_due(cfg: MailboxConfig) -> bool:

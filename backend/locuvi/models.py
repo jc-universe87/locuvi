@@ -460,12 +460,18 @@ class Document(TimestampMixin, Base):
 
 
 class MailboxConfig(Base):
-    """Singleton (id 1): read-only IMAP access to folders the owner chose. Password encrypted."""
+    """Singleton (id 1): read-only access to folders the owner chose, by IMAP (password
+    encrypted) or Microsoft sign-in (Graph, Mail.Read only; refresh token encrypted)."""
 
     __tablename__ = "mailbox_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    provider: Mapped[str] = mapped_column(String(12), default="imap")  # imap | microsoft
+    ms_client_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ms_tenant: Mapped[str] = mapped_column(String(64), default="common")
+    ms_token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    folder_labels: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
     host: Mapped[str] = mapped_column(String(200), default="")
     port: Mapped[int] = mapped_column(Integer, default=993)
     security: Mapped[str] = mapped_column(String(10), default="ssl")  # ssl | starttls
@@ -488,6 +494,7 @@ class MailFolderState(Base):
     folder: Mapped[str] = mapped_column(String(300), primary_key=True)
     uidvalidity: Mapped[int] = mapped_column(Integer, default=0)
     last_uid: Mapped[int] = mapped_column(Integer, default=0)
+    cursor: Mapped[str | None] = mapped_column(Text, nullable=True)  # Microsoft delta link
 
 
 class AssistantConfig(Base):
