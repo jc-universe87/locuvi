@@ -21,7 +21,7 @@ from locuvi.models import EmailConfig, Invoice, InvoiceEvent, InvoiceStatus, utc
 from locuvi.money import fmt_gbp
 from locuvi.pdf.render import uk_date
 from locuvi.secrets_store import SecretBox, SecretUnavailable
-from locuvi.services import core
+from locuvi.services import branding, core
 from locuvi.storage.local import resolve, sha256_file
 from locuvi.webdav.urlguard import UrlBlocked, resolve_and_check
 
@@ -97,7 +97,7 @@ def draft_for(s: Session, inv: Invoice) -> dict[str, Any]:
         f"Please find attached invoice {inv.invoice_number} for "
         f"{fmt_gbp(inv.grand_total or 0)}, due by {uk_date(inv.due_date)}.\n"
         "Bank details are on the invoice; please quote the invoice number as the reference.\n\n"
-        f"Kind regards,\n{seller}"
+        f"{branding.signoff(core.get_profile(s), seller)}"
     )
     return {
         "to": to,

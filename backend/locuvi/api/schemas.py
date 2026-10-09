@@ -91,6 +91,12 @@ class ProfileOut(BaseModel):
     last_digest_sent_at: str | None
 
 
+class BrandingIn(Strict):
+    accent: Literal["steel", "navy", "teal", "forest", "plum", "burgundy", "charcoal"] | None = None
+    invoice_footer: Annotated[str, StringConstraints(max_length=120)] | None = None
+    email_signoff: Annotated[str, StringConstraints(max_length=500)] | None = None
+
+
 class NumberingIn(Strict):
     prefix: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,29}$")]
     next_number: Annotated[int, Field(ge=1, le=99_999_999)]

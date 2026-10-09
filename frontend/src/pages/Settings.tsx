@@ -3,17 +3,17 @@ import { Link, useParams } from "react-router-dom";
 import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave } from "../components/ui";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
-import { api, setCsrf } from "../lib/api";
+import { api, openPendingTab, setCsrf } from "../lib/api";
 import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
-import type { AssistantConfig, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
+import type { AssistantConfig, Branding, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "password"] as const;
+const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "password"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", password: "settings",
+  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", password: "settings",
 };
 
 export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
@@ -27,6 +27,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         </p>
         <h1>{t(`settings.s_${section}` as MessageKey)}</h1>
         {section === "you" && <ProfileSection fields="you" />}
+        {section === "look" && <LookSection />}
         {section === "bank" && <ProfileSection fields="bank" />}
         {section === "practices" && <PracticesSection />}
         {section === "invoicing" && <InvoicingSection />}
@@ -188,6 +189,100 @@ function PracticesSection() {
       {open && (
         <PracticeSheet practice={open === "new" ? undefined : open} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); void load(); }} />
       )}
+    </>
+  );
+}
+
+function LookSection() {
+  const { t } = useT();
+  const [b, setB] = useState<Branding | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const persist = (v: Branding) => api.patch<Branding>("/settings/branding", { accent: v.accent, invoice_footer: v.invoice_footer, email_signoff: v.email_signoff });
+  const save = useAutosave(b, async (v) => {
+    if (v) await persist(v);
+  }, { enabled: b !== null, delay: 700 });
+  useEffect(() => {
+    api.get<Branding>("/settings/branding").then(setB, setError);
+  }, []);
+  if (!b) return <ErrorAlert error={error} />;
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await api.upload<Branding>("/settings/branding/logo", form);
+      setB({ ...b, has_logo: out.has_logo, logo_sha256: out.logo_sha256 });
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setError(null);
+    try {
+      await api.del("/settings/branding/logo");
+      setB({ ...b, has_logo: false, logo_sha256: null });
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const preview = async () => {
+    const tab = openPendingTab(); // before any await, or the browser blocks the tab
+    try {
+      await persist(b); // the preview always shows what is on screen
+      tab.show(await api.blob("GET", "/settings/branding/preview.pdf"));
+    } catch (e) {
+      tab.close();
+      setError(e);
+    }
+  };
+  return (
+    <>
+      <ErrorAlert error={error ?? save.error} />
+      <h3>{t("look.logo")}</h3>
+      <div className="form-list">
+        <div className="form-row stacked">
+          {b.has_logo ? (
+            <img className="logo-preview" src={`/api/v1/settings/branding/logo.png?v=${b.logo_sha256 ?? ""}`} alt={t("look.logo_alt")} />
+          ) : (
+            <span className="hint">{t("look.no_logo")}</span>
+          )}
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <label className="btn secondary small" aria-disabled={busy}>
+              <Icon name="upload" size={16} /> {b.has_logo ? t("look.replace_logo") : t("look.add_logo")}
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
+            </label>
+            {b.has_logo && <button type="button" className="btn ghost small" onClick={remove}>{t("look.remove_logo")}</button>}
+          </div>
+        </div>
+      </div>
+      <p className="form-foot">{t("look.logo_help")}</p>
+
+      <h3>{t("look.colour")}</h3>
+      <div className="swatches" role="radiogroup" aria-label={t("look.colour")}>
+        {Object.entries(b.accents).map(([key, hex]) => (
+          <button key={key} type="button" role="radio" aria-checked={b.accent === key} aria-label={t(`look.c_${key}` as MessageKey)}
+            title={t(`look.c_${key}` as MessageKey)} className={`swatch ${b.accent === key ? "on" : ""}`} style={{ background: hex }}
+            onClick={() => setB({ ...b, accent: key })} />
+        ))}
+      </div>
+
+      <h3>{t("look.words")}</h3>
+      <div className="form-list">
+        <Row id="l-footer" label={t("look.footer")} stacked hint={t("look.footer_hint")}>
+          <input id="l-footer" type="text" maxLength={120} value={b.invoice_footer} placeholder={t("look.footer_placeholder")} onChange={(e) => setB({ ...b, invoice_footer: e.target.value })} />
+        </Row>
+        <Row id="l-signoff" label={t("look.signoff")} stacked hint={t("look.signoff_hint")}>
+          <textarea id="l-signoff" rows={3} maxLength={500} value={b.email_signoff} placeholder={t("look.signoff_placeholder")} onChange={(e) => setB({ ...b, email_signoff: e.target.value })} />
+        </Row>
+      </div>
+      <p className="form-foot"><SavedIndicator state={save.state} /></p>
+      <button type="button" className="btn secondary block" onClick={preview}>{t("look.preview")}</button>
+      <p className="form-foot">{t("look.frozen")}</p>
     </>
   );
 }

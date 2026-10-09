@@ -6,6 +6,7 @@
 // (PLAYWRIGHT_BROWSERS_PATH or CHROMIUM_PATH).
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
+import { deflateSync } from "node:zlib";
 
 // require() honours NODE_PATH, so a global playwright install works too.
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -25,6 +26,38 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 const shot = async (name, p = page) => SHOTS && p.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 const step = (s) => console.log(`• ${s}`);
+
+// A tiny solid-colour PNG, built here so the test needs no image files.
+function makePng(w, h, [r, g, b]) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = 0xffffffff;
+    for (const x of buf) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(body));
+    return Buffer.concat([len, body, sum]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => [r, g, b]).flat())]);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
 process.on("unhandledRejection", async (e) => {
   console.error(e);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/FAILED.png`, fullPage: true }).catch(() => {});
@@ -258,6 +291,32 @@ await page.getByRole("switch", { name: "Calendar link" }).click();
 const icsUrl = (await page.locator("code").first().innerText()).trim();
 const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
 if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
+
+step("personalisation: logo, colour, footer line, sample preview");
+await page.getByRole("link", { name: "Settings" }).first().click();
+await page.getByRole("link", { name: /Personalisation/ }).click();
+await page.getByText("No logo yet").waitFor();
+await page.locator("input[type=file]").setInputFiles({
+  name: "logo.png", mimeType: "image/png", buffer: makePng(240, 80, [41, 77, 99]),
+});
+await page.getByRole("img", { name: "Your logo" }).waitFor();
+await page.getByRole("radio", { name: "Teal" }).click();
+await page.getByLabel(/Line at the bottom of every invoice/).fill("Thank you — GMC 0000000");
+await page.getByText("✓ Saved").waitFor();
+if ((await page.getByRole("radio", { name: "Teal" }).getAttribute("aria-checked")) !== "true") await fail("accent not selected");
+const sampleShown = new Promise((resolve) => {
+  ctx.once("page", (pg) => {
+    pg.once("download", resolve);
+    pg.waitForURL(/^blob:/, { waitUntil: "commit" }).then(resolve, () => {});
+  });
+});
+const [samplePopup] = await Promise.all([
+  page.waitForEvent("popup"),
+  page.getByRole("button", { name: "Preview a sample invoice" }).click(),
+]);
+await Promise.race([sampleShown, page.waitForTimeout(15000).then(() => fail("sample preview did not open"))]);
+await samplePopup.close().catch(() => {});
+await shot("11d-personalisation");
 
 step("credit note for one line (own number series, PDF downloads)");
 await page.getByRole("link", { name: "Invoices" }).first().click();

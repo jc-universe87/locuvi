@@ -18,6 +18,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     TypeDecorator,
@@ -132,6 +133,11 @@ class OwnerProfile(TimestampMixin, Base):
     digest_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     # Self Assessment basis: "cash" (HMRC default for sole traders) or "accruals" (invoiced)
     accounting_basis: Mapped[str] = mapped_column(String(10), default="cash")
+    # Personalisation (services/branding.py); frozen into each issued snapshot.
+    logo_png: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    brand_accent: Mapped[str] = mapped_column(String(20), default="steel")
+    invoice_footer: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    email_signoff: Mapped[str | None] = mapped_column(String(500), nullable=True)
     last_digest_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 

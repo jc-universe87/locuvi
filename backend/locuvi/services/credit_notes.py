@@ -123,6 +123,7 @@ def _snapshot(inv: Invoice, number: str, credit_date: date, reason: str, lines: 
         "bill_to": snap.get("bill_to", {}),
         "bank": {},
         "pension": snap.get("pension", {}),
+        "presentation": snap.get("presentation", {}),  # same look as the invoice it credits
         "lines": [
             {
                 "service_date": ln.service_date.isoformat(),

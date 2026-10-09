@@ -15,7 +15,8 @@ never submit pension forms or send email without an explicit owner tap.
   (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,
   audit), `services/mailbox.py` (read-only IMAP, chosen folders only),
   `services/bank.py` (CSV statement → credits only → deterministic matches), `services/backups.py`
-  + `backup_crypto.py` (nightly backup, encrypted off-server copy, restore drill), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
+  + `backup_crypto.py` (nightly backup, encrypted off-server copy, restore drill),
+  `services/branding.py` (logo/accent/footer/sign-off, frozen into snapshot `presentation`), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
   read tools + draft-only tools, never send/issue/pay/submit), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas, `inbox.py`, `mcp.py` = Bevro MCP server with

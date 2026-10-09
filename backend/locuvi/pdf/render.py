@@ -7,6 +7,7 @@ watermark and no invoice number.
 
 from __future__ import annotations
 
+import base64
 import io
 from datetime import date
 from decimal import Decimal
@@ -18,10 +19,12 @@ from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader, simpleSplit
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.platypus import (
+    Image,
     KeepTogether,
     Paragraph,
     SimpleDocTemplate,
@@ -119,6 +122,7 @@ class _NumberedCanvas(rl_canvas.Canvas):
     """Two-pass canvas so every page can show 'Page X of Y' and the footer."""
 
     footer_left = ""
+    footer_lines: list[str] = []
     watermark: str | None = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -147,12 +151,15 @@ class _NumberedCanvas(rl_canvas.Canvas):
         self.line(18 * mm, 16 * mm, width - 18 * mm, 16 * mm)
         self.setFont("Inter", 7.5)
         self.setFillColor(MUTED)
-        self.drawString(18 * mm, 11 * mm, self.footer_left)
+        base = 8.5 * mm if self.footer_lines else 11 * mm
+        self.drawString(18 * mm, base, self.footer_left)
         self.drawRightString(
             width - 18 * mm,
-            11 * mm,
+            base,
             label("pdf.page_x_of_y", page=self._pageNumber, total=total),
         )
+        for text in self.footer_lines[:1]:  # the owner's own line, just under the rule
+            self.drawCentredString(width / 2, 12.5 * mm, text)
         if self.watermark:
             self.setFont("Inter-Bold", 54)
             self.setFillColor(colors.Color(0.55, 0.35, 0.41, alpha=0.13))
@@ -162,7 +169,36 @@ class _NumberedCanvas(rl_canvas.Canvas):
         self.restoreState()
 
 
-def _styles() -> dict[str, ParagraphStyle]:
+def _accent(value: Any) -> colors.Color:
+    """Accent from the snapshot: only a plain #RRGGBB is accepted, else the default."""
+    if isinstance(value, str) and len(value) == 7 and value[0] == "#":
+        try:
+            int(value[1:], 16)
+            return colors.HexColor(value)
+        except ValueError:
+            pass
+    return STEEL
+
+
+LOGO_MAX_W, LOGO_MAX_H = 60 * mm, 22 * mm
+
+
+def _logo(b64: Any) -> Image | None:
+    """The frozen logo, scaled to fit 60 x 22 mm, keeping its proportions."""
+    if not isinstance(b64, str) or not b64:
+        return None
+    try:
+        data = base64.b64decode(b64, validate=True)
+        w, h = ImageReader(io.BytesIO(data)).getSize()
+    except (ValueError, OSError):
+        return None
+    scale = min(LOGO_MAX_W / w, LOGO_MAX_H / h)
+    img = Image(io.BytesIO(data), width=w * scale, height=h * scale)
+    img.hAlign = "LEFT"
+    return img
+
+
+def _styles(accent: colors.Color = STEEL) -> dict[str, ParagraphStyle]:
     base = ParagraphStyle("base", fontName="Inter", fontSize=9, leading=12.5, textColor=INK)
     return {
         "base": base,
@@ -177,7 +213,7 @@ def _styles() -> dict[str, ParagraphStyle]:
             fontName="Inter-SemiBold",
             fontSize=22,
             leading=26,
-            textColor=STEEL,
+            textColor=accent,
             alignment=TA_RIGHT,
         ),
         "right": ParagraphStyle("right", parent=base, alignment=TA_RIGHT),
@@ -221,7 +257,9 @@ def _styles() -> dict[str, ParagraphStyle]:
 
 def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> bytes:
     _register_fonts()
-    st = _styles()
+    look = snapshot.get("presentation") or {}
+    accent = _accent(look.get("accent"))
+    st = _styles(accent)
     inv = snapshot["invoice"]
     seller = snapshot["seller"]
     bill = snapshot["bill_to"]
@@ -232,6 +270,11 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     credit = snapshot.get("credit") if snapshot.get("kind") == "credit_note" else None
     doc_label = label("pdf.credit_note") if credit else label("pdf.invoice")
 
+    width = A4[0] - 36 * mm
+    footer_text = look.get("footer") if isinstance(look.get("footer"), str) else ""
+    footer_lines = simpleSplit(footer_text.strip(), "Inter", 7.5, width)
+    if len(footer_lines) > 1:  # one line only: never pushes the invoice onto another page
+        footer_lines = [footer_lines[0].rstrip() + "…"]
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -245,7 +288,6 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         subject=label("pdf.subject"),
         creator="Locuvi",
     )
-    width = A4[0] - 36 * mm
 
     # Header: seller (left) and title/meta (right)
     seller_lines = [f"<font name='Inter-SemiBold' size='12.5'>{_esc(seller['legal_name'])}</font>"]
@@ -259,7 +301,10 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     contact = [c for c in (seller.get("email"), seller.get("phone")) if c]
     if contact:
         seller_lines.append(_esc(" · ".join(contact)))
-    seller_par = Paragraph("<br/>".join(seller_lines), st["base"])
+    seller_par: Any = Paragraph("<br/>".join(seller_lines), st["base"])
+    logo = _logo(look.get("logo_png_b64"))
+    if logo is not None:
+        seller_par = [logo, Spacer(1, 3 * mm), seller_par]
 
     if credit:
         meta_rows = [
@@ -312,7 +357,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     story: list[Any] = [
         header,
         Spacer(1, 4 * mm),
-        HRFlowable(width="100%", thickness=1.2, color=STEEL, spaceAfter=4 * mm),
+        HRFlowable(width="100%", thickness=1.2, color=accent, spaceAfter=4 * mm),
     ]
 
     bill_lines = [f"<font name='Inter-SemiBold'>{_esc(bill['name'])}</font>"]
@@ -371,7 +416,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     line_style = [
         ("FONTNAME", (0, 0), (-1, -1), "Inter"),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.8, STEEL),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, accent),
         ("LINEBELOW", (0, -1), (-1, -1), 0.5, RULE),
         ("LEFTPADDING", (0, 0), (-1, -1), 3),
         ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -432,7 +477,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Inter"),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LINEABOVE", (0, -1), (-1, -1), 1.0, STEEL),
+                ("LINEABOVE", (0, -1), (-1, -1), 1.0, accent),
                 ("TOPPADDING", (0, -1), (-1, -1), 6),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -518,6 +563,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     def canvasmaker(*args: Any, **kwargs: Any) -> _NumberedCanvas:
         c = _NumberedCanvas(*args, **kwargs)
         c.footer_left = footer_left
+        c.footer_lines = footer_lines
         c.watermark = watermark
         return c
 

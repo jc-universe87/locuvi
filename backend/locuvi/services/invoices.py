@@ -34,7 +34,7 @@ from locuvi.money import (
     pensionable_months,
 )
 from locuvi.pdf.render import render_invoice_pdf
-from locuvi.services import core
+from locuvi.services import branding, core
 from locuvi.storage.local import write_issued_pdf
 
 log = logging.getLogger("locuvi.invoices")
@@ -505,6 +505,18 @@ def _address_lines(text: str) -> list[str]:
     return [ln.strip() for ln in text.splitlines() if ln.strip()]
 
 
+def seller_block(profile: Any) -> dict[str, Any]:
+    return {
+        "legal_name": profile.legal_name,
+        "trading_name": profile.trading_name,
+        "designation": profile.designation,
+        "address_lines": _address_lines(profile.address_lines),
+        "postcode": profile.postcode,
+        "email": profile.email,
+        "phone": profile.phone,
+    }
+
+
 def build_snapshot(
     s: Session,
     inv: Invoice,
@@ -532,15 +544,7 @@ def build_snapshot(
             "currency": "GBP",
             "issued_at": issued_at.isoformat() if issued_at else None,
         },
-        "seller": {
-            "legal_name": profile.legal_name,
-            "trading_name": profile.trading_name,
-            "designation": profile.designation,
-            "address_lines": _address_lines(profile.address_lines),
-            "postcode": profile.postcode,
-            "email": profile.email,
-            "phone": profile.phone,
-        },
+        "seller": seller_block(profile),
         "bill_to": {
             "practice_id": practice.id if practice else None,
             "name": practice.name if practice else "",
@@ -577,7 +581,7 @@ def build_snapshot(
             "rounding": ROUNDING_DESCRIPTION,
         },
         "vat": {"status": profile.vat_status, "amount": None},
-        "presentation": {"locale": "en-GB", "timezone": "Europe/London", "template": "a4-v1"},
+        "presentation": branding.presentation(profile),
     }
 
 

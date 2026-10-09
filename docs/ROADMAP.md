@@ -94,13 +94,18 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
   invoices (BEGIN IMMEDIATE, idempotency key, immutable PDF in `invoices/credit/`, PDF failure
   doesn't use a number); reduces what's owed, bank matching, pension month figures and the
   tax-year report; covered by integrity checks and backups; invoices with credit notes can't be
-  voided. (WebDAV archiving of credit-note PDFs: 💭.)
+  voided. Credit-note PDFs are archived to Nextcloud too (Part 2b).
 - ✅ Repeating bookings ("every Tuesday AM at X until December") in the Diary: Repeat… →
   weekdays, weekly/fortnightly, from/until, live preview; days already booked are skipped;
   one undo removes the whole series.
 - ✅ Calendar subscription (ICS) of booked sessions for the phone calendar (Settings › Phone
   calendar): private secret link (encrypted at rest, regenerate/turn off), no fees unless
   chosen, cancelled sessions marked cancelled, RFC 5545 folding/escaping.
+- ✅ Personalisation (owner request, Settings › Personalisation): own logo on invoices and
+  credit notes (PNG/JPEG/WebP, cleaned: metadata dropped, empty edges trimmed, resized; kept in
+  the database so backups cover it), accent colour from print-safe presets, one-line footer on
+  every invoice page, email sign-off for drafted emails, sample-invoice preview. Frozen into each
+  issued snapshot (`presentation`), so issued documents never change (migration 0018).
 - 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
 - ✅ Password change without editing the secret file (Settings › Password): scrypt hash in the
   database overrides the secret file; changing it signs out every other device (session epoch);

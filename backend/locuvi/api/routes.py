@@ -278,6 +278,76 @@ def add_policy(body: S.PolicyIn, s: DB) -> dict[str, Any]:
     return _policy_out(s, p)
 
 
+# ------------------------------------------------------------------ personalisation
+
+
+@api.get("/settings/branding")
+def get_branding(s: DB) -> dict[str, Any]:
+    from locuvi.services import branding
+
+    return branding.public(core.get_profile(s))
+
+
+@api.patch("/settings/branding")
+def patch_branding(body: S.BrandingIn, s: DB) -> dict[str, Any]:
+    from locuvi.services import branding
+
+    p = core.get_profile(s)
+    data = body.model_dump(exclude_unset=True)
+    if data.get("accent"):
+        p.brand_accent = data["accent"]
+    for k in ("invoice_footer", "email_signoff"):
+        if k in data:
+            setattr(p, k, (data[k] or "").strip() or None)
+    s.commit()
+    return branding.public(p)
+
+
+@api.post("/settings/branding/logo")
+def put_logo(s: DB, file: Annotated[UploadFile, File()]) -> dict[str, Any]:
+    from locuvi.services import branding
+
+    data = file.file.read(branding.MAX_UPLOAD_BYTES + 1)
+    return branding.public(branding.set_logo(s, data))
+
+
+@api.delete("/settings/branding/logo")
+def delete_logo(s: DB) -> dict[str, Any]:
+    from locuvi.services import branding
+
+    return branding.public(branding.remove_logo(s))
+
+
+@api.get("/settings/branding/logo.png")
+def logo_png(s: DB) -> Response:
+    p = core.get_profile(s)
+    if not p.logo_png:
+        raise NotFound("branding.no_logo", "No logo saved.")
+    return Response(p.logo_png, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@api.get("/settings/branding/preview.pdf")
+def branding_preview(s: DB) -> Response:
+    """A fictional sample invoice in the owner's current style (marked as a draft)."""
+    from locuvi.cli import example_snapshot
+    from locuvi.pdf.render import render_invoice_pdf
+    from locuvi.services import branding
+
+    p = core.get_profile(s)
+    snap = example_snapshot()
+    if p.legal_name:
+        snap["seller"] = svc.seller_block(p)
+    snap["presentation"] = branding.presentation(p)
+    return Response(
+        render_invoice_pdf(snap, draft=True),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'inline; filename="sample-invoice.pdf"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @api.delete("/settings/pension-policies/{policy_id}", status_code=204)
 def delete_policy(policy_id: str, s: DB) -> Response:
     p = s.get(PensionPolicy, policy_id)

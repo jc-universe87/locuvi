@@ -99,7 +99,9 @@ health check) reports `degraded` if not.
 Sign in and a three-step welcome asks for **you** (name, address), **getting paid** (bank
 details) and **your first practice** (name, address, usual session rate). That's all.
 Everything else is optional and lives under the gear icon (**Settings**): numbering and
-terms, pension rates and your employee tier, email, Nextcloud.
+terms, pension rates and your employee tier, email, Nextcloud. **Settings › Personalisation**
+adds your logo, an accent colour, a one-line invoice footer and your email sign-off, with a
+sample-invoice preview; issued invoices keep the look they were issued with.
 
 Check the pre-loaded 2026/27 employer rate (14.38% of 90% pensionable pay) against current
 NHSBSA/PCSE guidance. When it changes, add a new dated rate in Settings → Pension.

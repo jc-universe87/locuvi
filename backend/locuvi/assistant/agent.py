@@ -27,6 +27,7 @@ from locuvi.errors import DomainError
 from locuvi.models import AgentConversation, Invoice, InvoiceStatus, Practice, utcnow
 from locuvi.services import (
     bank,
+    branding,
     checks,
     core,
     diary,
@@ -369,7 +370,11 @@ class Tools:
                 f"£{Decimal(st['outstanding'] or 0):,.2f} "
                 "outstanding. I would be grateful if you could arrange payment, or let me know "
                 "if there is any problem with the invoice.\n\nThe invoice is attached again for "
-                "convenience.\n\nKind regards"
+                "convenience.\n\n"
+                + branding.signoff(
+                    core.get_profile(self.s),
+                    (inv.immutable_snapshot_json or {}).get("seller", {}).get("legal_name", ""),
+                )
             )
         self.created.append(
             {

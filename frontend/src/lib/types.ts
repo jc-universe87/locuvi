@@ -127,6 +127,15 @@ export interface Practice {
   form_a_signatory: string | null;
 }
 
+export interface Branding {
+  has_logo: boolean;
+  logo_sha256: string | null;
+  accent: string;
+  accents: Record<string, string>;
+  invoice_footer: string;
+  email_signoff: string;
+}
+
 export interface Profile {
   legal_name: string;
   trading_name: string | null;
