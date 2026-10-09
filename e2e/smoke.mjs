@@ -109,7 +109,7 @@ const cell = (d) => page.locator(".day:not(.out)").nth(d - 1);
 await cell(1).click();
 await page.getByText(/^Added AM/).waitFor();
 await cell(8).click();
-await page.getByRole("group", { name: "Session" }).getByRole("button", { name: "PM" }).click();
+await page.getByRole("group", { name: "Type of work" }).getByRole("button", { name: "PM" }).click();
 await page.getByRole("button", { name: /£600.00/ }).waitFor(); // remembered rate
 await cell(9).click();
 await page.locator("#h-month").waitFor();
