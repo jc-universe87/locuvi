@@ -6,7 +6,8 @@
 # Without it, the build uses the default public CAs. Nothing is stored in the image.
 
 # ---- frontend build -------------------------------------------------------
-FROM node:22.12.0-bookworm-slim AS frontend
+# Built on the build machine's own platform: the static files are the same for every target.
+FROM --platform=$BUILDPLATFORM node:22.12.0-bookworm-slim AS frontend
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=secret,id=build_ca,required=false \

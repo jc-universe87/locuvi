@@ -57,9 +57,15 @@ def create_app(
         settings.issued_dir.mkdir(parents=True, exist_ok=True)
         ensure_dir_private(settings.key_dir)
         engine = db.init_engine(settings.db_path)
+        from locuvi.services import backups
+
+        backups.before_upgrade(settings, engine)  # an update never migrates without a copy
         upgrade(engine)
         with db.new_session() as s:
             core.ensure_singletons(s)
+            from locuvi.services import invoices as invoice_svc
+
+            invoice_svc.refresh_drafts(s)  # drafts follow current rules and rates
             app.state.integrity = integrity.check(s, settings)
             from locuvi.models import AuthConfig
 

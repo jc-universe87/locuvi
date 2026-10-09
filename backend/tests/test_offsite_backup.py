@@ -166,3 +166,38 @@ def test_no_passphrase_means_local_only_finding(settings, session, ready, tmp_pa
     assert not list(st.backup_dir.glob("*.enc"))
     assert "backup_offsite_off" in kinds(session, st)
     assert "correct horse" not in repr(replace(st, backup_passphrase=PASS))
+
+
+def test_backup_before_upgrade(settings, session, ready, tmp_path, monkeypatch):
+    from alembic import command
+
+    from locuvi import migrate
+
+    st = replace(settings, backup_dir=tmp_path / "bk")
+    inv = issue_one(st, session, ready)
+    session.commit()
+    engine = db.get_engine()
+    assert backups.before_upgrade(st, engine) is None  # already at head: nothing to do
+    cfg = migrate.alembic_config()
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.stamp(cfg, "0017")  # pretend the server still runs an older release
+    current, head = migrate.pending(engine)
+    assert current == "0017" and head != current
+    dest = backups.before_upgrade(st, engine)
+    assert dest is not None and dest.name.endswith(f"-before-{head}.tar.gz")
+    assert cli.check_backup(dest)["issued_invoices"] == 1  # a restorable copy of the old data
+
+    # no restorable copy -> no migration (unless deliberately overridden)
+    pdf = st.data_dir / inv.local_pdf_path
+    good = pdf.read_bytes()
+    pdf.write_bytes(b"altered")
+    with pytest.raises(RuntimeError, match="Refusing to upgrade"):
+        backups.before_upgrade(st, engine)
+    monkeypatch.setenv("LOCUVI_UPGRADE_WITHOUT_BACKUP", "1")
+    assert backups.before_upgrade(st, engine) is None
+    pdf.write_bytes(good)
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.stamp(cfg, "head")
+    assert backups.before_upgrade(replace(st, backup_dir=None), engine) is None

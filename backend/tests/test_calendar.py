@@ -15,7 +15,9 @@ def test_render_ics(session, ready, settings):
         session,
         [
             diary.SessionInput(ready.id, today, "am"),
-            diary.SessionInput(ready.id, today, "hours", quantity=Decimal("4.5")),
+            diary.SessionInput(
+                ready.id, today, "hours", quantity=Decimal("4.5"), rate=Decimal("95")
+            ),
         ],
     )
     box = SecretBox(settings)

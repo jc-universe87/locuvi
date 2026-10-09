@@ -139,6 +139,8 @@ class PracticeIn(Strict):
     reference: Annotated[str, StringConstraints(max_length=100)] | None = None
     default_rate: DecStr | None = None
     default_unit: Unit = "am"
+    hourly_rate: DecStr | None = None
+    default_hours: DecStr | None = None
     default_pensionable: bool = True
     rate_includes_pension: bool = False
     default_payment_terms_days: Annotated[int, Field(ge=0, le=365)] | None = None
@@ -157,6 +159,8 @@ class PracticePatch(Strict):
     reference: Annotated[str, StringConstraints(max_length=100)] | None = None
     default_rate: DecStr | None = None
     default_unit: Unit | None = None
+    hourly_rate: DecStr | None = None
+    default_hours: DecStr | None = None
     default_pensionable: bool | None = None
     rate_includes_pension: bool | None = None
     default_payment_terms_days: Annotated[int, Field(ge=0, le=365)] | None = None
@@ -176,6 +180,8 @@ class PracticeOut(BaseModel):
     reference: str | None
     default_rate: str | None
     default_unit: str
+    hourly_rate: str | None
+    default_hours: str | None
     default_pensionable: bool
     rate_includes_pension: bool
     default_payment_terms_days: int | None
@@ -196,6 +202,7 @@ class LineIn(Strict):
     quantity: DecStr = "1"
     unit_price: DecStr
     pensionable: bool = False
+    agreed_rate: DecStr | None = None  # all-in rate incl. employer pension (fee is derived)
 
     def as_decimals(self) -> tuple[Decimal, Decimal]:
         return Decimal(self.quantity), Decimal(self.unit_price)

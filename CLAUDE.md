@@ -32,10 +32,14 @@ never submit pension forms or send email without an explicit owner tap.
   file to the next `NNNN_` prefix and replace `locuvi.models.*` column types with `sa.*`.
 - Frontend: `cd frontend && npm test && npm run typecheck && npm run build`
 - Docker: `docker compose up -d --build` (needs `secrets/locuvi_password.txt`).
-- CI: `.github/workflows/ci.yml` runs the backend and frontend checks above on PRs and `main`.
+- CI: `.github/workflows/ci.yml` runs the backend and frontend checks above on PRs and `main`;
+  green pushes to `main` publish `ghcr.io/jc-universe87/gp-locum-manager` (`latest`, `sha-…`).
+  The server updates with `./update.sh`; startup backs up before migrating (`backups.before_upgrade`).
 
 ## Rules that must not regress
-- Never use float for money; amounts cross the API as decimal strings.
+- Never use float for money; amounts cross the API as decimal strings. Rates agreed incl.
+  employer pension live in `agreed_rate`; the fee is `money.basic_from_inclusive` (analyse
+  derives `unit_prices`), never typed twice.
 - Issued invoices are immutable: number, snapshot, PDF. No edit/delete; void keeps them.
   Corrections after booking are credit notes (`services/credit_notes.py`, own series, same
   issue guarantees, PDFs in `invoices/credit/` — keep integrity + backup covering them).

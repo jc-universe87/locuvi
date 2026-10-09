@@ -233,7 +233,11 @@ class Tools:
             {
                 "id": p.id,
                 "name": p.name,
-                "usual_rate": _money(p.default_rate),
+                "paid_per": "hour" if p.default_unit == "hours" else "session",
+                "session_rate": _money(p.default_rate),
+                "hourly_rate": _money(p.hourly_rate),
+                "usual_hours": str(p.default_hours) if p.default_hours is not None else None,
+                "rates_include_employer_pension": p.rate_includes_pension,
                 "po_required": p.po_required,
                 "invoice_instructions": p.invoice_instructions,
                 "billing_email_set": bool(p.billing_email),

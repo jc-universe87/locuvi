@@ -46,7 +46,8 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Nightly backup | ✅ | Automatic after 02:00 into `/backups` (30 days kept), "Back up now" on Today |
 | Off-server encrypted copy of `backups/` | 🔜 | Built in: create `secrets/backup_passphrase.txt` and enable it in compose (README §5) |
 | Restore drill on the real server (once) | 🔜 | `locuvi.cli restore` into a scratch volume, then `verify` |
-| Merge working branch into `main`; deploy from `main` | 🔜 | Owner to approve PR |
+| Merge working branch into `main`; deploy from `main` | ✅ | PR #1 merged 9 Oct 2026 |
+| One-command updates: image published to GHCR on every green push to `main`; `./update.sh` (or `docker compose pull && docker compose up -d`); automatic backup before any database upgrade | ✅ | README "Updates"; one-time `docker login ghcr.io` (repo is private) |
 | HTTPS on the intranet (Caddy internal CA or Tailscale serve) | 🧭 | Plain http on LAN is readable by others on that network |
 | Connect Nextcloud (app password, allowlist if private) | 🧭 | Optional |
 | Go-live check of rules against GOV.UK invoice requirements and NHSBSA/PCSE guidance | 🔜 | `docs/handover/SOURCES.md` |
@@ -106,6 +107,13 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
   the database so backups cover it), accent colour from print-safe presets, one-line footer on
   every invoice page, email sign-off for drafted emails, sample-invoice preview. Frozen into each
   issued snapshot (`presentation`), so issued documents never change (migration 0018).
+- ✅ Rates (owner request): each practice is paid per **session** or per **hour** (hourly
+  rate + usual hours; the Diary opens on the practice's pay type), and the NHS employer
+  pension is either **added on top** or **included in the rate**. Included rates are really
+  calculated now: basic fee = agreed rate ÷ (1 + 90% × employer rate), rounded to the penny,
+  then the normal rules; the agreed rate is kept on the session, invoice line, snapshot and
+  PDF note, and any penny rounding against the agreed total is shown before issuing
+  (migration 0019). A session rate is never used as an hourly rate.
 - 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
 - ✅ Password change without editing the secret file (Settings › Password): scrypt hash in the
   database overrides the secret file; changing it signs out every other device (session epoch);

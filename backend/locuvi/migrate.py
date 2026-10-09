@@ -17,6 +17,17 @@ def alembic_config() -> Config:
     return cfg
 
 
+def pending(engine: Engine) -> tuple[str | None, str | None]:
+    """(current, head) revisions; current is None for a brand-new database."""
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    head = ScriptDirectory.from_config(alembic_config()).get_current_head()
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    return current, head
+
+
 def upgrade(engine: Engine, revision: str = "head") -> None:
     cfg = alembic_config()
     with engine.begin() as conn:

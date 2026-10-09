@@ -32,7 +32,8 @@ const emptyForm: Form = {
 const DEC = /^\d+(\.\d{1,2})?$/;
 
 function lineValid(l: Line) {
-  return !!l.service_date && DEC.test(l.unit_price.trim()) && DEC.test(l.quantity.trim()) && Number(l.quantity) > 0;
+  const price = l.agreed_rate != null ? l.agreed_rate : l.unit_price;
+  return !!l.service_date && DEC.test(price.trim()) && DEC.test(l.quantity.trim()) && Number(l.quantity) > 0;
 }
 
 function toBody(f: Form) {
@@ -48,7 +49,8 @@ function toBody(f: Form) {
       description: l.description,
       unit: l.unit,
       quantity: l.quantity.trim(),
-      unit_price: l.unit_price.trim(),
+      unit_price: (l.agreed_rate != null ? l.agreed_rate : l.unit_price).trim(),
+      ...(l.agreed_rate != null ? { agreed_rate: l.agreed_rate.trim() } : {}),
       pensionable: l.pensionable,
     })),
   };
@@ -152,6 +154,10 @@ export default function InvoiceEditor() {
     const pos = validIdx.indexOf(i);
     return pos >= 0 && calc ? calc.totals.line_amounts[pos] : null;
   };
+  const feeFor = (i: number) => {
+    const pos = validIdx.indexOf(i);
+    return pos >= 0 && calc?.unit_prices ? calc.unit_prices[pos] : null;
+  };
 
   const update = (patch: Partial<Form> | ((f: Form) => Partial<Form>)) => {
     touched.current = true;
@@ -172,8 +178,11 @@ export default function InvoiceEditor() {
           service_date: todayLondon(),
           unit,
           description: t(`editor.default_desc_${unit}` as MessageKey),
-          quantity: "1",
-          unit_price: practice?.default_rate ?? "",
+          quantity: (unit === "hours" ? practice?.default_hours : null) ?? "1",
+          unit_price: (unit === "hours" ? practice?.hourly_rate : practice?.default_rate) ?? "",
+          ...(practice?.rate_includes_pension
+            ? { agreed_rate: (unit === "hours" ? practice?.hourly_rate : practice?.default_rate) ?? "" }
+            : {}),
           pensionable: practice?.default_pensionable ?? true,
         };
       return { lines: [...f.lines, next] };
@@ -383,11 +392,20 @@ export default function InvoiceEditor() {
                         aria-invalid={!DEC.test(l.quantity.trim())}
                         onChange={(e) => updateLine(i, { quantity: e.target.value })} />
                     </Field>
-                    <Field id={`r${i}`} label={t("editor.line_rate")}>
-                      <input id={`r${i}`} type="text" inputMode="decimal" value={l.unit_price}
-                        aria-invalid={l.unit_price !== "" && !DEC.test(l.unit_price.trim())}
-                        onChange={(e) => updateLine(i, { unit_price: e.target.value })} />
-                    </Field>
+                    {l.agreed_rate != null ? (
+                      <Field id={`r${i}`} label={t("editor.line_rate_incl")}
+                        hint={feeFor(i) && form.pension_enabled && l.pensionable ? t("rates.fee_from_agreed", { fee: gbp(feeFor(i)), agreed: gbp(l.agreed_rate) }) : undefined}>
+                        <input id={`r${i}`} type="text" inputMode="decimal" value={l.agreed_rate}
+                          aria-invalid={l.agreed_rate !== "" && !DEC.test(l.agreed_rate.trim())}
+                          onChange={(e) => updateLine(i, { agreed_rate: e.target.value })} />
+                      </Field>
+                    ) : (
+                      <Field id={`r${i}`} label={t("editor.line_rate")}>
+                        <input id={`r${i}`} type="text" inputMode="decimal" value={l.unit_price}
+                          aria-invalid={l.unit_price !== "" && !DEC.test(l.unit_price.trim())}
+                          onChange={(e) => updateLine(i, { unit_price: e.target.value })} />
+                      </Field>
+                    )}
                     <div className="line-foot">
                       <label className="check">
                         <input type="checkbox" checked={l.pensionable} disabled={!form.pension_enabled}

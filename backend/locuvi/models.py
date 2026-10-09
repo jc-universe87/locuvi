@@ -180,6 +180,9 @@ class Practice(TimestampMixin, Base):
     default_unit: Mapped[str] = mapped_column(String(16), default=LineUnit.am)
     default_pensionable: Mapped[bool] = mapped_column(Boolean, default=True)
     rate_includes_pension: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Hourly practices: default_unit == "hours", paid hourly_rate × default_hours by default.
+    hourly_rate: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
+    default_hours: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
     default_payment_terms_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     practice_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -268,6 +271,9 @@ class InvoiceLine(TimestampMixin, Base):
     unit_price: Mapped[Decimal] = mapped_column(DecimalString)
     amount: Mapped[Decimal] = mapped_column(DecimalString)
     pensionable: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Rate agreed *including* the employer pension contribution; unit_price is then derived
+    # from it (money.basic_from_inclusive) whenever pension applies to the line.
+    agreed_rate: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     invoice: Mapped[Invoice] = relationship(back_populates="lines")
@@ -354,6 +360,8 @@ class WorkSession(TimestampMixin, Base):
     quantity: Mapped[Decimal] = mapped_column(DecimalString, default=Decimal("1"))
     rate: Mapped[Decimal] = mapped_column(DecimalString)
     pensionable: Mapped[bool] = mapped_column(Boolean, default=True)
+    # The rate above was agreed including the employer pension contribution.
+    rate_includes_pension: Mapped[bool] = mapped_column(Boolean, default=False)
     description: Mapped[str] = mapped_column(String(300), default="")
     status: Mapped[str] = mapped_column(String(16), default=SessionStatus.active)
     invoice_id: Mapped[str | None] = mapped_column(

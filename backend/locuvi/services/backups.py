@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,39 @@ def backup_now(settings: Settings) -> dict:
         "offsite": offsite.get("status"),
         "drill_ok": drill["ok"],
     }
+
+
+def before_upgrade(settings: Settings, engine: Any) -> Path | None:
+    """Back up the database and PDFs before an update migrates them (needs BACKUP_DIR).
+
+    If the copy cannot be made the upgrade is refused (raises), so the database is never
+    migrated without a restorable copy. Go back to the previous image (LOCUVI_TAG) or fix the
+    cause; LOCUVI_UPGRADE_WITHOUT_BACKUP=1 overrides this once, deliberately.
+    """
+    from locuvi import cli, migrate
+
+    if settings.backup_dir is None:
+        return None
+    current, head = migrate.pending(engine)
+    if current is None or current == head:
+        return None  # new install, or nothing to migrate
+    folder = Path(settings.backup_dir)
+    stamp = datetime.now(UTC).astimezone(core.LONDON).strftime("%Y-%m-%d-%H%M%S")
+    dest = folder / f"locuvi-{stamp}-before-{head}.tar.gz"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        cli.backup(settings, dest)
+    except (SystemExit, Exception) as exc:  # noqa: BLE001
+        log.error("backup before upgrade %s -> %s failed: %s", current, head, exc)
+        if os.environ.get("LOCUVI_UPGRADE_WITHOUT_BACKUP") == "1":
+            log.warning("LOCUVI_UPGRADE_WITHOUT_BACKUP=1: migrating without a backup")
+            return None
+        raise RuntimeError(
+            f"Refusing to upgrade the database ({current} -> {head}) without a backup: {exc}. "
+            "Fix the backup folder or the reported problem, or go back to the previous image."
+        ) from None
+    log.info("backup before upgrade %s -> %s written: %s", current, head, dest.name)
+    return dest
 
 
 # ------------------------------------------------------------------ off-server copy

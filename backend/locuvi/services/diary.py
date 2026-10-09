@@ -54,7 +54,11 @@ def remembered_rate(s: Session, practice: Practice, unit: str) -> Decimal | None
         .order_by(WorkSession.date.desc(), WorkSession.created_at.desc())
         .limit(1)
     ).first()
-    return last if last is not None else practice.default_rate
+    if last is not None:
+        return last
+    if unit == LineUnit.hours:
+        return practice.hourly_rate
+    return practice.default_rate
 
 
 def _practice(s: Session, practice_id: str) -> Practice:
@@ -88,8 +92,13 @@ def add_sessions(
             practice_id=p.id,
             date=it.date,
             unit=it.unit,
-            quantity=it.quantity if it.quantity is not None else Decimal("1"),
+            quantity=it.quantity
+            if it.quantity is not None
+            else (
+                p.default_hours if it.unit == LineUnit.hours and p.default_hours else Decimal("1")
+            ),
             rate=rate,
+            rate_includes_pension=p.rate_includes_pension,
             pensionable=p.default_pensionable if it.pensionable is None else it.pensionable,
             description=(it.description or "").strip() or DEFAULT_DESCRIPTIONS[it.unit],
             status=SessionStatus.active,
@@ -230,7 +239,15 @@ def invoice_month(s: Session, practice_id: str, month: str) -> Invoice:
         key=lambda w: (w.date, w.unit),
     )
     lines = [
-        inv_svc.LineData(w.date, w.description, w.unit, w.quantity, w.rate, w.pensionable)
+        inv_svc.LineData(
+            w.date,
+            w.description,
+            w.unit,
+            w.quantity,
+            w.rate,
+            w.pensionable,
+            w.rate if w.rate_includes_pension else None,  # converted to the basic fee on save
+        )  # fmt: skip
         for w in all_sessions
     ]
     draft = inv_svc.save_draft(s, draft, practice_id=practice_id, lines=lines)
