@@ -75,7 +75,9 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
 ### Next — 🔜 driven by owner feedback
 - 🔜 Owner feedback after a month of real use (list items here).
 - 🧭 Credit notes (own number series) for corrections after a practice has booked an invoice.
-- 🧭 Repeating bookings ("every Tuesday AM at X until December") in the Diary.
+- ✅ Repeating bookings ("every Tuesday AM at X until December") in the Diary: Repeat… →
+  weekdays, weekly/fortnightly, from/until, live preview; days already booked are skipped;
+  one undo removes the whole series.
 - 🧭 Calendar subscription (ICS) of booked sessions for the phone calendar.
 - 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
 - 🧭 Password change without editing the secret file.

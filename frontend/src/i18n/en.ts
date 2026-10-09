@@ -885,6 +885,23 @@ const en = {
   "agents.safety_1": "Issue, void or change invoices, send email, record payments or submit pension forms.",
   "agents.safety_2": "See passwords, bank details, API keys or your mailbox.",
   "agents.safety_3": "Every call is recorded in Locuvi's audit log with the connection's name.",
+  "repeat.open": "Repeat…",
+  "repeat.title": "Repeat {unit} at {practice}",
+  "repeat.weekdays": "Days",
+  "repeat.every": "How often",
+  "repeat.weekly": "Every week",
+  "repeat.fortnightly": "Every 2 weeks",
+  "repeat.from": "From",
+  "repeat.until": "Until",
+  "repeat.none": "No days in that period.",
+  "repeat.skipped": "{n} days already booked will be skipped",
+  "repeat.skipped_one": "1 day already booked will be skipped",
+  "repeat.added": "Added {n} sessions",
+  "repeat.added_one": "Added 1 session",
+  "repeat.usual_rate": "Uses the usual rate for this practice.",
+  "error.session.series_range": "Check the dates (up to about a year).",
+  "error.session.series_weekdays": "Choose at least one weekday.",
+  "error.session.series_too_long": "That's too many sessions at once.",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -332,3 +332,62 @@ def test_api_new_endpoints(settings):
         assert c.get("/api/v1/reports/summary").json()["label"]
         assert c.get("/api/v1/pension/2026-13").status_code == 400
         assert c.get("/api/v1/settings/email").json()["password_set"] is False
+
+
+# ------------------------------------------------------------- repeating bookings
+
+
+def test_series_dates_and_skip_duplicates(session, ready):
+    from locuvi.errors import DomainError
+
+    dates = diary.series_dates(date(2026, 11, 2), date(2026, 11, 30), [1, 3])  # Tue, Thu
+    assert [d.day for d in dates] == [3, 5, 10, 12, 17, 19, 24, 26]
+    fortnightly = diary.series_dates(date(2026, 11, 2), date(2026, 11, 30), [1], every_weeks=2)
+    assert [d.day for d in fortnightly] == [3, 17]
+    with pytest.raises(DomainError):
+        diary.series_dates(date(2026, 11, 2), date(2026, 10, 1), [1])
+    with pytest.raises(DomainError):
+        diary.series_dates(date(2026, 11, 2), date(2026, 11, 30), [])
+
+    diary.add_sessions(session, [diary.SessionInput(ready.id, date(2026, 11, 10), "day")])
+    base = diary.SessionInput(ready.id, date(2026, 11, 2), "am")
+    preview = diary.add_series(session, base, dates, dry_run=True)
+    assert "2026-11-10" in preview["skipped"] and len(preview["dates"]) == 7
+    out = diary.add_series(session, base, dates)
+    assert len(out["created"]) == 7 and out["created"][0].rate == Decimal("600.00")
+    again = diary.add_series(session, base, dates)
+    assert again["created"] == [] and len(again["skipped"]) == 8
+    assert diary.delete_many(session, [w.id for w in out["created"]]) == 7
+
+
+def test_api_series(settings):
+    from fastapi.testclient import TestClient
+
+    from locuvi.main import create_app
+
+    with TestClient(create_app(settings)) as c:
+        h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
+        p = c.post(
+            "/api/v1/practices",
+            headers=h,
+            json={
+                "name": "Example Medical Practice",
+                "billing_address": "2 Test Road",
+                "default_rate": "600.00",
+            },
+        ).json()
+        body = {
+            "practice_id": p["id"],
+            "start": "2026-11-02",
+            "until": "2026-11-30",
+            "weekdays": [1],
+            "unit": "pm",
+        }
+        prev = c.post("/api/v1/sessions/series", headers=h, json={**body, "dry_run": True}).json()
+        assert prev["dates"] == ["2026-11-03", "2026-11-10", "2026-11-17", "2026-11-24"]
+        r = c.post("/api/v1/sessions/series", headers=h, json=body)
+        assert r.status_code == 201 and len(r.json()["created"]) == 4
+        ids = [x["id"] for x in r.json()["created"]]
+        assert c.post("/api/v1/sessions/delete-many", headers=h, json={"ids": ids}).json() == {
+            "deleted": 4
+        }

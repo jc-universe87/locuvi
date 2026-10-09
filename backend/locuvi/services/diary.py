@@ -252,3 +252,84 @@ def reconcile_on_issue(s: Session, inv: Invoice) -> None:
     for ws in s.scalars(select(WorkSession).where(WorkSession.invoice_id == inv.id)):
         if ws.date not in dates:
             ws.invoice_id = None
+
+
+MAX_SERIES = 120
+
+
+def series_dates(start: date, until: date, weekdays: list[int], every_weeks: int = 1) -> list[date]:
+    """Dates from start to until (inclusive) on the given weekdays (Mon=0), every N weeks."""
+    from datetime import timedelta
+
+    if until < start:
+        raise DomainError("session.series_range", "The end date is before the start date.")
+    if (until - start).days > 400:
+        raise DomainError("session.series_range", "Choose up to about a year.")
+    days = sorted({d for d in weekdays if 0 <= d <= 6})
+    if not days:
+        raise DomainError("session.series_weekdays", "Choose at least one weekday.")
+    every = max(1, min(every_weeks, 4))
+    week0 = start - timedelta(days=start.weekday())
+    out = []
+    d = start
+    while d <= until:
+        if d.weekday() in days and ((d - week0).days // 7) % every == 0:
+            out.append(d)
+        d += timedelta(days=1)
+    if len(out) > MAX_SERIES:
+        raise DomainError("session.series_too_long", "That's too many sessions at once.")
+    return out
+
+
+def add_series(
+    s: Session, base: SessionInput, dates: list[date], *, dry_run: bool = False
+) -> dict[str, object]:
+    """Repeating booking: one session per date, skipping days already booked at this practice."""
+    _practice(s, base.practice_id)
+    taken = {
+        (w.date, w.unit)
+        for w in s.scalars(
+            select(WorkSession).where(
+                WorkSession.practice_id == base.practice_id,
+                WorkSession.status == SessionStatus.active,
+                WorkSession.date.in_(dates),
+            )
+        )
+    }
+    overlap = {"am": {"am", "day"}, "pm": {"pm", "day"}, "day": {"am", "pm", "day"}}
+    new_dates, skipped = [], []
+    for d in dates:
+        clash = any((d, u) in taken for u in overlap.get(base.unit, {base.unit}))
+        (skipped if clash else new_dates).append(d)
+    if dry_run:
+        return {"dates": [d.isoformat() for d in new_dates],
+                "skipped": [d.isoformat() for d in skipped]}  # fmt: skip
+    items = [
+        SessionInput(
+            base.practice_id,
+            d,
+            base.unit,
+            base.quantity,
+            base.rate,
+            base.pensionable,
+            base.description,
+        )  # fmt: skip
+        for d in new_dates
+    ]
+    created = add_sessions(s, items) if items else []
+    core.audit(s, "diary.series_added", sessions=len(created), skipped=len(skipped))
+    s.commit()
+    return {"created": created, "skipped": [d.isoformat() for d in skipped]}
+
+
+def delete_many(s: Session, ids: list[str]) -> int:
+    """Undo for a series: removes the given sessions unless they are on an issued invoice."""
+    n = 0
+    for i in ids[:MAX_SERIES]:
+        ws = s.get(WorkSession, i)
+        if ws is not None and not is_locked(ws, s):
+            if ws.invoice_id is None:
+                s.delete(ws)
+                n += 1
+    s.commit()
+    return n

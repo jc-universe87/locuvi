@@ -834,6 +834,27 @@ def add_sessions(body: S.SessionsIn, s: DB) -> list[dict[str, Any]]:
     return [_session_out(s, w) for w in diary.add_sessions(s, items)]
 
 
+@api.post("/sessions/series", status_code=201)
+def add_series(body: S.SeriesIn, s: DB) -> dict[str, Any]:
+    dates = diary.series_dates(body.start, body.until, body.weekdays, body.every_weeks)
+    base = diary.SessionInput(
+        practice_id=body.practice_id,
+        date=body.start,
+        unit=body.unit,
+        quantity=Decimal(body.quantity) if body.quantity else None,
+        rate=Decimal(body.rate) if body.rate else None,
+    )
+    out = diary.add_series(s, base, dates, dry_run=body.dry_run)
+    if body.dry_run:
+        return out
+    return {"created": [_session_out(s, w) for w in out["created"]], "skipped": out["skipped"]}
+
+
+@api.post("/sessions/delete-many")
+def delete_many_sessions(body: S.IdsIn, s: DB) -> dict[str, int]:
+    return {"deleted": diary.delete_many(s, body.ids)}
+
+
 @api.patch("/sessions/{session_id}")
 def patch_session(session_id: str, body: S.SessionPatch, s: DB) -> dict[str, Any]:
     ws = diary.get_session_or_404(s, session_id)

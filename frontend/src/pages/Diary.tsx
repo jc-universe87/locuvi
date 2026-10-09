@@ -69,6 +69,7 @@ export default function DiaryPage() {
   const [open, setOpen] = useState<WorkSession | null>(null);
   const [newPractice, setNewPractice] = useState(false);
   const [pasting, setPasting] = useState(false);
+  const [repeating, setRepeating] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   const { start, end, y, m, last } = monthBounds(month);
@@ -244,8 +245,11 @@ export default function DiaryPage() {
             </button>
           )}
         </div>
-        <p className="hint" style={{ margin: "0.6rem 0 0" }}>
-          {practice ? t("diary.tap_hint", { unit: t(`unit.${unit}` as MessageKey), practice: practice.name }) : ""}
+        <p className="hint row wrap" style={{ margin: "0.6rem 0 0", gap: "0.5rem" }}>
+          <span style={{ flex: 1 }}>{practice ? t("diary.tap_hint", { unit: t(`unit.${unit}` as MessageKey), practice: practice.name }) : ""}</span>
+          {practice && (
+            <button type="button" className="btn ghost small" onClick={() => setRepeating(true)}>{t("repeat.open")}</button>
+          )}
         </p>
       </div>
 
@@ -328,6 +332,11 @@ export default function DiaryPage() {
         }} />
       )}
       <BookingSheet open={pasting} onClose={() => setPasting(false)} onChanged={() => void load()} />
+      {repeating && practice && (
+        <RepeatSheet practice={practice} unit={unit} rate={DEC.test(rate.trim()) ? rate.trim() : null}
+          hours={unit === "hours" && DEC.test(hours.trim()) ? hours.trim() : null}
+          onClose={() => setRepeating(false)} onDone={() => { setRepeating(false); void load(); }} />
+      )}
     </>
   );
 }
@@ -493,6 +502,82 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
           </>
         )}
       </div>
+    </Dialog>
+  );
+}
+
+const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
+/** "Every Tuesday AM at X until December" in one go; days already booked are skipped. */
+function RepeatSheet({ practice, unit, rate, hours, onClose, onDone }: {
+  practice: Practice; unit: Unit; rate: string | null; hours: string | null; onClose: () => void; onDone: () => void;
+}) {
+  const { t, tn } = useT();
+  const toast = useToast();
+  const today = todayLondon();
+  const [days, setDays] = useState<number[]>([]);
+  const [every, setEvery] = useState<"1" | "2">("1");
+  const [start, setStart] = useState(today);
+  const [until, setUntil] = useState(() => {
+    const [y, m] = today.split("-").map(Number);
+    const last = new Date(Date.UTC(y, m + 1, 0));
+    return last.toISOString().slice(0, 10);
+  });
+  const [preview, setPreview] = useState<{ dates: string[]; skipped: string[] } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const body = { practice_id: practice.id, start, until, weekdays: days, every_weeks: Number(every), unit,
+    ...(rate ? { rate } : {}), ...(hours ? { quantity: hours } : {}) };
+  const key = JSON.stringify(body);
+  useEffect(() => {
+    if (!days.length || !start || !until) { setPreview(null); return; }
+    const id = setTimeout(() => {
+      api.post<{ dates: string[]; skipped: string[] }>("/sessions/series", { ...body, dry_run: true })
+        .then((p) => { setPreview(p); setError(null); }, (e) => { setPreview(null); setError(e); });
+    }, 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const add = async () => {
+    try {
+      const r = await api.post<{ created: WorkSession[]; skipped: string[] }>("/sessions/series", body);
+      const ids = r.created.map((w) => w.id);
+      toast({ text: tn("repeat.added", ids.length), undo: async () => {
+        await api.post("/sessions/delete-many", { ids });
+        onDone();
+      } });
+      onDone();
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const n = preview?.dates.length ?? 0;
+  return (
+    <Dialog open onClose={onClose} title={t("repeat.title", { unit: t(`unit.${unit}` as MessageKey), practice: practice.name })}
+      footer={<button className="btn" disabled={!n} onClick={add}>{n ? tn("booking.add_n", n) : t("booking.add_none")}</button>}>
+      <ErrorAlert error={error} />
+      <div className="chips" role="group" aria-label={t("repeat.weekdays")}>
+        {WEEKDAYS.map((w, i) => (
+          <button key={w} type="button" className="chip" aria-pressed={days.includes(i)}
+            onClick={() => setDays((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]))}>
+            {t(`diary.wd_${w}` as MessageKey)}
+          </button>
+        ))}
+      </div>
+      <div className="row wrap" style={{ margin: "0.9rem 0", gap: "0.75rem" }}>
+        <Segmented<"1" | "2"> value={every} onChange={setEvery} label={t("repeat.every")}
+          options={[{ value: "1", label: t("repeat.weekly") }, { value: "2", label: t("repeat.fortnightly") }]} />
+      </div>
+      <div className="row wrap" style={{ gap: "0.75rem" }}>
+        <Field id="rep-from" label={t("repeat.from")}><input id="rep-from" type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
+        <Field id="rep-until" label={t("repeat.until")}><input id="rep-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} /></Field>
+      </div>
+      {preview && (
+        <p className="muted">
+          {n ? preview.dates.map((d) => weekdayDate(d)).slice(0, 6).join(", ") + (n > 6 ? " …" : "") : t("repeat.none")}
+          {preview.skipped.length > 0 && <><br />{tn("repeat.skipped", preview.skipped.length)}</>}
+        </p>
+      )}
+      {!rate && <p className="hint">{t("repeat.usual_rate")}</p>}
     </Dialog>
   );
 }

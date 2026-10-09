@@ -385,3 +385,21 @@ class AgentAskIn(Strict):
 class AgentTokenIn(Strict):
     name: Annotated[str, StringConstraints(min_length=1, max_length=100)] = "Bevro"
     allow_drafts: bool = False
+
+
+class SeriesIn(Strict):
+    practice_id: str
+    start: _dt.date
+    until: _dt.date
+    weekdays: Annotated[list[Annotated[int, Field(ge=0, le=6)]], Field(min_length=1, max_length=7)]
+    every_weeks: Annotated[int, Field(ge=1, le=4)] = 1
+    unit: Literal["am", "pm", "day", "hours"] = "am"
+    quantity: DecStr | None = None
+    rate: DecStr | None = None
+    dry_run: bool = False
+
+
+class IdsIn(Strict):
+    ids: Annotated[
+        list[Annotated[str, StringConstraints(max_length=36)]], Field(min_length=1, max_length=120)
+    ]

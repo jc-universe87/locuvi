@@ -182,6 +182,16 @@ await shot("10c-booking-review");
 await page.getByRole("dialog").getByRole("button", { name: "Add 2 sessions" }).click();
 await page.getByRole("status").getByText("Added 2 sessions").waitFor();
 
+step("diary: repeating booking (every Wednesday) with undo");
+await page.getByRole("button", { name: "Repeat…" }).click();
+await page.getByRole("dialog").getByRole("group", { name: "Days" }).getByRole("button", { name: "Wed" }).click();
+const addRepeat = page.getByRole("dialog").getByRole("button", { name: /^Add \d+ sessions?$/ });
+await addRepeat.waitFor();
+await shot("10c2-repeat");
+await addRepeat.click();
+await page.getByRole("status").getByText(/^Added \d+ sessions?$/).waitFor();
+await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+
 step("inbox: pasted booking is filed as done; upload a file");
 await page.getByRole("link", { name: /^Inbox/ }).click();
 await page.getByRole("heading", { name: "Inbox" }).waitFor();
