@@ -112,7 +112,7 @@ communicate from one place. Locuvi joins it as one connected agent/tool provider
 3. Document inbox, then paste-a-booking as the first AI feature. ✅ (Oct 2026)
 4. Bank CSV import. ✅ (Oct 2026)
 5. Form A tracking and PCSE import. ✅ (Oct 2026)
-6. The full administrative agent.
+6. The full administrative agent. ✅ (Oct 2026)
 7. Bevro integration.
 
 ### Phase 1 — Foundation without AI — ✅ (v1.0)
@@ -184,21 +184,23 @@ Each item is useful on its own and gives the AI something reliable to work with.
   one tap by the owner. (B, F)
 - 💭 Structured outputs validated by backend schemas; every proposal is audit-logged.
 
-### Phase 3 — Administrative agent — 💭 (v2.x)
-- 💭 Tool-calling agent over controlled service functions: `list_sessions`,
-  `find_uninvoiced_sessions`, `get_invoice`, `create_invoice_draft`, `list_outstanding_invoices`,
-  `compare_payments`, `audit_pension_records`, `read_authorised_document`,
-  `draft_followup_email`, `generate_financial_summary`. Read-only by default; writes need
-  approval.
-- 💭 "Check all outstanding administrative work" → multi-step investigation over the checks
-  engine's findings, documents and correspondence, separating confirmed facts from assumptions,
-  ranked by urgency, with prepared drafts. (Spec 3)
-- 💭 Payment reconciliation help: inconsistent references, combined and partial payments,
-  deductions explained. (D)
-- 💭 Pension audit: work with no Form A, Form A not approved, missing Form B, deadlines,
-  PCSE comparison. Never claims a submission was accepted. (C)
-- 💭 Questions in plain language over your records ("Which practices still owe me money?").
-  Figures come from the database, never from AI estimates. (G)
+### Phase 3 — Administrative agent — ✅ (v2.x, Oct 2026)
+- ✅ **Ask Locuvi** (`assistant/agent.py`, `/ask`, sparkle icon when the assistant is on):
+  tool-calling agent over controlled service functions — `get_overview`, `run_checks`,
+  `list_practices`, `list_sessions`, `find_uninvoiced_sessions`, `list_invoices`,
+  `get_invoice`, `financial_summary`, `pension_overview`, `pension_month`, `list_documents`,
+  `read_document` (inbox only, minimised), `bank_payments_to_match`, plus two draft-only tools:
+  `prepare_invoice_draft` (no number; owner issues) and `draft_email` (invoice email or polite
+  reminder; never sent). Strict tool schemas, no forced tool choice, adaptive thinking echoed
+  unchanged, server-side refusal fallback (with the documented echo rule), step limit, every
+  call logged on the conversation and in the audit log. Follow-up questions keep context.
+- ✅ "Check all outstanding administrative work" → runs the checks engine and explains,
+  prioritised, separating records from assumptions. (Spec 3)
+- ✅ Payment and pension questions answer from the deterministic bank matcher, Form A
+  tracking and PCSE comparison (Spec C, D); it never claims a submission was accepted.
+- ✅ Questions in plain language over your records ("Which practices still owe me money?").
+  Figures come from the services, never from AI estimates. (G)
+- 🧭 Correspondence log (emails sent/received per invoice) as further context. (F)
 
 ### Phase 4 — Extended integration — 💭 (v3)
 - 💭 Scheduled multi-step reviews (e.g. a Monday-morning admin brief).

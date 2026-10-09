@@ -146,7 +146,10 @@ scanned PDFs/photos: paste an API key (stored encrypted) or mount one as a Docke
 set `ANTHROPIC_API_KEY_FILE`. Only the booking text, your practice names and today's date are
 sent — long numbers and dates of birth are removed first; never passwords, bank details or
 invoices. Refused requests are retried on a fallback model by the provider; the model used is
-recorded with every suggestion. It only suggests — calculations never use AI. See
+recorded with every suggestion. It only suggests — calculations never use AI. With the assistant on, the ✨ icon opens **Ask
+Locuvi**: ask "Check all my outstanding admin", "Which practices still owe me money?" or
+"Prepare invoices for last month" — it looks things up with Locuvi's own functions and can
+prepare invoice drafts and email drafts, but never issues, sends, pays or submits. See
 [`docs/specs/AI_AND_AGENTS.md`](docs/specs/AI_AND_AGENTS.md).
 
 You can still create an invoice by hand (Invoices → New invoice). Pensionable lines in two
@@ -243,6 +246,9 @@ npm test && npm run typecheck && npm run build
 
 # UI smoke test against a running instance (needs playwright + chromium)
 BASE_URL=http://127.0.0.1:8000 LOCUVI_PASSWORD=... node e2e/smoke.mjs
+# AI paths, against a local fake of the Anthropic API (start Locuvi with
+# ANTHROPIC_BASE_URL=http://127.0.0.1:8901 after `python e2e/fake_anthropic.py 8901 &`)
+BASE_URL=http://127.0.0.1:8000 LOCUVI_PASSWORD=... node e2e/assistant.mjs
 ```
 
 Configuration reference (environment): `APP_ENV`, `DATA_DIR`, `KEY_DIR`, `STATIC_DIR`,

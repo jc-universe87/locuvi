@@ -5,6 +5,7 @@ import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
 import DiaryPage from "./pages/Diary";
+import AskPage from "./pages/Ask";
 import BankPage from "./pages/Bank";
 import InboxPage from "./pages/Inbox";
 import InvoiceDetailPage from "./pages/InvoiceDetail";
@@ -84,6 +85,7 @@ export default function App() {
               ))}
             </nav>
             <span className="spacer" />
+            <AskLink />
             <InboxLink />
             <NavLink to="/settings" className="icon-btn" aria-label={t("nav.settings")} title={t("nav.settings")}>
               <Icon name="settings" />
@@ -101,6 +103,7 @@ export default function App() {
             <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/bank" element={<BankPage />} />
+            <Route path="/ask" element={<AskPage />} />
             <Route path="/pension" element={<PensionPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage onSignOut={session.auth_mode === "password" ? signOut : undefined} />} />
@@ -135,6 +138,21 @@ function InboxLink() {
     <NavLink to="/inbox" className="icon-btn badge-host" aria-label={label} title={label}>
       <Icon name="inbox" />
       {count > 0 && <span className="badge" aria-hidden="true">{count > 9 ? "9+" : count}</span>}
+    </NavLink>
+  );
+}
+
+/** Sparkle in the top bar, only when the optional assistant is switched on. */
+function AskLink() {
+  const { t } = useT();
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    api.get<{ ready: boolean }>("/settings/assistant").then((r) => setOn(r.ready), () => undefined);
+  }, []);
+  if (!on) return null;
+  return (
+    <NavLink to="/ask" className="icon-btn" aria-label={t("ask.title")} title={t("ask.title")}>
+      <Icon name="sparkle" />
     </NavLink>
   );
 }

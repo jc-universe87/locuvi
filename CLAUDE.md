@@ -14,13 +14,14 @@ never submit pension forms or send email without an explicit owner tap.
   `services/pension.py`, `services/reports.py` (+ Today overview), `services/checks.py`
   (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,
   audit), `services/mailbox.py` (read-only IMAP, chosen folders only),
-  `services/bank.py` (CSV statement → credits only → deterministic matches), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM), `mail.py` (SMTP),
+  `services/bank.py` (CSV statement → credits only → deterministic matches), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
+  read tools + draft-only tools, never send/issue/pay/submit), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
 - `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Bank, Invoices, InvoiceEditor,
   InvoiceDetail, Pension, Reports, Settings, Welcome), `components/Booking.tsx` (paste + review), `components/ui.tsx` (sheets, toggles, segmented,
   toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.
-- `e2e/smoke.mjs` Playwright UI smoke; `docs/` decisions, report, example PDF.
+- `e2e/smoke.mjs` Playwright UI smoke; `e2e/assistant.mjs` + `e2e/fake_anthropic.py` AI paths; `docs/` decisions, report, example PDF.
 
 ## Commands
 - Backend: `cd backend && uv run pytest && uv run ruff check . && uv run ruff format .`

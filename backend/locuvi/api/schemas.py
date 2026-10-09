@@ -375,3 +375,8 @@ class FormAIn(Strict):
 class PcseIn(Strict):
     pensionable_pay: DecStr | None = None
     contributions: DecStr | None = None
+
+
+class AgentAskIn(Strict):
+    question: Annotated[str, StringConstraints(min_length=1, max_length=4000)]
+    conversation_id: Annotated[str, StringConstraints(max_length=36)] | None = None

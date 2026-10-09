@@ -536,3 +536,16 @@ class PcseRecord(Base):
     contributions: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
     source: Mapped[str] = mapped_column(String(10), default="manual")  # manual | csv
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class AgentConversation(Base):
+    """A conversation with the administrative agent: messages for follow-ups + tool-call log."""
+
+    __tablename__ = "agent_conversation"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    messages_json: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    steps_json: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

@@ -286,3 +286,46 @@ def bank_undo(tx_id: str, s: DB) -> dict[str, Any]:
     tx = bank.get(s, tx_id)
     bank.undo(s, tx)
     return bank.as_dict(tx)
+
+
+# ----------------------------------------------------------------------- agent
+
+
+@api.post("/assistant/ask")
+def agent_ask(body: S.AgentAskIn, request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.assistant import agent
+
+    provider = _provider(request, s)
+    if provider is None or not hasattr(provider, "run_turn"):
+        raise DomainError("assistant.off", "Turn on the assistant in Settings first.")
+    return agent.ask(s, state(request).settings, provider, body.question, body.conversation_id)
+
+
+@api.get("/assistant/conversations")
+def agent_conversations(s: DB) -> list[dict[str, Any]]:
+    from locuvi.models import AgentConversation
+
+    rows = s.scalars(
+        select(AgentConversation).order_by(AgentConversation.updated_at.desc()).limit(30)
+    )
+    return [{"id": c.id, "title": c.title, "updated_at": c.updated_at,
+             "tools_used": len(c.steps_json or [])} for c in rows]  # fmt: skip
+
+
+@api.get("/assistant/conversations/{conversation_id}")
+def agent_conversation(conversation_id: str, s: DB) -> dict[str, Any]:
+    """Readable transcript: the owner's questions and the assistant's answers, plus tool log."""
+    from locuvi.models import AgentConversation
+
+    c = s.get(AgentConversation, conversation_id)
+    if c is None:
+        raise NotFound("agent.not_found", "Conversation not found.")
+    turns = []
+    for m in c.messages_json or []:
+        if m["role"] == "user" and isinstance(m["content"], str):
+            turns.append({"role": "user", "text": m["content"]})
+        elif m["role"] == "assistant":
+            text = "\n\n".join(b.get("text", "") for b in m["content"] if b.get("type") == "text")
+            if text.strip() and not any(b.get("type") == "tool_use" for b in m["content"]):
+                turns.append({"role": "assistant", "text": text.strip()})
+    return {"id": c.id, "title": c.title, "turns": turns, "steps": c.steps_json or []}

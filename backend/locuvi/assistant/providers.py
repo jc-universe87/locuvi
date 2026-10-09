@@ -147,30 +147,17 @@ class AnthropicProvider:
         blocks.append({"type": "text", "text": "List the sessions in this booking."})
         return blocks
 
-    def read_booking(
-        self,
-        *,
-        text: str,
-        attachment: tuple[bytes, str] | None,
-        practices: list[dict[str, str]],
-        today: date,
-    ) -> dict[str, Any]:
+    def _create(self, **kw: Any) -> Any:
+        """One Messages API call with refusal fallback; SDK errors become friendly ones."""
         import anthropic
 
         try:
-            resp = self._client.beta.messages.create(
+            return self._client.beta.messages.create(
                 model=self.model,
                 max_tokens=16000,
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
-                output_config={
-                    "effort": "medium",
-                    "format": {"type": "json_schema", "schema": BOOKING_SCHEMA},
-                },
-                system=SYSTEM_PROMPT,
-                messages=[
-                    {"role": "user", "content": self._content(text, attachment, practices, today)}
-                ],
+                **kw,
             )
         except anthropic.AuthenticationError:
             raise DomainError(
@@ -185,6 +172,37 @@ class AnthropicProvider:
         except anthropic.APIStatusError as exc:
             log.warning("assistant request failed: status %s", exc.status_code)
             raise DomainError("assistant.failed", "The AI service could not read this.") from None
+
+    def run_turn(
+        self, *, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> Any:
+        """One step of the agent loop (tool use, adaptive thinking, explicit effort)."""
+        resp = self._create(
+            output_config={"effort": "medium"}, system=system, messages=messages, tools=tools
+        )
+        served = getattr(resp, "model", None)
+        if served and served != self.model:
+            self.engine = f"ai:{served}"
+        return resp
+
+    def read_booking(
+        self,
+        *,
+        text: str,
+        attachment: tuple[bytes, str] | None,
+        practices: list[dict[str, str]],
+        today: date,
+    ) -> dict[str, Any]:
+        resp = self._create(
+            output_config={
+                "effort": "medium",
+                "format": {"type": "json_schema", "schema": BOOKING_SCHEMA},
+            },
+            system=SYSTEM_PROMPT,
+            messages=[
+                {"role": "user", "content": self._content(text, attachment, practices, today)}
+            ],
+        )
         if resp.stop_reason == "refusal":
             raise DomainError("assistant.refused", "The AI declined to read this document.")
         if resp.stop_reason == "max_tokens":
