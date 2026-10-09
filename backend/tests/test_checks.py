@@ -80,17 +80,48 @@ def test_overdue_severity_and_payment_clears(settings, session, ready):
     assert not {"invoice_overdue", "invoice_awaiting"} & kinds(s, today=due + timedelta(days=20))
 
 
-def test_pension_due_changed_and_tier(settings, session, ready):
+def test_pension_form_b_by_payment_month_and_ten_week_rule(settings, session, ready):
     add(session, ready, date(2026, 8, 3))
-    inv = issue_month(settings, session, ready, "2026-08")
+    inv = session.get(Invoice, issue_month(settings, session, ready, "2026-08").id)
     found = {f.kind: f for f in checks.run_checks(session, today=TODAY)}
-    assert found["pension_due"].severity == "urgent"  # two months ago
+    # not paid yet: no Form B, but the 10-week limit (3 Aug + 70 days = 12 Oct) is close
+    assert "pension_due" not in found and "pension_overdue" not in found
+    tw = found["pension_deadline_unpaid"]
+    assert tw.params["deadline"] == "2026-10-12" and tw.severity == "urgent"
     assert "pension_tier_missing" in found
-    pension.mark_submitted(session, "2026-08")
-    assert "pension_due" not in kinds(session)
+
+    payments.record_payment(session, inv, paid_on=date(2026, 9, 10))
+    found = {f.kind: f for f in checks.run_checks(session, today=date(2026, 10, 2))}
+    # paid in September -> September's Form B, due by 7 October
+    assert found["pension_due"].params == {
+        "month": "2026-09",
+        "pay": "540.00",
+        "due": "2026-10-07",
+        "days": 5,
+    }
+    assert "pension_deadline_form_a" in found  # paid, Form A not yet signed
+    late = {f.kind: f for f in checks.run_checks(session, today=TODAY)}
+    assert late["pension_overdue"].severity == "urgent"
+
+    key = pension.month_figures(session, "2026-08")["forms_a"][0]["key"]
+    pension.set_form_a(session, "2026-08", key, "signed")
+    pension.mark_submitted(session, "2026-09")
+    found = kinds(session)
+    assert not {"pension_due", "pension_overdue"} & found
+    assert not {k for k in found if k.startswith("pension_deadline")}
     s = db.new_session()
-    svc.void(s, s.get(Invoice, inv.id), "test")
-    assert "pension_changed" in kinds(s)
+    payments.delete_payment(s, s.get(Invoice, inv.id).payments[0].id)
+    assert "pension_changed" in kinds(s)  # September's received figures changed
+
+
+def test_ten_week_rule_for_work_not_yet_invoiced(session, ready):
+    add(session, ready, date(2026, 9, 1))
+    found = {f.kind: f for f in checks.run_checks(session, today=date(2026, 10, 20))}
+    f = found["pension_deadline_not_invoiced"]
+    assert f.params["deadline"] == "2026-11-10" and f.severity == "warn"
+    assert f.action == {"type": "create_invoice", "practice_id": ready.id, "month": "2026-09"}
+    gone = kinds(session, today=date(2027, 3, 1))  # long past: nothing left to act on
+    assert not {k for k in gone if k.startswith("pension_deadline")}
 
 
 def test_po_required_finding_and_warning(session, ready):

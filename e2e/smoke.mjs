@@ -134,10 +134,10 @@ await page.getByRole("button", { name: "Send" }).click();
 await page.getByRole("dialog").getByText("Connect your email account once").waitFor();
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
-step("pension: month ready, worksheet, mark submitted");
+step("pension: Form A for the work month, Form B for the month the fee was received");
 await page.getByRole("link", { name: "Pension" }).first().click();
 const row = page.locator(".list-row", { hasText: prevMonth });
-await row.getByText("Ready").waitFor();
+await row.getByText(/1 Form A/).waitFor();
 await row.click();
 await page.getByRole("dialog").getByText("£1,620.00").first().waitFor();
 const [ws] = await Promise.all([
@@ -147,10 +147,14 @@ const [ws] = await Promise.all([
 if (!ws.suggestedFilename().startsWith("nhs-pension-worksheet-")) await fail("worksheet name");
 await page.getByRole("dialog").getByRole("group", { name: "Form A status" }).getByRole("button", { name: "Signed" }).click();
 await page.getByRole("dialog").getByText(/^Signed \d/).waitFor();
+await page.getByRole("dialog").getByText("No pensionable fees were received this month.").waitFor();
 await shot("09-pension-month");
-await page.getByRole("dialog").getByRole("button", { name: "Mark submitted" }).click();
-await row.getByText("Submitted").waitFor();
-await row.getByText("Form A signed 1/1").waitFor();
+await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+await row.getByText(/1 signed/).waitFor();
+// paid today: this month's Form B lists it, with the 7th-of-next-month deadline
+const thisMonth = new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "Europe/London" });
+const recRow = page.locator(".list-row", { hasText: thisMonth });
+await recRow.getByText(/received £1,620\.00 · Form B due/).waitFor();
 
 step("reports");
 await page.getByRole("link", { name: "Reports" }).first().click();

@@ -133,6 +133,10 @@ def test_pension_month_figures_and_submission(settings, session, ready):
     p = core.get_profile(session)
     p.employee_rate = Decimal("0.098")
     session.commit()
+    session.expire_all()
+    # Form B counts fees *received*: both invoices paid in September
+    for inv in session.query(Invoice).filter(Invoice.status == "issued").all():
+        payments.record_payment(session, inv, paid_on=date(2026, 9, 28))
     fig = pension.month_figures(session, "2026-09")
     assert len(fig["forms_a"]) == 2
     b = fig["form_b"]
@@ -143,8 +147,9 @@ def test_pension_month_figures_and_submission(settings, session, ready):
     pdf = PdfReader(
         io.BytesIO(__import__("locuvi.pdf.pension", fromlist=["x"]).render_pension_worksheet(fig))
     )
-    text = pdf.pages[0].extract_text()
+    text = "".join(pg.extract_text() for pg in pdf.pages)
     assert "September 2026" in text and "X00000" in text and "£391.71" in text
+    assert "07/10/2026" in text  # Form B due by the 7th of the next month
     assert "not a submission" in text
     row = next(m for m in pension.overview(session) if m["month"] == "2026-09")
     assert row["submitted_on"] is None and row["ready"]

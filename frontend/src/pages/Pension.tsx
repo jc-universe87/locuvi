@@ -6,8 +6,20 @@ import { api, downloadBlob } from "../lib/api";
 import { gbp, monthLabel, pct, ukDate } from "../lib/format";
 import type { PensionMonth } from "../lib/types";
 
+interface FormBItem {
+  invoice_id: string;
+  invoice_number: string;
+  practice: string;
+  work_month: string;
+  paid_on: string;
+  amount: string;
+  pensionable_pay: string;
+  employer: string;
+}
 interface FormA {
   key: string;
+  deadline: string;
+  received_pay: string;
   form_a: { status: "to_send" | "sent" | "signed"; sent_on: string | null; signed_on: string | null };
   practice_name: string;
   practice_code: string | null;
@@ -20,7 +32,11 @@ interface FormA {
 interface MonthFigures {
   month: string;
   forms_a: FormA[];
-  form_b: { pensionable_pay: string; employer: string; employee_rate: string | null; employee: string | null; total_payable: string | null };
+  form_b: {
+    items: FormBItem[];
+    pensionable_pay: string; employer: string; employee_rate: string | null; employee: string | null;
+    total_payable: string | null; due_by: string;
+  };
   pcse: {
     status: "none" | "match" | "mismatch";
     expected_pay: string;
@@ -135,8 +151,9 @@ export default function PensionPage() {
               <span className="list-main">
                 <span className="list-title">{monthLabel(m.month)}</span>
                 <span className="list-sub">
-                  {tn("pension.row_sub", m.practices, { pay: gbp(m.pensionable_pay) })}
-                  {m.ready && ` · ${t("pension.forms_a_signed", { n: m.forms_a_signed, of: m.practices })}`}
+                  {m.practices > 0 && tn("pension.row_work", m.practices, { pay: gbp(m.work_pay), signed: m.forms_a_signed })}
+                  {m.practices > 0 && m.received_items > 0 && " · "}
+                  {m.received_items > 0 && t("pension.row_received", { pay: gbp(m.pensionable_pay), due: ukDate(m.due_by) })}
                 </span>
               </span>
               {m.pcse === "mismatch" && <span className="pill overdue">{t("pension.pcse_mismatch")}</span>}
@@ -147,9 +164,9 @@ export default function PensionPage() {
                   : <span className="pill ok">✓ {t("pension.submitted")}</span>
               ) : m.ready ? (
                 <span className="pill due">{t("pension.ready")}</span>
-              ) : (
+              ) : m.received_items > 0 ? (
                 <span className="pill draft">{t("pension.in_progress")}</span>
-              )}
+              ) : null}
               <span className="chev"><Icon name="chevron" size={18} /></span>
             </button>
           ))}
@@ -167,14 +184,14 @@ export default function PensionPage() {
                 {row?.submitted_on ? (
                   <button className="btn ghost" onClick={() => submitted(open.month, false)}>{t("pension.unmark")}</button>
                 ) : (
-                  <button className="btn" onClick={() => submitted(open.month, true)}><Icon name="check" size={18} /> {t("pension.mark")}</button>
+                  <button className="btn" disabled={open.form_b.items.length === 0} onClick={() => submitted(open.month, true)}><Icon name="check" size={18} /> {t("pension.mark")}</button>
                 )}
               </>
             );
           })()}>
           {open.forms_a.map((a, i) => (
             <div key={i} style={{ marginBottom: "1rem" }}>
-              <h3 style={{ marginTop: i ? "0.5rem" : 0 }}>{t("pension.form_a", { n: i + 1 })} · {a.practice_name}</h3>
+              <h3 style={{ marginTop: i ? "0.5rem" : 0 }}>{t("pension.form_a", { n: i + 1 })} · {a.practice_name} · {a.invoices.join(", ")}</h3>
               <div className="row wrap" style={{ gap: "0.5rem", margin: "0.25rem 0 0.5rem" }}>
                 <Segmented<FormA["form_a"]["status"]> value={a.form_a.status} label={t("pension.form_a_status")}
                   onChange={(v) => void formA(open.month, a.key, v)}
@@ -193,10 +210,28 @@ export default function PensionPage() {
                 <dt>{t("pension.fees")}</dt><dd className="money">{gbp(a.fees)}</dd>
                 <dt>{t("pension.pay")}</dt><dd className="money">{gbp(a.pensionable_pay)}</dd>
                 <dt>{t("pension.employer")}</dt><dd className="money">{gbp(a.employer)}</dd>
+                <dt>{t("pension.ten_week")}</dt><dd>{ukDate(a.deadline)}</dd>
               </dl>
             </div>
           ))}
+          {open.forms_a.length === 0 && <p className="muted">{t("pension.no_work_month")}</p>}
           <h3>{t("pension.form_b")}</h3>
+          <p className="hint" style={{ marginTop: 0 }}>{t("pension.form_b_explain", { due: ukDate(open.form_b.due_by) })}</p>
+          {open.form_b.items.length === 0 ? (
+            <p className="muted">{t("pension.nothing_received")}</p>
+          ) : (
+            <ul className="list" style={{ marginBottom: "0.5rem" }}>
+              {open.form_b.items.map((r, j) => (
+                <li key={j} style={{ padding: "0.5rem 0" }}>
+                  <span className="list-main">
+                    <span className="list-title">{r.invoice_number} · {r.practice}</span>
+                    <span className="list-sub">{t("pension.item_sub", { work: monthLabel(r.work_month), paid: ukDate(r.paid_on), amount: gbp(r.amount) })}</span>
+                  </span>
+                  <span className="money">{gbp(r.pensionable_pay)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <dl className="kv">
             <dt>{t("pension.pay")}</dt><dd className="money">{gbp(open.form_b.pensionable_pay)}</dd>
             <dt>{t("pension.employer")}</dt><dd className="money">{gbp(open.form_b.employer)}</dd>

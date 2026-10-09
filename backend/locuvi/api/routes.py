@@ -1077,8 +1077,8 @@ def pension_pdf(month: str, s: DB) -> Response:
 
     _check_month(month)
     fig = pension.month_figures(s, month)
-    if not fig["forms_a"]:
-        raise NotFound("pension.no_work", "No pensionable invoices for that month.")
+    if not fig["forms_a"] and not fig["form_b"]["items"]:
+        raise NotFound("pension.no_work", "No pensionable work or income for that month.")
     return Response(
         render_pension_worksheet(fig),
         media_type="application/pdf",

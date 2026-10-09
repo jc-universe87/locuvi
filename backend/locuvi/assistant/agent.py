@@ -110,12 +110,15 @@ TOOLS: list[dict[str, Any]] = [
     ),
     _tool(
         "pension_overview",
-        "Pension months: pensionable pay, Form A signed count, "
-        "submission and PCSE comparison status.",
+        "Pension months: Forms A (one per invoice, for work done that month, with signed "
+        "count) and Form B (pensionable fees received that month, due by the 7th of the next "
+        "month), submission and PCSE status.",
     ),
     _tool(
         "pension_month",
-        "Form A and B figures for one month, with Form A progress and the PCSE comparison.",
+        "One month: Form A rows for work done in it (per invoice, with the 10-week deadline "
+        "and Form A progress) and the Form B for fees received in it (items, totals, due "
+        "date), with the PCSE comparison.",
         {"month": MONTH},
     ),
     _tool(

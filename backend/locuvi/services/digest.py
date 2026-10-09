@@ -29,7 +29,32 @@ TEXT: dict[str, str] = {
     "invoice_awaiting": "{number} ({practice}) awaiting payment: {outstanding}.",
     "session_duplicate": "Possible duplicate session at {practice} on {date}.",
     "session_overlap": "Overlapping sessions on {date}: {a} and {b}.",
-    "pension_due": "{month_label} pension figures are ready (pensionable pay {pay}).",
+    "pension_due": (
+        "Form B for fees received in {month_label} (pensionable pay {pay}) is due by {due}."
+    ),
+    "pension_overdue": (
+        "Form B for fees received in {month_label} was due by {due} — send it to PCSE now."
+    ),
+    "pension_deadline_not_invoiced": (
+        "{practice}: work ending {work_end} isn't invoiced yet; pension forms are due by "
+        "{deadline} (10-week rule)."
+    ),
+    "pension_deadline_unpaid": (
+        "{practice}: work ending {work_end} isn't paid yet; pension forms are due by {deadline} "
+        "(10-week rule) — chase payment."
+    ),
+    "pension_deadline_form_a": (
+        "{practice}: Form A for work ending {work_end} isn't signed; due by {deadline} "
+        "(10-week rule)."
+    ),
+    "pension_deadline_form_b": (
+        "{practice}: fees for work ending {work_end} aren't on a submitted Form B; due by "
+        "{deadline} (10-week rule)."
+    ),
+    "pension_deadline_passed": (
+        "{practice}: the 10-week pension deadline for work ending {work_end} passed on "
+        "{deadline} — check with PCSE."
+    ),
     "pension_changed": "{month_label} pension figures changed after you marked them submitted.",
     "pension_tier_missing": "Set your employee pension tier to complete Form B figures.",
     "practice_no_address": "{practice} has no billing address.",
@@ -55,6 +80,12 @@ def _fmt(f: checks.Finding) -> str:
     if "month" in p:
         y, m = (int(x) for x in str(p["month"]).split("-"))
         p["month_label"] = f"{MONTHS[m - 1]} {y}"
+    for k in ("due", "work_end", "deadline"):
+        if p.get(k):
+            from datetime import date as _date
+
+            d = _date.fromisoformat(str(p[k]))
+            p[k] = f"{d.day} {MONTHS[d.month - 1][:3]} {d.year}"
     for k in ("total", "outstanding", "pay", "difference"):
         if p.get(k) not in (None, ""):
             from decimal import Decimal

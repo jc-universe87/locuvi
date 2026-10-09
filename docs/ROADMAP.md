@@ -53,6 +53,20 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 
 ---
 
+## Part 2b — Review fixes (external code review, 9 Oct 2026)
+
+| Item | Status |
+|---|---|
+| Form B by month fees were **received** (payments apportioned per invoice, exact across partial/late payments); Form A one per invoice for the work month (migration 0015 re-keys) | ✅ |
+| Pension deadlines: 10-week rule per engagement (incl. work not yet invoiced / unpaid / Form A unsigned / not on a submitted Form B) and Form B 7th-of-month due/overdue | ✅ |
+| Cash-basis and invoiced-income reports; 12 tax months | 🔜 |
+| Atomic multi-invoice bank matching | 🔜 |
+| Refund owed after a credit note on a paid invoice | 🔜 |
+| AI attachments only with explicit approval; stronger redaction | 🔜 |
+| Credit notes archived to Nextcloud | 🔜 |
+| Encrypted off-server backups + automatic restore drill | 🔜 |
+| CI on GitHub Actions; `main` as the stable branch | 🔜 |
+
 ## Part 3 — Product roadmap
 
 Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuitiveness** —

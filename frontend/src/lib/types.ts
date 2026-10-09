@@ -225,6 +225,9 @@ export interface PensionMonth {
   ready: boolean;
   forms_a_signed: number;
   pcse: "none" | "match" | "mismatch";
+  work_pay: string;
+  received_items: number;
+  due_by: string;
 }
 
 export interface EmailConfig {

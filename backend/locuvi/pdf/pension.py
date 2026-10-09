@@ -51,7 +51,9 @@ def render_pension_worksheet(fig: dict[str, Any]) -> bytes:
     locum = fig["locum"]
     story: list[Any] = [
         Paragraph("NHS pension worksheet", st["title"]),
-        Paragraph(_esc(f"GP Locum Forms A and B · {month}"), st["right"]),
+        Paragraph(
+            _esc(f"Forms A: work done in {month} · Form B: fees received in {month}"), st["right"]
+        ),
         Spacer(1, 5 * mm),
         Paragraph(
             _esc(
@@ -76,7 +78,8 @@ def render_pension_worksheet(fig: dict[str, Any]) -> bytes:
             ["Practice", a["practice_name"]],
             ["Practice code", a.get("practice_code") or "—"],
             ["Session dates", ", ".join(short_date(d)[:5] for d in a["session_dates"])],
-            ["Invoices", ", ".join(a["invoices"])],
+            ["Invoice", ", ".join(a["invoices"])],
+            ["Submit within 10 weeks — by", short_date(a["deadline"])],
             ["Total locum fees (pensionable)", fmt_gbp(Decimal(a["fees"]))],
             ["Pensionable pay (90%)", fmt_gbp(Decimal(a["pensionable_pay"]))],
             ["Employer contribution (paid by practice)", fmt_gbp(Decimal(a["employer"]))],
@@ -91,10 +94,32 @@ def render_pension_worksheet(fig: dict[str, Any]) -> bytes:
             )
         )
 
+    if not fig["forms_a"]:
+        story.append(Paragraph(_esc(f"No pensionable work done in {month}."), st["small"]))
+        story.append(Spacer(1, 6 * mm))
     b = fig["form_b"]
+    if b["items"]:
+        items = [
+            [
+                f"{r['invoice_number']} · {r['practice']} · work {_month_label(r['work_month'])}",
+                f"paid {short_date(r['paid_on'])}: pensionable pay "
+                f"{fmt_gbp(Decimal(r['pensionable_pay']))}, employer "
+                f"{fmt_gbp(Decimal(r['employer']))}",
+            ]
+            for r in b["items"]
+        ]
+        story.append(
+            KeepTogether(
+                [
+                    Paragraph(f"FEES RECEIVED IN {month.upper()}", st["h"]),
+                    _kv(items, st, width),
+                    Spacer(1, 6 * mm),
+                ]
+            )
+        )
     rows = [
-        ["Number of Forms A", str(len(fig["forms_a"]))],
-        ["Total pensionable pay", fmt_gbp(Decimal(b["pensionable_pay"]))],
+        ["Forms A included", str(len({r["invoice_id"] for r in b["items"]}))],
+        ["Total pensionable pay received", fmt_gbp(Decimal(b["pensionable_pay"]))],
         ["Employer contributions", fmt_gbp(Decimal(b["employer"]))],
     ]
     if b.get("employee") is not None:
@@ -107,8 +132,11 @@ def render_pension_worksheet(fig: dict[str, Any]) -> bytes:
         ]
     else:
         rows.append(["Employee contributions", "Set your tier rate in Settings → Pension"])
+    rows.append(["Send Form B and contributions by", short_date(b["due_by"])])
     story.append(
-        KeepTogether([Paragraph("FORM B — MONTHLY SUMMARY", st["h"]), _kv(rows, st, width)])
+        KeepTogether(
+            [Paragraph("FORM B — FEES RECEIVED THIS MONTH", st["h"]), _kv(rows, st, width)]
+        )
     )
 
     def canvasmaker(*args: Any, **kwargs: Any) -> _NumberedCanvas:

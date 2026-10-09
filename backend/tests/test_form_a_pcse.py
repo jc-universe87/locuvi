@@ -14,13 +14,19 @@ from locuvi.services import checks, core, diary, pension
 from locuvi.services import invoices as svc
 
 
-def issue(settings, s, practice, month, days):
+def issue(settings, s, practice, month, days, paid_on=None):
+    """Issue the month's invoice; with ``paid_on``, record it as paid in full that day."""
     diary.add_sessions(
         s, [diary.SessionInput(practice.id, date.fromisoformat(f"{month}-{d:02d}")) for d in days]
     )
     d = diary.invoice_month(s, practice.id, month)
     svc.issue(settings, d.id, uuid.uuid4().hex)
+    s.commit()
     s.expire_all()
+    if paid_on is not None:
+        from locuvi.services import payments
+
+        payments.record_payment(s, svc.get_invoice(s, d.id), paid_on=paid_on)
 
 
 def test_form_a_progress_and_chase(settings, session, ready):
@@ -57,7 +63,7 @@ def test_form_a_progress_and_chase(settings, session, ready):
 
 
 def test_form_a_progress_does_not_count_as_figure_change(settings, session, ready):
-    issue(settings, session, ready, "2026-08", [3])
+    issue(settings, session, ready, "2026-08", [3], paid_on=date(2026, 8, 25))
     pension.mark_submitted(session, "2026-08")
     key = pension.month_figures(session, "2026-08")["forms_a"][0]["key"]
     pension.set_form_a(session, "2026-08", key, "signed")
@@ -67,8 +73,9 @@ def test_form_a_progress_does_not_count_as_figure_change(settings, session, read
 def test_pcse_manual_and_csv(settings, session, ready):
     core.get_profile(session).employee_rate = Decimal("0.098")
     session.commit()
-    issue(settings, session, ready, "2026-08", [3])  # pay 540.00, employer 77.65
-    issue(settings, session, ready, "2026-09", [3])
+    # pay 540.00, employer 77.65 each; received in the same month as the work
+    issue(settings, session, ready, "2026-08", [3], paid_on=date(2026, 8, 25))
+    issue(settings, session, ready, "2026-09", [3], paid_on=date(2026, 9, 25))
     fig = pension.month_figures(session, "2026-08")
     assert fig["pcse"]["status"] == "none"
     expected = Decimal(fig["form_b"]["total_payable"])
@@ -120,3 +127,26 @@ def test_api_form_a_and_pcse(settings):
             files={"file": ("p.csv", b"Month,Pensionable pay\n2026-07,100.00\n", "text/csv")},
         )
         assert r.status_code == 200 and r.json()["imported"] == 1
+
+
+def test_form_b_apportions_partial_and_late_payments(settings, session, ready):
+    from locuvi.services import payments
+
+    issue(settings, session, ready, "2026-08", [3, 4, 5])  # pay 1620.00, employer 232.96
+    inv = session.query(__import__("locuvi.models", fromlist=["Invoice"]).Invoice).one()
+    payments.record_payment(session, inv, amount=Decimal("1000.00"), paid_on=date(2026, 9, 20))
+    payments.record_payment(session, inv, amount=Decimal("500.00"), paid_on=date(2026, 10, 2))
+    payments.record_payment(session, inv, paid_on=date(2026, 10, 30))  # the rest (532.96)
+    sep = pension.month_figures(session, "2026-09")
+    octo = pension.month_figures(session, "2026-10")
+    aug = pension.month_figures(session, "2026-08")
+    # Form A: August work; Form B: nothing received in August
+    assert len(aug["forms_a"]) == 1 and aug["form_b"]["items"] == []
+    assert len(sep["form_b"]["items"]) == 1 and len(octo["form_b"]["items"]) == 2
+    assert sep["form_b"]["items"][0]["work_month"] == "2026-08"
+    pay = Decimal(sep["form_b"]["pensionable_pay"]) + Decimal(octo["form_b"]["pensionable_pay"])
+    emp = Decimal(sep["form_b"]["employer"]) + Decimal(octo["form_b"]["employer"])
+    assert pay == Decimal("1620.00") and emp == Decimal("232.96")  # exact, no rounding drift
+    assert sep["form_b"]["pensionable_pay"] == "796.87"  # 1620 x 1000/2032.96 = 796.868
+    assert sep["form_b"]["due_by"] == "2026-10-07" and octo["form_b"]["due_by"] == "2026-11-07"
+    assert aug["forms_a"][0]["deadline"] == "2026-10-14"  # 5 Aug + 10 weeks

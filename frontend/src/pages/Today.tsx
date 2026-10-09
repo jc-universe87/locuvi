@@ -4,7 +4,7 @@ import { ErrorAlert, Icon, useToast } from "../components/ui";
 import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
-import { gbp, gbpRound, monthLabel, period, weekdayDate } from "../lib/format";
+import { gbp, gbpRound, monthLabel, period, ukDate, weekdayDate } from "../lib/format";
 import type { Finding, InvoiceDetail, Overview } from "../lib/types";
 
 function greetingKey(): MessageKey {
@@ -173,7 +173,7 @@ export default function TodayPage() {
               <span className="task-icon ok"><Icon name="pension" /></span>
               <span className="list-main">
                 <span className="list-title">{t("today.pension_title", { month: monthLabel(p.month) })}</span>
-                <span className="list-sub">{t("today.pension_sub", { pay: gbp(p.pensionable_pay) })}</span>
+                <span className="list-sub">{t("today.pension_sub", { pay: gbp(p.pensionable_pay), due: ukDate(p.due_by) })}</span>
               </span>
               <span className="chev"><Icon name="chevron" size={18} /></span>
             </Link>
@@ -224,7 +224,8 @@ function findingParams(f: Finding): Record<string, string | number> {
     if (v === null || v === undefined) continue;
     if (k === "month" && typeof v === "string") p.month = monthLabel(v);
     else if (k === "date" && typeof v === "string") p.date = weekdayDate(v);
-    else if (["total", "outstanding", "pay"].includes(k)) p[k] = gbp(String(v));
+    else if (["due", "deadline", "work_end"].includes(k) && typeof v === "string") p[k] = ukDate(v);
+    else if (["total", "outstanding", "pay", "difference"].includes(k)) p[k] = gbp(String(v));
     else if (k === "unit") p.unit = String(v).toUpperCase();
     else p[k] = v;
   }

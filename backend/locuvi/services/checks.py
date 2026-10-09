@@ -194,6 +194,7 @@ def _pension(s: Session, today: date) -> list[Finding]:
     out = []
     months = pension.overview(s)
     profile = core.get_profile(s)
+    submitted = {m["month"] for m in months if m["submitted_on"]}
     for m in months:
         if m["changed_since_submitted"]:
             out.append(Finding(
@@ -202,30 +203,36 @@ def _pension(s: Session, today: date) -> list[Finding]:
                 action={"type": "open_pension", "month": m["month"]}, dismissible=False,
             ))  # fmt: skip
         elif m["ready"] and not m["submitted_on"]:
-            y, mo = (int(x) for x in m["month"].split("-"))
-            months_ago = (today.year - y) * 12 + today.month - mo
+            due = date.fromisoformat(m["due_by"])
             out.append(Finding(
-                key=f"pension_due:{m['month']}", kind="pension_due",
-                severity="urgent" if months_ago >= 2 else "warn",
-                params={"month": m["month"], "pay": m["pensionable_pay"]},
+                key=f"pension_due:{m['month']}",
+                kind="pension_due" if today <= due else "pension_overdue",
+                severity="warn" if (due - today).days > 3 else "urgent",
+                params={"month": m["month"], "pay": m["pensionable_pay"],
+                        "due": m["due_by"], "days": (due - today).days},
                 ref={"type": "pension_month", "id": m["month"]},
                 action={"type": "open_pension", "month": m["month"]}, dismissible=False,
             ))  # fmt: skip
+    out += _ten_week(s, today, submitted)
     for rec in s.scalars(select(FormARecord).where(FormARecord.status == "sent")):
         if rec.sent_on and (today - rec.sent_on).days > 14:
-            name = rec.practice_key
+            inv = s.get(Invoice, rec.practice_key)
             p = s.get(Practice, rec.practice_key)
+            name = (
+                (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name")
+                if inv is not None
+                else (p.name if p else rec.practice_key)
+            )
             out.append(Finding(
                 key=f"form_a_chase:{rec.month}:{rec.practice_key}", kind="form_a_chase",
                 severity="warn",
-                params={"month": rec.month, "practice": p.name if p else name,
-                        "days": (today - rec.sent_on).days},
+                params={"month": rec.month, "practice": name, "days": (today - rec.sent_on).days},
                 ref={"type": "pension_month", "id": rec.month},
                 action={"type": "open_pension", "month": rec.month},
             ))  # fmt: skip
     for rec in s.scalars(select(PcseRecord)):
         fig = pension.month_figures(s, rec.month)
-        if fig["forms_a"] and fig["pcse"]["status"] == "mismatch":
+        if fig["form_b"]["items"] and fig["pcse"]["status"] == "mismatch":
             out.append(Finding(
                 key=f"pcse_mismatch:{rec.month}", kind="pcse_mismatch", severity="warn",
                 params={"month": rec.month, "difference": fig["pcse"]["difference"]},
@@ -237,6 +244,69 @@ def _pension(s: Session, today: date) -> list[Finding]:
             key="pension_tier_missing", kind="pension_tier_missing", severity="info",
             action={"type": "open_settings", "section": "pension"},
         ))  # fmt: skip
+    return out
+
+
+TEN_WEEK_WARN_DAYS = 28  # start reminding four weeks before the 10-week limit
+TEN_WEEK_FORGET_DAYS = 60  # stop after the limit has long passed (nothing left to do)
+
+
+def _ten_week(s: Session, today: date, submitted: set[str]) -> list[Finding]:
+    """Per engagement: pension forms must be in within 10 weeks of the end of the work.
+
+    Covers work not yet invoiced, invoices not yet paid, Form A not yet signed and fees received
+    but not yet on a submitted Form B. The 7th-of-month Form B deadline is checked separately.
+    """
+    out = []
+
+    def add(key: str, stage: str, practice: str, work_end: date, ref: dict[str, Any] | None,
+            action: dict[str, Any]) -> None:  # fmt: skip
+        deadline = work_end + timedelta(days=pension.TEN_WEEKS)
+        left = (deadline - today).days
+        if left > TEN_WEEK_WARN_DAYS or left < -TEN_WEEK_FORGET_DAYS:
+            return
+        out.append(Finding(
+            key=f"tenweek:{key}", kind="pension_deadline_passed" if left < 0
+            else f"pension_deadline_{stage}",
+            severity="urgent" if left <= 7 else "warn",
+            params={"practice": practice, "work_end": work_end.isoformat(),
+                    "deadline": deadline.isoformat(), "days": left},
+            ref=ref, action=action, dismissible=False,
+        ))  # fmt: skip
+
+    for inv in pension._pension_invoices(s):
+        rec_months = {r["received_month"] for r in pension.receipts(inv)}
+        done = payments.outstanding(inv) == 0 and rec_months and rec_months <= submitted
+        if done or pension.net_figures(inv)["pay"] <= 0:
+            continue
+        rec = s.scalars(select(FormARecord).where(FormARecord.practice_key == inv.id)).first()
+        if payments.outstanding(inv) > 0:
+            stage = "unpaid"
+        elif rec is None or rec.status != "signed":
+            stage = "form_a"
+        else:
+            stage = "form_b"
+        name = (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name", "")
+        add(inv.id, stage, name, pension.last_session(inv), {"type": "invoice", "id": inv.id},
+            {"type": "open_invoice", "invoice_id": inv.id})  # fmt: skip
+
+    groups: dict[tuple[str, str], list[WorkSession]] = defaultdict(list)
+    for w in s.scalars(
+        select(WorkSession).where(
+            WorkSession.status == SessionStatus.active,
+            WorkSession.pensionable.is_(True),
+            WorkSession.date <= today,
+            WorkSession.date >= today - timedelta(days=pension.TEN_WEEKS + TEN_WEEK_FORGET_DAYS),
+        )
+    ):
+        inv = s.get(Invoice, w.invoice_id) if w.invoice_id else None
+        if inv is None or inv.status == InvoiceStatus.draft:
+            groups[(w.practice_id, _month(w.date))].append(w)
+    for (pid, month), items in groups.items():
+        end = max(w.date for w in items)
+        add(f"{pid}:{month}", "not_invoiced", items[0].practice.name, end,
+            {"type": "practice", "id": pid},
+            {"type": "create_invoice", "practice_id": pid, "month": month})  # fmt: skip
     return out
 
 
