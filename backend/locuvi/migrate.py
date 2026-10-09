@@ -29,10 +29,30 @@ def pending(engine: Engine) -> tuple[str | None, str | None]:
 
 
 def upgrade(engine: Engine, revision: str = "head") -> None:
+    """Apply migrations in one transaction.
+
+    SQLite can only change some columns by rebuilding the table, which a foreign key pointing
+    at it would block, so enforcement is switched off for the migration (the documented SQLite
+    procedure) and every reference is checked with ``PRAGMA foreign_key_check`` before commit.
+    Any broken reference rolls the whole upgrade back.
+    """
     cfg = alembic_config()
-    with engine.begin() as conn:
-        cfg.attributes["connection"] = conn
-        command.upgrade(cfg, revision)
+    with engine.connect() as conn:
+        raw = conn.connection.dbapi_connection
+        assert raw is not None
+        raw.execute("PRAGMA foreign_keys=OFF")  # outside any transaction, or SQLite ignores it
+        try:
+            with conn.begin():
+                cfg.attributes["connection"] = conn
+                command.upgrade(cfg, revision)
+                broken = conn.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+                if broken:
+                    raise RuntimeError(
+                        f"database upgrade rolled back: {len(broken)} broken reference(s), "
+                        f"e.g. table {broken[0][0]} row {broken[0][1]} -> {broken[0][2]}"
+                    )
+        finally:
+            raw.execute("PRAGMA foreign_keys=ON")
 
 
 def autogenerate(engine: Engine, message: str) -> None:
