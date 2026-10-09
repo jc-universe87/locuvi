@@ -494,6 +494,7 @@ class MailFolderState(Base):
     folder: Mapped[str] = mapped_column(String(300), primary_key=True)
     uidvalidity: Mapped[int] = mapped_column(Integer, default=0)
     last_uid: Mapped[int] = mapped_column(Integer, default=0)
+    cursor: Mapped[str | None] = mapped_column(Text, nullable=True)  # Microsoft delta link
 
 
 class AssistantConfig(Base):

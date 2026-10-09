@@ -27,9 +27,13 @@ def upgrade() -> None:
         )
         batch_op.add_column(sa.Column("ms_token_ciphertext", sa.Text(), nullable=True))
         batch_op.add_column(sa.Column("folder_labels", sa.JSON(), nullable=True))
+    with op.batch_alter_table("mail_folder_state", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("cursor", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
+    with op.batch_alter_table("mail_folder_state", schema=None) as batch_op:
+        batch_op.drop_column("cursor")
     with op.batch_alter_table("mailbox_config", schema=None) as batch_op:
         for col in ("folder_labels", "ms_token_ciphertext", "ms_tenant", "ms_client_id",
                     "provider"):  # fmt: skip

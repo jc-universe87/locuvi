@@ -24,10 +24,12 @@ CLIENT_ID = "00000000-0000-0000-0000-000000000000"
 class FakeMicrosoft:
     """Login + Graph. Fails the test on any write request to Graph."""
 
-    def __init__(self, folders, *, consent=True, approve_after=1):
-        self.folders = folders  # {id: (name, [(msg_id, received, raw)])}
+    def __init__(self, folders, *, consent=True, approve_after=1, slow_down=False):
+        self.folders = folders  # {id: (name, [(msg_id, received, raw)])}, list in arrival order
         self.consent = consent
         self.polls_left = approve_after
+        self.slow_down = slow_down
+        self.forget_delta = False
         self.refresh = "refresh-token-1"
         self.requests: list[httpx.Request] = []
 
@@ -52,7 +54,8 @@ class FakeMicrosoft:
                 assert form["device_code"] == "secret-device-code"
                 if self.polls_left > 0:
                     self.polls_left -= 1
-                    return httpx.Response(400, json={"error": "authorization_pending"})
+                    error = "slow_down" if self.slow_down else "authorization_pending"
+                    return httpx.Response(400, json={"error": error})
                 if not self.consent:
                     return httpx.Response(400, json={
                         "error": "invalid_grant",
@@ -77,15 +80,36 @@ class FakeMicrosoft:
         if path == "/v1.0/me/mailFolders/inbox-id/childFolders":
             name = self.folders["child-id"][0]
             return httpx.Response(200, json={"value": [{"id": "child-id", "displayName": name}]})
-        if path.endswith("/messages") and path.startswith("/v1.0/me/mailFolders/"):
+        if path.endswith("/messages/delta"):
+            # delta: the first call lists the folder, later calls only what arrived since
+            # (in arrival order, whatever the received date). Pages of 1 to test paging.
+            assert req.headers["prefer"] == "odata.maxpagesize=50"
             fid = path.split("/")[4]
-            flt = parse_qs(url.query.decode())["$filter"][0]
-            after = flt.split(" gt ")[1]
-            msgs = [m for m in self.folders[fid][1] if m[1] > after]
-            return httpx.Response(200, json={"value": [
-                {"id": mid, "internetMessageId": f"<{mid}@example.invalid>",
-                 "receivedDateTime": when} for mid, when, _ in sorted(msgs, key=lambda m: m[1])
-            ]})  # fmt: skip
+            q = parse_qs(url.query.decode())
+            msgs = self.folders[fid][1]
+            if "$deltatoken" in q or "$skiptoken" in q:
+                if self.forget_delta:
+                    self.forget_delta = False
+                    return httpx.Response(410, json={"error": {"code": "syncStateNotFound"}})
+                pos = int((q.get("$deltatoken") or q["$skiptoken"])[0])
+                todo = list(range(pos, len(msgs)))
+            else:
+                since = q["$filter"][0].split(" ge ")[1]
+                todo = [i for i, m in enumerate(msgs) if m[1] >= since]
+            base = f"https://graph.microsoft.com/v1.0/me/mailFolders/{fid}/messages/delta"
+            if not todo:
+                return httpx.Response(
+                    200, json={"value": [], "@odata.deltaLink": f"{base}?$deltatoken={len(msgs)}"}
+                )
+            i = todo[0]
+            mid, when, _ = msgs[i]
+            page = {"value": [{"id": mid, "internetMessageId": f"<{mid}@example.invalid>",
+                               "receivedDateTime": when}]}  # fmt: skip
+            if len(todo) > 1:
+                page["@odata.nextLink"] = f"{base}?$skiptoken={todo[1]}"
+            else:
+                page["@odata.deltaLink"] = f"{base}?$deltatoken={len(msgs)}"
+            return httpx.Response(200, json=page)
         if path.endswith("/$value"):
             mid = path.split("/")[4]
             for _, msgs in self.folders.values():
@@ -143,6 +167,52 @@ def test_sign_in_keeps_only_an_encrypted_token(session, box, fake):
     assert e.value.code == "mailbox.ms_expired"
 
 
+def test_slow_down_lengthens_the_wait(session, box):
+    fake = FakeMicrosoft({}, approve_after=2, slow_down=True)
+    start = mailbox.ms_start(CLIENT_ID, "common", fake.transport())
+    first = mailbox.ms_poll(session, box, fake.transport())
+    second = mailbox.ms_poll(session, box, fake.transport())
+    assert (first["interval"], second["interval"]) == (
+        start["interval"] + 5,
+        start["interval"] + 10,
+    )
+    assert mailbox.ms_poll(session, box, fake.transport())["status"] == "done"
+
+
+def test_stale_poll_neither_saves_nor_ends_the_new_sign_in(session, box, monkeypatch):
+    fake = FakeMicrosoft({}, approve_after=0)
+    mailbox.ms_start(CLIENT_ID, "common", fake.transport())
+    stale = dict(mail_microsoft._pending)
+    mailbox.ms_start(CLIENT_ID, "common", fake.transport())  # owner cancelled and restarted
+    newer = dict(mail_microsoft._pending)
+    newer["device_code"] = "newer-code"
+    mail_microsoft._pending.update(newer)
+    real = mail_microsoft._pending_lock
+
+    class Swap:  # the poll copies the *stale* attempt, as if it was already in flight
+        def __enter__(self):
+            real.acquire()
+            if not getattr(self, "used", False):
+                self.used = True
+                self.saved = dict(mail_microsoft._pending)
+                mail_microsoft._pending.clear()
+                mail_microsoft._pending.update(stale)
+            elif hasattr(self, "saved"):
+                mail_microsoft._pending.clear()
+                mail_microsoft._pending.update(self.saved)
+                del self.saved
+
+        def __exit__(self, *exc):
+            real.release()
+
+    monkeypatch.setattr(mail_microsoft, "_pending_lock", Swap())
+    with pytest.raises(DomainError) as e:
+        mailbox.ms_poll(session, box, fake.transport())
+    assert e.value.code == "mailbox.ms_expired"
+    assert not mailbox.get_config(session).ms_token_ciphertext
+    assert mail_microsoft._pending["device_code"] == "newer-code"
+
+
 def test_bad_app_id_and_missing_approval(session, box):
     with pytest.raises(DomainError) as e:
         mailbox.ms_start("not-a-guid", "common")
@@ -171,14 +241,24 @@ def test_folders_scan_and_resume_read_only(settings, session, box, fake, ready):
     assert doc.source == "email" and doc.mail_folder == "child-id"
     assert session.query(Proposal).count() == 1
 
-    # next scan resumes after the last message; a new one is read, nothing twice
-    fake.folders["child-id"][1].append(booking("m2", "2026-10-05T10:00:00Z",
-                                               "Remittance advice BACS paid"))  # fmt: skip
+    # next scan reads only what was added since -- including an old message the owner
+    # filed into the folder by hand (received before the last scan)
+    fake.folders["child-id"][1].append(
+        booking("m2", "2026-09-20T10:00:00Z", "Remittance advice BACS paid")
+    )
     res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
     assert res["checked"] == 1 and res["remittances"] == 1
-    assert session.get(MailFolderState, "child-id").last_uid > 0
+    assert "deltatoken=2" in session.get(MailFolderState, "child-id").cursor
+    res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+    assert res["checked"] == 0
+
+    # Microsoft forgot the position: read again from the start, nothing imported twice
+    fake.forget_delta = True
+    res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+    assert res["checked"] == 2 and res["already_seen"] == 2
+    assert session.query(Document).count() == 2
     assert all(r.method == "GET" for r in fake.requests if r.url.host == "graph.microsoft.com")
-    assert fake.refresh.endswith("-5")  # sign-in, folders, 2 scans: each kept the new one
+    assert fake.refresh.endswith("-7")  # sign-in, folders, 2 scans: each kept the new one
 
 
 def test_expired_sign_in_is_reported(settings, session, box, fake):

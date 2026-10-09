@@ -376,35 +376,56 @@ def _scan_graph_folder(
     today: date,
     totals: dict[str, int],
 ) -> None:
-    """Like ``_scan_folder`` for Microsoft: progress is the last received time read (UTC)."""
+    """Like ``_scan_folder`` for Microsoft: progress is the folder's delta link, so messages
+    moved into the folder later are read too (their received date may be old)."""
     state = s.get(MailFolderState, folder) or MailFolderState(
         folder=folder, uidvalidity=-1, last_uid=0
     )
     if state.uidvalidity != -1:
-        state.uidvalidity, state.last_uid = -1, 0
+        state.uidvalidity, state.last_uid, state.cursor = -1, 0, None
     s.add(state)
-    if state.last_uid:
-        after = datetime.fromtimestamp(state.last_uid, UTC)
-    else:
-        start = today - timedelta(days=since_days)
-        after = datetime(start.year, start.month, start.day, tzinfo=UTC)
-    seen = 0
-    for m in graph.messages(folder, after):
-        if seen >= MAX_PER_FOLDER:
-            break
-        seen += 1
-        totals["checked"] += 1
-        received = mail_microsoft.parse_time(str(m.get("receivedDateTime") or ""))
-        if received is not None:
-            state.last_uid = max(state.last_uid, int(received.timestamp()))
-        message_id = str(m.get("internetMessageId") or "").strip()[:300]
-        if message_id and s.query(Document.id).filter(Document.message_id == message_id).first():
-            totals["already_seen"] += 1
-            continue
-        raw = graph.mime(str(m.get("id") or ""), MAX_MESSAGE_BYTES) if m.get("id") else None
-        if raw:
-            _import_message(s, settings, raw, folder, provider, today, totals)
+    start = today - timedelta(days=since_days)
+    since = datetime(start.year, start.month, start.day, tzinfo=UTC)
+    try:
+        _read_changes(s, settings, graph, state, folder, since, provider, today, totals)
+    except DomainError as exc:
+        if exc.code != "mailbox.ms_resync" or not state.cursor:
+            raise
+        state.cursor = None  # Microsoft forgot the position: read again (duplicates skipped)
+        _read_changes(s, settings, graph, state, folder, since, provider, today, totals)
     s.commit()
+
+
+def _read_changes(
+    s: Session,
+    settings: Settings,
+    graph: mail_microsoft.GraphMail,
+    state: MailFolderState,
+    folder: str,
+    since: datetime,
+    provider: Any,
+    today: date,
+    totals: dict[str, int],
+) -> None:
+    done = 0
+    for page, link in graph.changes(folder, state.cursor, since):
+        for m in page:
+            totals["checked"] += 1
+            message_id = str(m.get("internetMessageId") or "").strip()[:300]
+            if (
+                message_id
+                and s.query(Document.id).filter(Document.message_id == message_id).first()
+            ):
+                totals["already_seen"] += 1
+                continue
+            raw = graph.mime(str(m.get("id") or ""), MAX_MESSAGE_BYTES) if m.get("id") else None
+            if raw:
+                _import_message(s, settings, raw, folder, provider, today, totals)
+        done += len(page)
+        state.cursor = link
+        s.commit()
+        if done >= MAX_PER_FOLDER:  # the rest next time, from the saved link
+            return
 
 
 def _scan_microsoft(

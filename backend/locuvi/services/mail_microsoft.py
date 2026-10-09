@@ -127,7 +127,7 @@ def poll_sign_in(
     with _pending_lock:
         pending = dict(_pending)
     if not pending or time.monotonic() > pending["expires_at"]:
-        _pending.clear()
+        _forget(pending)
         raise DomainError("mailbox.ms_expired", "The sign-in code expired. Start again.")
     with client(transport) as http:
         data = _post_login(http, pending["tenant"], "token", {
@@ -136,11 +136,20 @@ def poll_sign_in(
             "device_code": pending["device_code"],
         })  # fmt: skip
         if data.get("error") in {"authorization_pending", "slow_down"}:
-            return {"status": "pending"}
+            interval = pending["interval"]
+            if data["error"] == "slow_down":  # RFC 8628 §3.5: wait 5 s longer from now on
+                interval += 5
+                with _pending_lock:
+                    if _pending.get("device_code") == pending["device_code"]:
+                        _pending["interval"] = interval
+            return {"status": "pending", "interval": interval}
+        # Only the sign-in still in progress may finish; a stale poll (the owner cancelled
+        # and started again meanwhile) neither saves its account nor clears the new one.
+        current = _forget(pending)
         if data["_status"] != 200 or not data.get("refresh_token"):
-            _pending.clear()
             raise _login_error(data)
-        _pending.clear()
+        if not current:
+            raise DomainError("mailbox.ms_expired", "The sign-in code expired. Start again.")
         if "Mail.Read" not in str(data.get("scope", "")):
             raise DomainError(
                 "mailbox.ms_admin_consent",
@@ -152,6 +161,15 @@ def poll_sign_in(
     cfg.ms_token_ciphertext = box.encrypt(data["refresh_token"])
     cfg.username = str(me.get("mail") or me.get("userPrincipalName") or "")[:200]
     return {"status": "done", "username": cfg.username}
+
+
+def _forget(pending: dict[str, Any]) -> bool:
+    """End this sign-in attempt if it is still the current one; True if it was."""
+    with _pending_lock:
+        if pending and _pending.get("device_code") == pending.get("device_code"):
+            _pending.clear()
+            return True
+        return False
 
 
 def sign_out(cfg: MailboxConfig) -> None:
@@ -212,20 +230,31 @@ class GraphMail:
                     url = ""
         return sorted(out, key=lambda f: (f["label"].lower() != "inbox", f["label"].lower()))
 
-    def messages(self, folder_id: str, after: datetime) -> Iterator[dict[str, Any]]:
-        """Messages received after ``after`` (UTC), oldest first."""
-        since = after.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        url: str | None = (
-            f"{GRAPH}/me/mailFolders/{_q(folder_id)}/messages"
-            f"?$select=id,internetMessageId,receivedDateTime"
-            f"&$filter=receivedDateTime gt {since}&$orderby=receivedDateTime asc&$top=50"
-        )
+    def changes(
+        self, folder_id: str, cursor: str | None, since: datetime
+    ) -> Iterator[tuple[list[dict[str, Any]], str | None]]:
+        """Messages added to (or moved into) a folder since the last scan, page by page.
+
+        Uses Graph's per-folder delta query, so a message filed into the folder later is
+        still seen even though it was received long ago. Yields ``(messages, link)``: save
+        ``link`` once the page is handled; it resumes there (next page, or the next scan).
+        """
+        url: str | None = cursor
+        if not url:
+            start = since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            url = (
+                f"{GRAPH}/me/mailFolders/{_q(folder_id)}/messages/delta"
+                f"?$select=id,internetMessageId,receivedDateTime"
+                f"&$filter=receivedDateTime ge {start}"
+            )
         while url:
-            page = self._get(url)
-            yield from page.get("value") or []
-            url = page.get("@odata.nextLink")
-            if url and not url.startswith(GRAPH + "/"):
-                url = None
+            if not url.startswith(GRAPH + "/"):
+                raise DomainError("mailbox.failed", "Reading the mail folders failed.")
+            page = _get_json(self.http, self.token, url, {"Prefer": "odata.maxpagesize=50"})
+            items = [m for m in page.get("value") or [] if "@removed" not in m]
+            nxt = page.get("@odata.nextLink")
+            yield items, nxt or page.get("@odata.deltaLink")
+            url = nxt
 
     def mime(self, message_id: str, limit: int) -> bytes | None:
         """The full original message (RFC 822), or None if it is larger than ``limit``."""
@@ -251,11 +280,15 @@ def _q(graph_id: str) -> str:
     return quote(graph_id, safe="")
 
 
-def _get_json(http: httpx.Client, token: str, url: str) -> dict[str, Any]:
+def _get_json(
+    http: httpx.Client, token: str, url: str, extra: dict[str, str] | None = None
+) -> dict[str, Any]:
     try:
-        r = http.get(url, headers={"Authorization": f"Bearer {token}"})
+        r = http.get(url, headers={"Authorization": f"Bearer {token}", **(extra or {})})
     except httpx.HTTPError:
         raise DomainError("mailbox.unreachable", "Couldn't reach Microsoft.") from None
+    if r.status_code == 410 or (r.status_code == 400 and "syncState" in r.text):
+        raise DomainError("mailbox.ms_resync", "Folder changes must be read again from the start.")
     if r.status_code in (401, 403):
         raise DomainError(
             "mailbox.ms_admin_consent",
@@ -268,10 +301,3 @@ def _get_json(http: httpx.Client, token: str, url: str) -> dict[str, Any]:
     except ValueError:
         raise DomainError("mailbox.failed", "Reading the mail folders failed.") from None
     return data if isinstance(data, dict) else {}
-
-
-def parse_time(value: str) -> datetime | None:
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
-    except (ValueError, AttributeError):
-        return None

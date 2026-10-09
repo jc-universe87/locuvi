@@ -224,7 +224,8 @@ Each item is useful on its own and gives the AI something reliable to work with.
   **Account presets** (Gmail with app password; Outlook/Hotmail/Microsoft 365 and NHSmail via
   Microsoft sign-in, `services/mail_microsoft.py`; owner request 9 Oct 2026): device-code
   sign-in with the owner's own app registration, Graph with `Mail.Read` only, GET requests
-  only, refresh token encrypted and rotated. NHSmail needs its administrators' approval of
+  only, refresh token encrypted and rotated, per-folder delta links (messages filed later are
+  still read). NHSmail needs its administrators' approval of
   the app; until then, forwarding booking emails to Gmail is the documented route
   (`docs/EMAIL_SETUP.md`).
 - ✅ "Prepare all outstanding invoices for September" → drafts made by the deterministic

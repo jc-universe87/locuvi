@@ -692,9 +692,10 @@ function MailboxSection() {
     if (!signin) return;
     let stop = false;
     let timer = 0;
+    let wait = signin.interval;
     const tick = async () => {
       try {
-        const r = await api.post<{ status: string; config?: MailboxConfig }>("/settings/mailbox/microsoft/poll");
+        const r = await api.post<{ status: string; interval?: number; config?: MailboxConfig }>("/settings/mailbox/microsoft/poll");
         if (stop) return;
         if (r.status === "done" && r.config) {
           setSignin(null);
@@ -702,7 +703,8 @@ function MailboxSection() {
           setFolders((await api.post<{ folders: Folder[] }>("/settings/mailbox/folders")).folders);
           return;
         }
-        timer = window.setTimeout(tick, signin.interval * 1000);
+        wait = r.interval ?? wait; // Microsoft may ask us to slow down
+        timer = window.setTimeout(tick, wait * 1000);
       } catch (e) {
         if (!stop) { setSignin(null); setError(e); }
       }
