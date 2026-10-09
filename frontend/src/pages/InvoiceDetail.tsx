@@ -54,7 +54,7 @@ export default function InvoiceDetailPage() {
   const totals = snap?.totals;
   const a = inv.archive;
   const pay = inv.payment;
-  const unpaid = inv.status === "issued" && pay.state !== "paid";
+  const unpaid = inv.status === "issued" && !["paid", "credited", "refund_due"].includes(pay.state);
 
   const download = async () => {
     try {
@@ -125,6 +125,24 @@ export default function InvoiceDetailPage() {
         ) : null}
         {inv.last_emailed_at && <p className="hint" style={{ margin: "0.3rem 0 0" }}>{t("email.sent_on", { when: dateTime(inv.last_emailed_at) })}</p>}
       </div>
+
+      {pay.state === "refund_due" && (
+        <div className="alert warn row wrap" style={{ gap: "0.75rem" }}>
+          <span style={{ flex: 1 }}>{t("refund.banner", { amount: gbp(pay.refund_due) })}</span>
+          <button className="btn small" onClick={async () => {
+            try {
+              const d = await api.post<InvoiceDetail>(`/invoices/${inv.id}/refunds`, {});
+              setInv(d);
+              const rid = d.payments[d.payments.length - 1]?.id;
+              toast({ text: t("refund.recorded"), undo: rid ? async () => {
+                setInv(await api.del(`/payments/${rid}`).then(() => api.get<InvoiceDetail>(`/invoices/${inv.id}`)));
+              } : undefined });
+            } catch (e) {
+              setError(e);
+            }
+          }}>{t("refund.record")}</button>
+        </div>
+      )}
 
       {inv.status === "voided" && (
         <div className="alert warn">{t("detail.voided", { date: dateTime(inv.voided_at), reason: inv.void_reason ?? "" })}</div>

@@ -425,3 +425,9 @@ class CreditIn(Strict):
 class PasswordChangeIn(Strict):
     current: Annotated[str, StringConstraints(max_length=500)]
     new: Annotated[str, StringConstraints(min_length=10, max_length=500)]
+
+
+class RefundIn(Strict):
+    amount: DecStr | None = None
+    paid_on: _dt.date | None = None
+    reference: Annotated[str, StringConstraints(max_length=100)] | None = None

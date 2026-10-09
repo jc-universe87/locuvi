@@ -56,8 +56,9 @@ export interface Line {
 }
 
 export interface PaymentState {
-  state: "unpaid" | "part_paid" | "paid" | "overdue" | "credited" | "n/a";
+  state: "unpaid" | "part_paid" | "paid" | "overdue" | "credited" | "refund_due" | "n/a";
   credited?: string;
+  refund_due?: string;
   paid: string | null;
   outstanding: string | null;
   days_overdue: number;

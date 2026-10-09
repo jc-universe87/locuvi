@@ -180,3 +180,33 @@ def test_api_credit_notes(settings):
         assert detail["payment"]["state"] == "credited"
         pdf = c.get(f"/api/v1/credit-notes/{r.json()['id']}/pdf")
         assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+
+def test_refund_owed_after_credit_on_paid_invoice(settings, session, ready):
+    from locuvi.services import checks
+
+    inv = issue_with(settings, session, ready, [3, 4])  # 1355.30
+    payments.record_payment(session, inv)  # paid in full
+    credit_notes.issue(settings, inv.id, [inv.lines[1].id], "Second session cancelled", key())
+    session.commit()
+    session.expire_all()
+    inv = svc.get_invoice(session, inv.id)
+    st = payments.payment_state(inv)
+    assert st["state"] == "refund_due" and st["refund_due"] == "677.65"
+    found = {f.kind: f for f in checks.run_checks(session)}
+    assert found["refund_due"].params["refund"] == "677.65"
+    with pytest.raises(DomainError):
+        payments.record_refund(session, inv, amount=Decimal("700.00"))
+    payments.record_refund(session, inv, paid_on=core.today_london())
+    session.expire_all()
+    inv = svc.get_invoice(session, inv.id)
+    assert payments.payment_state(inv)["state"] == "paid"
+    assert "refund_due" not in {f.kind for f in checks.run_checks(session)}
+    with pytest.raises(Conflict):
+        payments.record_refund(session, inv)
+    # cash basis nets the refund off; Form B takes the employer share back
+    summ = reports.summary(session, reports.tax_year_of(core.today_london()), "cash")
+    assert summ["totals"]["income"] == "677.65"
+    month = core.today_london().strftime("%Y-%m")
+    b = pension.month_figures(session, month)["form_b"]
+    assert b["pensionable_pay"] == "540.00" and b["employer"] == "77.65"

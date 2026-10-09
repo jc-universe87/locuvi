@@ -30,14 +30,18 @@ def outstanding(inv: Invoice) -> Decimal:
 
 
 def payment_state(inv: Invoice, today: date | None = None) -> dict[str, Any]:
-    """unpaid | part_paid | paid | overdue | credited (fully credited, nothing paid) | n/a."""
+    """unpaid | part_paid | paid | overdue | credited (fully credited, nothing paid) |
+    refund_due (more was paid than is owed after credit notes) | n/a."""
     if inv.status != InvoiceStatus.issued or inv.grand_total is None:
         return {"state": "n/a", "paid": None, "outstanding": None, "days_overdue": 0}
     today = today or core.today_london()
     paid = paid_total(inv)
     credited = credited_total(inv)
     outstanding = round_money(inv.grand_total - credited - paid)
-    if credited > 0 and credited >= inv.grand_total and paid == 0:
+    refund_due = max(round_money(-outstanding), ZERO)
+    if refund_due > 0:
+        state = "refund_due"
+    elif credited > 0 and credited >= inv.grand_total and paid == 0:
         state = "credited"
     elif outstanding <= 0:
         state = "paid"
@@ -54,6 +58,7 @@ def payment_state(inv: Invoice, today: date | None = None) -> dict[str, Any]:
         "credited": str(credited),
         "paid": str(paid),
         "outstanding": str(max(outstanding, ZERO)),
+        "refund_due": str(refund_due),
         "days_overdue": days,
         "paid_on": last.isoformat() if state == "paid" and last else None,
     }
@@ -124,3 +129,40 @@ def delete_payment(s: Session, payment_id: str, *, commit: bool = True) -> Invoi
     else:
         s.flush()
     return inv
+
+
+def record_refund(
+    s: Session,
+    inv: Invoice,
+    *,
+    amount: Decimal | None = None,
+    paid_on: date | None = None,
+    reference: str | None = None,
+) -> Payment:
+    """Money paid back to the practice (after a credit note on a paid invoice).
+
+    Stored as a negative payment so every total (owed, Form B, cash basis) stays consistent.
+    """
+    st = payment_state(inv)
+    due = Decimal(st.get("refund_due") or "0")
+    if due <= 0:
+        raise Conflict("refund.none_due", "No refund is owed on this invoice.")
+    amount = due if amount is None else amount
+    if amount <= 0 or amount.as_tuple().exponent < -2:  # type: ignore[operator]
+        raise DomainError("payment.amount_invalid", "Enter an amount above £0.00.")
+    if amount > due:
+        raise DomainError("refund.too_high", "That is more than the refund owed.", due=str(due))
+    paid_on = paid_on or core.today_london()
+    p = Payment(
+        invoice_id=inv.id,
+        paid_on=paid_on,
+        amount=-amount,
+        method="refund",
+        reference=(reference or "").strip() or None,
+    )
+    s.add(p)
+    inv.payments.append(p)
+    meta = {"amount": str(amount), "paid_on": paid_on.isoformat()}
+    s.add(InvoiceEvent(invoice_id=inv.id, event_type="refund_recorded", metadata_json=meta))
+    s.commit()
+    return p

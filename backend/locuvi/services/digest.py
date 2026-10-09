@@ -68,6 +68,7 @@ TEXT: dict[str, str] = {
         "Form A for {month_label} at {practice} was sent {days} days ago and isn't signed yet."
     ),
     "pcse_mismatch": "PCSE's record for {month_label} differs from your invoices by {difference}.",
+    "refund_due": "{number} ({practice}): a refund of {refund} is owed after a credit note.",
     "bank_unmatched": "{n} payment(s) from your bank statement wait to be matched.",
     "mailbox_failed": "Checking your email folders failed — open Settings › Email folders.",
 }
@@ -86,7 +87,7 @@ def _fmt(f: checks.Finding) -> str:
 
             d = _date.fromisoformat(str(p[k]))
             p[k] = f"{d.day} {MONTHS[d.month - 1][:3]} {d.year}"
-    for k in ("total", "outstanding", "pay", "difference"):
+    for k in ("total", "outstanding", "pay", "difference", "refund"):
         if p.get(k) not in (None, ""):
             from decimal import Decimal
 

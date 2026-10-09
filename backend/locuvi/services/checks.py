@@ -132,6 +132,14 @@ def _payments(s: Session, today: date) -> list[Finding]:
         name = (inv.immutable_snapshot_json or {}).get("bill_to", {}).get("name", "")
         base = {"number": inv.invoice_number, "practice": name, "outstanding": st["outstanding"]}
         act = {"type": "mark_paid", "invoice_id": inv.id, "number": inv.invoice_number}
+        if st["state"] == "refund_due":
+            out.append(Finding(
+                key=f"refund:{inv.id}", kind="refund_due", severity="warn",
+                params={**base, "refund": st["refund_due"]},
+                ref={"type": "invoice", "id": inv.id},
+                action={"type": "open_invoice", "invoice_id": inv.id}, dismissible=False,
+            ))  # fmt: skip
+            continue
         if st["state"] == "overdue":
             days = st["days_overdue"]
             out.append(Finding(

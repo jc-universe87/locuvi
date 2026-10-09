@@ -61,7 +61,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Pension deadlines: 10-week rule per engagement (incl. work not yet invoiced / unpaid / Form A unsigned / not on a submitted Form B) and Form B 7th-of-month due/overdue | ✅ |
 | Cash-basis (default, HMRC) and invoiced-income reports, switchable and remembered; payments-received CSV in the year pack; 12 tax months (6th–5th) instead of 13 calendar months | ✅ |
 | Atomic multi-invoice bank matching (all payments + "matched" in one transaction; failure-injection tests) | ✅ |
-| Refund owed after a credit note on a paid invoice | 🔜 |
+| Refund owed after a credit note on a paid invoice: "refund_due" state, finding, "Record refund" (negative payment with undo), netted in cash reports and Form B | ✅ |
 | AI attachments only with explicit approval; stronger redaction | 🔜 |
 | Credit notes archived to Nextcloud | 🔜 |
 | Encrypted off-server backups + automatic restore drill | 🔜 |

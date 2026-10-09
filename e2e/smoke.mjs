@@ -273,7 +273,12 @@ const [cnPdf] = await Promise.all([
 ]);
 if (cnPdf.suggestedFilename() !== "CN-0001.pdf") await fail(`credit note file ${cnPdf.suggestedFilename()}`);
 await page.getByRole("heading", { name: "Credit notes" }).waitFor();
+// the invoice was already paid: the credit makes a refund owed
+await page.locator(".inv-hero .pill", { hasText: "Refund owed" }).waitFor();
 await shot("11c-credit-note");
+await page.getByRole("button", { name: "Record refund" }).click();
+await page.getByRole("status").getByText("Refund recorded").waitFor();
+await page.locator(".inv-hero .pill", { hasText: "Paid" }).waitFor();
 
 step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

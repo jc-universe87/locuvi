@@ -225,7 +225,7 @@ function findingParams(f: Finding): Record<string, string | number> {
     if (k === "month" && typeof v === "string") p.month = monthLabel(v);
     else if (k === "date" && typeof v === "string") p.date = weekdayDate(v);
     else if (["due", "deadline", "work_end"].includes(k) && typeof v === "string") p[k] = ukDate(v);
-    else if (["total", "outstanding", "pay", "difference"].includes(k)) p[k] = gbp(String(v));
+    else if (["total", "outstanding", "pay", "difference", "refund"].includes(k)) p[k] = gbp(String(v));
     else if (k === "unit") p.unit = String(v).toUpperCase();
     else p[k] = v;
   }

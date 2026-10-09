@@ -972,6 +972,14 @@ const en = {
   "finding.pension_deadline_form_b": "{practice}: fees for work to {work_end} not on a submitted Form B — deadline {deadline}",
   "finding.pension_deadline_passed": "{practice}: 10-week pension deadline for work to {work_end} passed on {deadline}",
   "error.pension.no_income": "No pensionable fees were received that month.",
+  "refund.pill": "Refund owed",
+  "refund.banner": "After the credit note, {amount} was overpaid. Pay it back to the practice, then record it here.",
+  "refund.record": "Record refund",
+  "refund.recorded": "Refund recorded",
+  "finding.refund_due": "{number}: refund of {refund} owed to {practice}",
+  "event.refund_recorded": "Refund recorded",
+  "error.refund.none_due": "No refund is owed on this invoice.",
+  "error.refund.too_high": "That is more than the refund owed ({due}).",
 } as const;
 
 export type MessageKey = keyof typeof en;

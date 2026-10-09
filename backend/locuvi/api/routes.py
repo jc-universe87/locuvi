@@ -995,6 +995,19 @@ def add_payment(invoice_id: str, body: S.PaymentIn, s: DB) -> dict[str, Any]:
     return _detail(s, svc.get_invoice(s, invoice_id))
 
 
+@api.post("/invoices/{invoice_id}/refunds", status_code=201)
+def add_refund(invoice_id: str, body: S.RefundIn, s: DB) -> dict[str, Any]:
+    inv = svc.get_invoice(s, invoice_id)
+    payments.record_refund(
+        s,
+        inv,
+        amount=Decimal(body.amount) if body.amount else None,
+        paid_on=body.paid_on,
+        reference=body.reference,
+    )
+    return _detail(s, svc.get_invoice(s, invoice_id))
+
+
 @api.delete("/payments/{payment_id}")
 def remove_payment(payment_id: str, s: DB) -> dict[str, Any]:
     inv = payments.delete_payment(s, payment_id)
