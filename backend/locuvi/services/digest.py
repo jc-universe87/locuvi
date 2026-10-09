@@ -66,7 +66,34 @@ def _fmt(f: checks.Finding) -> str:
         return f.kind
 
 
-def compose(s: Session, settings: Settings) -> tuple[str, str] | None:
+BRIEF_QUESTION = (
+    "Write my weekly admin brief for this Monday: run the checks, then in at most 8 short "
+    "bullet points say what needs doing this week, most urgent first, with the figures from "
+    "the records. Don't prepare drafts. End with one line saying everything else is up to date "
+    "if that's true."
+)
+
+
+def ai_brief(s: Session, settings: Settings, provider: Any) -> str | None:
+    """The assistant's short prioritised brief, or None (the rule-based summary still goes)."""
+    if provider is None or not hasattr(provider, "run_turn"):
+        return None
+    from locuvi.assistant import agent
+
+    try:
+        answer = agent.ask(s, settings, provider, BRIEF_QUESTION)["answer"].strip()
+    except DomainError as exc:
+        log.warning("weekly brief not written by the assistant: %s", exc.code)
+        s.rollback()
+        return None
+    except Exception:  # noqa: BLE001 - the digest must still go out
+        log.exception("weekly brief failed")
+        s.rollback()
+        return None
+    return answer[:4000] or None
+
+
+def compose(s: Session, settings: Settings, provider: Any = None) -> tuple[str, str] | None:
     findings = [f for f in checks.run_checks(s, settings) if f.kind != "invoice_awaiting"]
     if not findings:
         return None
@@ -74,7 +101,12 @@ def compose(s: Session, settings: Settings) -> tuple[str, str] | None:
     subject = f"Locuvi: {len(findings)} thing(s) need attention"
     if counts["urgent"]:
         subject += f" ({counts['urgent']} urgent)"
-    lines = ["Good morning,", "", "Here is your weekly Locuvi summary:", ""]
+    lines = ["Good morning,", ""]
+    brief = ai_brief(s, settings, provider)
+    if brief:
+        lines += ["Your assistant's brief (AI-written — the list below is the record):", "",
+                  brief, "", "—", ""]  # fmt: skip
+    lines += ["Here is your weekly Locuvi summary:", ""]
     for sev, title in (("urgent", "Urgent"), ("warn", "To do"), ("info", "For information")):
         items = [f for f in findings if f.severity == sev]
         if items:
@@ -85,8 +117,25 @@ def compose(s: Session, settings: Settings) -> tuple[str, str] | None:
     return subject, "\n".join(lines)
 
 
-def send_now(s: Session, settings: Settings, box: SecretBox, smtp_factory: Any = None) -> dict:
-    composed = compose(s, settings)
+def brief_provider(s: Session, settings: Settings, box: SecretBox) -> Any:
+    """The AI provider when the owner opted into an assistant-written brief, else None."""
+    from locuvi.assistant import providers
+
+    cfg = providers.get_config(s)
+    if not cfg.weekly_brief:
+        return None
+    try:
+        return providers.provider_for(s, settings, box)
+    except DomainError:
+        return None
+
+
+def send_now(
+    s: Session, settings: Settings, box: SecretBox, smtp_factory: Any = None, provider: Any = None
+) -> dict:
+    if provider is None:
+        provider = brief_provider(s, settings, box)
+    composed = compose(s, settings, provider)
     if composed is None:
         return {"sent": False, "reason": "nothing_to_report"}
     subject, body = composed

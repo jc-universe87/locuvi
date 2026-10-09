@@ -945,6 +945,8 @@ const en = {
   "password.forgot": "Forgot it? On the server run: docker compose exec locuvi python -m locuvi.cli reset-password, restart, and sign in with the password from secrets/locuvi_password.txt.",
   "error.auth.same_password": "Choose a different password.",
   "error.auth.gateway_mode": "Sign-in is handled by your gateway.",
+  "assistant.weekly_brief": "Assistant writes my weekly summary",
+  "assistant.weekly_brief_hint": "Adds a short prioritised brief to the Monday email (Settings › Email). The usual list stays underneath.",
 } as const;
 
 export type MessageKey = keyof typeof en;

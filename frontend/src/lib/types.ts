@@ -322,6 +322,7 @@ export interface AssistantConfig {
   key_saved: boolean;
   key_from_server: boolean;
   ready: boolean;
+  weekly_brief: boolean;
 }
 
 export interface ScanResult {

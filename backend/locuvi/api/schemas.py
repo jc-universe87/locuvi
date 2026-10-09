@@ -327,6 +327,7 @@ class AssistantIn(Strict):
     enabled: bool = False
     api_key: Annotated[str, StringConstraints(max_length=500)] | None = None
     clear_key: bool = False
+    weekly_brief: bool | None = None
 
 
 class ProposalChoice(Strict):

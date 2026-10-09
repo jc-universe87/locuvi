@@ -859,13 +859,17 @@ def system_backup(request: Request) -> dict[str, Any]:
 
 @api.post("/digest/send")
 def digest_send(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.assistant import providers
     from locuvi.services import digest
 
+    factory = getattr(state(request), "ai_provider_factory", None)  # tests: fake provider
+    provider = factory(s) if factory and providers.get_config(s).weekly_brief else None
     return digest.send_now(
         s,
         state(request).settings,
         state(request).secrets,
         smtp_factory=getattr(state(request), "smtp_factory", None),
+        provider=provider,
     )
 
 

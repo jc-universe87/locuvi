@@ -185,6 +185,7 @@ def put_assistant(body: S.AssistantIn, request: Request, s: DB) -> dict[str, Any
         enabled=body.enabled,
         api_key=body.api_key,
         clear_key=body.clear_key,
+        weekly_brief=body.weekly_brief,
     )
     return providers.config_public(cfg, state(request).settings)
 

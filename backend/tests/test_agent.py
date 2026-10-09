@@ -233,3 +233,22 @@ def test_api_agent(settings):
         assert convs[0]["id"] == cid and convs[0]["tools_used"] == 1
         tr = c.get(f"/api/v1/assistant/conversations/{cid}").json()
         assert [t["role"] for t in tr["turns"]] == ["user", "assistant"]
+
+
+def test_weekly_brief_written_by_assistant_with_fallback(settings, session, ready):
+    from locuvi.services import digest
+
+    diary.add_sessions(session, [diary.SessionInput(ready.id, date(2026, 9, 3))])
+    fake = Scripted(
+        resp([use("run_checks", {})], stop="tool_use"),
+        resp([text("- Invoice September at Example Medical Practice (£600.00).")]),
+    )
+    subject, body = digest.compose(session, settings, fake)
+    assert "AI-written" in body and "Invoice September" in body
+    assert "ready to invoice" in body  # the rule-based list is still there
+    # the assistant failing never stops the digest
+    broken = Scripted(resp([], stop="refusal"))
+    subject2, body2 = digest.compose(session, settings, broken)
+    assert "AI-written" not in body2 and "ready to invoice" in body2
+    # off by default
+    assert digest.brief_provider(session, settings, None) is None

@@ -240,13 +240,22 @@ def config_public(cfg: AssistantConfig, settings: Settings) -> dict[str, Any]:
         "key_saved": bool(cfg.api_key_ciphertext),
         "key_from_server": bool(settings.ai_api_key_override),
         "ready": cfg.enabled and bool(cfg.api_key_ciphertext or settings.ai_api_key_override),
+        "weekly_brief": cfg.weekly_brief,
     }
 
 
 def save_config(
-    s: Session, secrets: SecretBox, *, enabled: bool, api_key: str | None, clear_key: bool = False
+    s: Session,
+    secrets: SecretBox,
+    *,
+    enabled: bool,
+    api_key: str | None,
+    clear_key: bool = False,
+    weekly_brief: bool | None = None,
 ) -> AssistantConfig:
     cfg = get_config(s)
+    if weekly_brief is not None:
+        cfg.weekly_brief = weekly_brief
     if api_key is not None and api_key.strip():
         key = api_key.strip()
         if len(key) < 20 or any(c.isspace() for c in key):

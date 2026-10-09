@@ -534,6 +534,18 @@ function AssistantSection() {
           </Row>
         )}
       </div>
+      {cfg.ready && (
+        <div className="form-list" style={{ marginTop: "0.75rem" }}>
+          <SwitchRow label={t("assistant.weekly_brief")} hint={t("assistant.weekly_brief_hint")} checked={cfg.weekly_brief}
+            onChange={async (v) => {
+              try {
+                setCfg(await api.put<AssistantConfig>("/settings/assistant", { enabled: true, weekly_brief: v }));
+              } catch (e) {
+                setError(e);
+              }
+            }} />
+        </div>
+      )}
       {cfg.enabled && !cfg.key_from_server && (
         <div className="actions" style={{ marginTop: "0.5rem" }}>
           <button className="btn" disabled={!key && !cfg.key_saved} onClick={() => void save(true)}>{t("common.save")}</button>

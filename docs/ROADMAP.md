@@ -132,7 +132,7 @@ Structured sessions, deterministic invoice engine, payments, pension figures, Ne
 The Today overview already gives rule-based monitoring for uninvoiced months, overdue invoices
 and pension months. Service functions (`services/*.py`) are the future tool layer.
 
-### v1.5 — Groundwork the assistant needs (no AI yet) — 🔜 in progress
+### v1.5 — Groundwork the assistant needs (no AI yet) — ✅
 Each item is useful on its own and gives the AI something reliable to work with.
 - ✅ **Checks engine** (`services/checks.py`): deterministic rules that produce *findings* (severity, explanation,
   linked records, suggested action), e.g. uninvoiced sessions, due/overdue invoices,
@@ -171,7 +171,7 @@ Each item is useful on its own and gives the AI something reliable to work with.
 - ✅ **Self-assessment figures** in the tax-year pack: income totals and employee pension
   contributions, as figures only, not tax advice.
 
-### Phase 2 — AI invoice assistant — 🔜 in progress (v2.0)
+### Phase 2 — AI invoice assistant — ✅ (v2.0, Oct 2026)
 - ✅ Provider-agnostic LLM interface (`assistant/providers.py`; Claude API first via the
   official SDK, local model option later). Off by default; API key encrypted at rest or
   supplied as `ANTHROPIC_API_KEY_FILE`. Structured JSON output, explicit effort, server-side
@@ -192,11 +192,11 @@ Each item is useful on its own and gives the AI something reliable to work with.
   against the Diary**: already booked → filed as verified, no action; booked but a different
   fee → "rate differs"; new → suggestion to check. Resumes by UID; app password encrypted.
   Microsoft 365 / NHSmail OAuth is not supported yet (💭).
-- 💭 "Prepare all outstanding invoices for September" → drafts made by the deterministic
+- ✅ "Prepare all outstanding invoices for September" → drafts made by the deterministic
   engine from confirmed sessions; inconsistent rates are flagged. (B)
-- 💭 Draft invoice emails and polite reminders in the right tone; always reviewed and sent with
+- ✅ Draft invoice emails and polite reminders in the right tone; always reviewed and sent with
   one tap by the owner. (B, F)
-- 💭 Structured outputs validated by backend schemas; every proposal is audit-logged.
+- ✅ Structured outputs validated by backend schemas; every proposal is audit-logged.
 
 ### Phase 3 — Administrative agent — ✅ (v2.x, Oct 2026)
 - ✅ **Ask Locuvi** (`assistant/agent.py`, `/ask`, sparkle icon when the assistant is on):
@@ -226,8 +226,9 @@ Each item is useful on its own and gives the AI something reliable to work with.
   Verified with the official MCP Python client.
 - ✅ Email connector: read-only IMAP of chosen folders (see Phase 2 › Email folders).
 - ✅ Better document processing: scanned PDFs and photos are read by the assistant when on.
-- 💭 Scheduled multi-step reviews (e.g. a Monday-morning admin brief written by the agent;
-  today the weekly digest is rule-based).
+- ✅ Scheduled review: optional Monday brief written by the agent (Settings › Assistant), at
+  the top of the weekly digest email; the rule-based list stays underneath as the record, and
+  any AI failure falls back to the plain digest.
 - 💭 Calendar connector (bookings from a calendar feed).
 - 💭 Microsoft 365 / NHSmail OAuth for the email connector.
 - 💭 Optional local models for maximum privacy (the provider interface is ready).
