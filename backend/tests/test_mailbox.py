@@ -272,7 +272,7 @@ def test_several_accounts_each_with_own_folders_and_errors(settings, session, bo
     found = [f for f in checks.run_checks(session, today=TODAY) if f.kind == "mailbox_failed"]
     assert [f.params["account"] for f in found] == ["home@example.invalid"]
 
-    # removing an account stops it (undo restores it); after a day it is purged
+    # removing an account stops it (undo restores it); after 30 days it is purged
     mailbox.remove_account(session, home.id)
     assert [a.id for a in mailbox.list_accounts(session)] == [work.id]
     mailbox.restore_account(session, home.id)
@@ -282,7 +282,8 @@ def test_several_accounts_each_with_own_folders_and_errors(settings, session, bo
     from locuvi.models import utcnow
 
     assert mailbox.purge_removed(session) == 0
-    assert mailbox.purge_removed(session, now=utcnow() + timedelta(days=2)) == 1
+    assert mailbox.purge_removed(session, now=utcnow() + timedelta(days=29)) == 0
+    assert mailbox.purge_removed(session, now=utcnow() + timedelta(days=31)) == 1
     assert {st.account_id for st in session.query(MailFolderState)} == {work.id}
     with pytest.raises(DomainError):
         mailbox.restore_account(session, home.id)

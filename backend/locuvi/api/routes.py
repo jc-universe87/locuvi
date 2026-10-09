@@ -11,9 +11,9 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from locuvi import __version__
+from locuvi import __version__, db
 from locuvi.api import schemas as S
-from locuvi.api.auth import COOKIE, SessionManager, Unauthorized
+from locuvi.api.auth import COOKIE, Forbidden, SessionManager, Unauthorized
 from locuvi.db import get_session
 from locuvi.errors import Conflict, DomainError, NotFound
 from locuvi.models import Document, Invoice, InvoiceEvent, PensionPolicy, Practice
@@ -26,7 +26,9 @@ DB = Annotated[Session, Depends(get_session)]
 
 
 def state(request: Request) -> Any:
-    return request.app.state
+    """The app state as seen by this request: settings and data of the signed-in profile."""
+    view = getattr(request.state, "view", None)
+    return view if view is not None else request.app.state
 
 
 def require_auth(request: Request) -> None:
@@ -41,15 +43,24 @@ api = APIRouter(prefix="/api/v1", dependencies=[Depends(require_auth)])
 # ------------------------------------------------------------------ auth/health
 
 
+def _set_cookie(request: Request, response: Response, token: str) -> None:
+    st = request.app.state.settings
+    response.set_cookie(COOKIE, token, httponly=True, secure=st.cookie_secure,
+                        samesite="strict", max_age=st.session_hours * 3600, path="/")  # fmt: skip
+
+
 @public.get("/auth/session")
 def auth_session(request: Request) -> dict[str, Any]:
     sm: SessionManager = request.app.state.sessions
     token = request.cookies.get(COOKIE)
-    ok = sm.authenticated(request)
+    profile = sm.profile_for(request)
     return {
-        "authenticated": ok,
+        "authenticated": profile is not None,
         "auth_mode": sm.mode,
-        "csrf_token": sm.csrf_for(token) if ok else None,
+        "login_required": sm.login_required(),
+        "multi": sm.multi(),  # the sign-in screen then asks for a name too
+        "csrf_token": sm.csrf_for(token) if profile is not None else None,
+        "profile": profile.public() if profile is not None else None,
         "version": __version__,
     }
 
@@ -57,52 +68,146 @@ def auth_session(request: Request) -> dict[str, Any]:
 @public.post("/auth/login")
 def login(body: S.LoginIn, request: Request, response: Response) -> dict[str, Any]:
     sm: SessionManager = request.app.state.sessions
-    if sm.mode != "password":
+    if not sm.login_required():
         return {"authenticated": True, "csrf_token": sm.csrf_for(None)}
-    if not sm.check_password(body.password):
-        raise Unauthorized("auth.invalid_password", "That password is not correct.")
-    token = sm.issue_token()
-    st = request.app.state.settings
-    response.set_cookie(
-        COOKIE,
-        token,
-        httponly=True,
-        secure=st.cookie_secure,
-        samesite="strict",
-        max_age=st.session_hours * 3600,
-        path="/",
-    )
-    return {"authenticated": True, "csrf_token": sm.csrf_for(token)}
+    profile = sm.check_password(body.name, body.password)
+    if profile is None:
+        raise Unauthorized(
+            "auth.invalid_password",
+            "That name and password don't match."
+            if sm.multi()
+            else "That password is not correct.",
+        )
+    token = sm.issue_token(profile)
+    _set_cookie(request, response, token)
+    return {"authenticated": True, "csrf_token": sm.csrf_for(token), "profile": profile.public()}
 
 
 @api.post("/auth/password")
 def change_password(
     body: S.PasswordChangeIn, request: Request, response: Response, s: DB
 ) -> dict[str, Any]:
-    """Change the owner password in the app. Every other session is signed out."""
-    from locuvi.api.auth import hash_password
-    from locuvi.models import AuthConfig, utcnow
+    """Change your own password. Every other session of your profile is signed out."""
+    from locuvi import profiles
+    from locuvi.api.auth import hash_password, verify_password
 
     sm: SessionManager = request.app.state.sessions
-    if sm.mode != "password":
-        raise DomainError("auth.gateway_mode", "Sign-in is handled by your gateway.")
-    if not sm.check_password(body.current):
+    me = request.state.profile
+    settings = request.app.state.settings
+    if me.password_hash and not verify_password(body.current, me.password_hash):
         raise Unauthorized("auth.invalid_password", "That password is not correct.")
     if body.new == body.current:
         raise DomainError("auth.same_password", "Choose a different password.")
-    cfg = s.get(AuthConfig, 1) or AuthConfig(id=1, session_epoch=0)
-    s.add(cfg)
-    cfg.password_hash = hash_password(body.new)
-    cfg.session_epoch = (cfg.session_epoch or 0) + 1
-    cfg.changed_at = utcnow()
+    me = profiles.set_password(settings, me.id, hash_password(body.new))
     core.audit(s, "auth.password_changed")
     s.commit()
-    sm.set_password_hash(cfg.password_hash, cfg.session_epoch)
-    token = sm.issue_token()  # keep this device signed in
-    st = request.app.state.settings
-    response.set_cookie(COOKIE, token, httponly=True, secure=st.cookie_secure,
-                        samesite="strict", max_age=st.session_hours * 3600, path="/")  # fmt: skip
+    token = sm.issue_token(me)  # keep this device signed in
+    _set_cookie(request, response, token)
     return {"ok": True, "csrf_token": sm.csrf_for(token)}
+
+
+# ----------------------------------------------------------------- profiles (admin)
+
+
+def _admin(request: Request) -> Any:
+    me = getattr(request.state, "profile", None)
+    if me is None or not me.is_admin:
+        raise Forbidden("profile.admin_only", "Only the admin can manage profiles.")
+    return me
+
+
+@api.get("/profiles")
+def list_profiles(request: Request) -> dict[str, Any]:
+    from locuvi import profiles
+
+    _admin(request)
+    st = request.app.state.settings
+    return {
+        "profiles": [p.public() for p in profiles.all_profiles(st)],
+        "removed": [p.public() for p in profiles.all_profiles(st, deleted=True)],
+    }
+
+
+@api.post("/profiles", status_code=201)
+def add_profile(body: S.HouseholdProfileIn, request: Request) -> dict[str, Any]:
+    """A new, empty Locuvi for another person: they sign in with this name and password."""
+    from locuvi import profiles
+    from locuvi.api.auth import hash_password
+
+    me = _admin(request)
+    st = request.app.state.settings
+    if not me.password_hash:
+        raise DomainError(
+            "profile.admin_password",
+            "Set a password for your own profile first (Settings › Password).",
+        )
+    profiles.check_password_strength(body.password)
+    p = profiles.create(st, body.name, hash_password(body.password))
+    request.app.state.open_profile(p.id)
+    with db.use_profile(1), db.new_session() as s:
+        core.audit(s, "profile.added", profile=p.id)
+        s.commit()
+    return p.public()
+
+
+@api.patch("/profiles/{profile_id}")
+def update_household_profile(
+    profile_id: int, body: S.HouseholdProfilePatch, request: Request
+) -> dict[str, Any]:
+    """Rename a profile or set a new password for it (signs that person out everywhere)."""
+    from locuvi import profiles
+    from locuvi.api.auth import hash_password
+
+    _admin(request)
+    st = request.app.state.settings
+    if profiles.active(st, profile_id) is None:
+        raise NotFound("profile.not_found", "That profile no longer exists.")
+    p = profiles.active(st, profile_id)
+    if body.name is not None:
+        p = profiles.rename(st, profile_id, body.name)
+    if body.password is not None:
+        profiles.check_password_strength(body.password)
+        p = profiles.set_password(st, profile_id, hash_password(body.password))
+    with db.use_profile(1), db.new_session() as s:
+        core.audit(s, "profile.updated", profile=profile_id, renamed=body.name is not None,
+                   password_reset=body.password is not None)  # fmt: skip
+        s.commit()
+    assert p is not None
+    return p.public()
+
+
+@api.delete("/profiles/{profile_id}")
+def remove_profile(profile_id: int, request: Request) -> dict[str, Any]:
+    """Remove a profile: its person is signed out at once; the data is kept for 30 days and
+    can be restored until then."""
+    from locuvi import profiles
+
+    me = _admin(request)
+    if profile_id == me.id:
+        raise DomainError("profile.admin", "The admin profile can't be removed.")
+    st = request.app.state.settings
+    p = profiles.remove(st, profile_id)
+    worker = request.app.state.workers.pop(profile_id, None)
+    if worker is not None:
+        worker.stop()
+    with db.use_profile(1), db.new_session() as s:
+        core.audit(s, "profile.removed", profile=profile_id)
+        s.commit()
+    return p.public()
+
+
+@api.post("/profiles/{profile_id}/restore")
+def restore_profile(profile_id: int, request: Request) -> dict[str, Any]:
+    from locuvi import profiles
+
+    _admin(request)
+    st = request.app.state.settings
+    p = profiles.restore(st, profile_id)
+    request.app.state.open_profile(profile_id)
+    with db.use_profile(1), db.new_session() as s:
+        core.audit(s, "profile.restored", profile=profile_id)
+        s.commit()
+    return p.public()
 
 
 @public.post("/auth/logout")
@@ -359,19 +464,22 @@ def branding_preview(s: DB) -> Response:
     )
 
 
-@api.delete("/settings/pension-policies/{policy_id}", status_code=204)
-def delete_policy(policy_id: str, s: DB) -> Response:
+@api.delete("/settings/pension-policies/{policy_id}")
+def delete_policy(policy_id: str, s: DB) -> dict[str, Any]:
     p = s.get(PensionPolicy, policy_id)
     if p is None:
         raise NotFound("policy.not_found", "Rate not found.")
     if _policy_out(s, p)["in_use"]:
         raise Conflict("policy.in_use", "This rate is used by issued invoices and is kept.")
+    from locuvi.services import trash
+
     for inv in s.scalars(select(Invoice).where(Invoice.pension_policy_id == p.id)):
         inv.pension_policy_id = None
+    item = trash.bin_policy(s, p)
     s.delete(p)
     core.audit(s, "settings.policy_deleted", effective_from=p.effective_from.isoformat())
     s.commit()
-    return Response(status_code=204)
+    return {"trash_id": item.id}
 
 
 # -------------------------------------------------------------------- practices
@@ -713,10 +821,10 @@ def patch_invoice(invoice_id: str, body: S.InvoiceIn, s: DB) -> dict[str, Any]:
     return _detail(s, _save(s, svc.get_invoice(s, invoice_id), body))
 
 
-@api.delete("/invoices/{invoice_id}", status_code=204)
-def delete_invoice(invoice_id: str, s: DB) -> Response:
-    svc.delete_draft(s, svc.get_invoice(s, invoice_id))
-    return Response(status_code=204)
+@api.delete("/invoices/{invoice_id}")
+def delete_invoice(invoice_id: str, s: DB) -> dict[str, Any]:
+    """Drafts only (issued invoices are voided, never deleted). Kept in Recently deleted."""
+    return {"trash_id": svc.delete_draft(s, svc.get_invoice(s, invoice_id))}
 
 
 @api.post("/invoices/{invoice_id}/preview")
@@ -1050,10 +1158,9 @@ def patch_session(session_id: str, body: S.SessionPatch, s: DB) -> dict[str, Any
     return _session_out(s, diary.update_session(s, ws, **data))
 
 
-@api.delete("/sessions/{session_id}", status_code=204)
-def delete_session(session_id: str, s: DB) -> Response:
-    diary.delete_session(s, diary.get_session_or_404(s, session_id))
-    return Response(status_code=204)
+@api.delete("/sessions/{session_id}")
+def delete_session(session_id: str, s: DB) -> dict[str, Any]:
+    return {"trash_id": diary.delete_session(s, diary.get_session_or_404(s, session_id))}
 
 
 @api.get("/sessions/suggest-rate")
@@ -1112,8 +1219,26 @@ def add_refund(invoice_id: str, body: S.RefundIn, s: DB) -> dict[str, Any]:
 
 @api.delete("/payments/{payment_id}")
 def remove_payment(payment_id: str, s: DB) -> dict[str, Any]:
-    inv = payments.delete_payment(s, payment_id)
-    return _detail(s, svc.get_invoice(s, inv.id))
+    inv, trash_id = payments.delete_payment(s, payment_id)
+    return {**_detail(s, svc.get_invoice(s, inv.id)), "trash_id": trash_id}
+
+
+# ------------------------------------------------------------- recently deleted
+
+
+@api.get("/trash")
+def list_trash(s: DB) -> dict[str, Any]:
+    """Everything deleted in the last 30 days (newest first), restorable."""
+    from locuvi.services import trash
+
+    return {"items": trash.listing(s), "keep_days": trash.KEEP_DAYS}
+
+
+@api.post("/trash/{item_id}/restore")
+def restore_trash(item_id: str, s: DB) -> dict[str, Any]:
+    from locuvi.services import trash
+
+    return trash.restore(s, item_id)
 
 
 # ------------------------------------------------------------------------ email
@@ -1214,8 +1339,8 @@ def pension_submitted(month: str, body: S.PensionSubmitIn, s: DB) -> dict[str, A
 @api.delete("/pension/{month}/submitted")
 def pension_unsubmitted(month: str, s: DB) -> dict[str, Any]:
     _check_month(month)
-    pension.unmark_submitted(s, month)
-    return {"months": pension.overview(s)}
+    trash_id = pension.unmark_submitted(s, month)
+    return {"months": pension.overview(s), "trash_id": trash_id}
 
 
 @api.post("/pension/{month}/form-a")

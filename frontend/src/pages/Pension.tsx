@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useToast } from "../components/ui";
+import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useConfirm, useToast } from "../components/ui";
+import { restoreFromBin } from "../lib/trash";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
 import { dayMonth, gbp, monthLabel, pct, ukDate } from "../lib/format";
@@ -50,6 +51,7 @@ interface MonthFigures {
 export default function PensionPage() {
   const { t, tn } = useT();
   const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState<{ months: PensionMonth[]; employee_rate: string | null } | null>(null);
   const [open, setOpen] = useState<MonthFigures | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -110,12 +112,29 @@ export default function PensionPage() {
       setError(e);
     }
   };
-  const submitted = async (month: string, on: boolean) => {
+  const submitted = async (month: string, on: boolean, ask = true) => {
+    if (!on && ask) {
+      const ok = await confirm({
+        title: t("trash.ask_unmark", { month: monthLabel(month) }),
+        body: t("trash.ask_unmark_body"),
+        confirm: t("pension.unmark"),
+      });
+      if (!ok) return;
+    }
     try {
-      const r = on ? await api.post<{ months: PensionMonth[] }>(`/pension/${month}/submitted`, {})
-        : await api.del(`/pension/${month}/submitted`).then(() => api.get<{ months: PensionMonth[] }>("/pension"));
+      const r: { months: PensionMonth[]; trash_id?: string | null } = on ? await api.post<{ months: PensionMonth[] }>(`/pension/${month}/submitted`, {})
+        : await api.del<{ months: PensionMonth[]; trash_id: string | null }>(`/pension/${month}/submitted`);
       setData((d) => (d ? { ...d, months: r.months } : d));
-      if (on) toast({ text: t("pension.marked", { month: monthLabel(month) }), undo: () => void submitted(month, false) });
+      // Undo of a mark needs no question; an unmark can be undone from the bin.
+      if (on) toast({ text: t("pension.marked", { month: monthLabel(month) }), undo: () => void submitted(month, false, false) });
+      else if (ask && r.trash_id) {
+        const tid = r.trash_id;
+        toast({
+          text: t("trash.unmarked", { month: monthLabel(month) }),
+          undo: () => void restoreFromBin(tid, t, tn, toast).then(() => api.get<{ months: PensionMonth[] }>("/pension"))
+            .then((x) => setData((d) => (d ? { ...d, months: x.months } : d)), () => undefined),
+        });
+      }
       setOpen(null);
     } catch (e) {
       setError(e);

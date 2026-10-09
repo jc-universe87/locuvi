@@ -140,11 +140,17 @@ def update_session(s: Session, ws: WorkSession, **changes: object) -> WorkSessio
     return ws
 
 
-def delete_session(s: Session, ws: WorkSession) -> None:
+def delete_session(s: Session, ws: WorkSession) -> str:
+    """Delete a session (not one on an issued invoice); kept in Recently deleted for 30 days."""
+    from locuvi.services import trash
+
     if is_locked(ws, s):
         raise Conflict("session.invoiced", "This session is on an issued invoice.")
+    item = trash.bin_sessions(s, [ws])
     s.delete(ws)
     s.commit()
+    assert item is not None
+    return item.id
 
 
 def list_sessions(s: Session, start: date, end: date) -> list[WorkSession]:
@@ -340,13 +346,18 @@ def add_series(
 
 
 def delete_many(s: Session, ids: list[str]) -> int:
-    """Undo for a series: removes the given sessions unless they are on an issued invoice."""
-    n = 0
+    """Undo for a series: removes the given sessions unless they are on an invoice.
+
+    They go to Recently deleted together, as one entry."""
+    from locuvi.services import trash
+
+    gone = []
     for i in ids[:MAX_SERIES]:
         ws = s.get(WorkSession, i)
-        if ws is not None and not is_locked(ws, s):
-            if ws.invoice_id is None:
-                s.delete(ws)
-                n += 1
+        if ws is not None and not is_locked(ws, s) and ws.invoice_id is None:
+            gone.append(ws)
+    trash.bin_sessions(s, gone)
+    for ws in gone:
+        s.delete(ws)
     s.commit()
-    return n
+    return len(gone)

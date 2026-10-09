@@ -121,6 +121,15 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
 - ✅ Password change without editing the secret file (Settings › Password): scrypt hash in the
   database overrides the secret file; changing it signs out every other device (session epoch);
   `python -m locuvi.cli reset-password` falls back to the secret file if forgotten.
+- ✅ Guardrails against accidental deletion (owner request, "Confirm + 30-day bin"): every
+  delete asks first, naming what goes (shared `useConfirm` sheet, Cancel focused, Escape
+  cancels), then keeps a copy in **Settings › Recently deleted** for 30 days with Restore
+  (`services/trash.py`, `trash_item` table, migration 0023; purged nightly by the scheduler).
+  Covers diary sessions (one entry per undone series), draft invoices (lines, history and
+  linked sessions — only still-unbilled sessions are re-linked), payments and refunds,
+  pension rates, "Form B submitted" marks, inbox files and email accounts. Restores refuse
+  clearly on conflicts (already booked, overpaying, rate or month taken again). Issued
+  invoices and credit notes are still never deleted (void only).
 - 🧭 Each April: add the new employer rate and check your employee tier (Settings → Pension).
 
 ### Later ideas — 💭
@@ -229,7 +238,7 @@ Each item is useful on its own and gives the AI something reliable to work with.
   the app; until then, forwarding booking emails to Gmail is the documented route
   (`docs/EMAIL_SETUP.md`). **Several accounts** (owner request 9 Oct 2026): each with its
   own type, folders, progress and status; one failing account doesn't stop the others;
-  remove with undo (purged with its secrets after a day).
+  remove with undo (kept in Recently deleted, purged with its secrets after 30 days).
 - ✅ "Prepare all outstanding invoices for September" → drafts made by the deterministic
   engine from confirmed sessions; inconsistent rates are flagged. (B)
 - ✅ Draft invoice emails and polite reminders in the right tone; always reviewed and sent with
@@ -283,3 +292,14 @@ before enabling a cloud model.
 - Before starting work, pick the next 🔜 item with the owner; move it to ✅ when merged,
   with a link to the PR/commit and any ADR.
 - New ideas go under "Later ideas" first; the owner decides when they become a version.
+
+## Household profiles (owner request, 9 Oct 2026) ✅
+
+- Separate Locuvi per person: own database and files (`profiles.py`; profile 1 stays in
+  `DATA_DIR`, others in `DATA_DIR/profiles/<id>`), selected per request from the signed-in
+  session (`db` context variable); hourly jobs, archive workers, backups, Bevro tokens and
+  calendar links all work per profile.
+- The first user (the existing owner) is the admin: adds, renames, resets passwords of and
+  removes profiles (removal is restorable for 30 days). Sign-in asks for a name once there is
+  more than one profile.
+

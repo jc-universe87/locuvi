@@ -13,8 +13,11 @@ page.on("pageerror", (e) => errors.push(String(e)));
 const step = (s) => console.log(`• ${s}`);
 await page.goto(`${BASE}/`);
 if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() => false)) {
+  const who = page.getByLabel("Your name"); // shown once there are several profiles
+  if (await who.isVisible().catch(() => false)) await who.fill("Owner");
   await page.getByLabel("Password").fill(process.env.LOCUVI_PASSWORD ?? "");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("heading", { name: "Sign in" }).waitFor({ state: "detached" });
 }
 step("turn on the assistant");
 await page.goto(`${BASE}/settings/assistant`);

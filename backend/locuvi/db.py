@@ -1,16 +1,25 @@
-"""SQLite engine/session setup (WAL, busy timeout, explicit BEGIN control)."""
+"""SQLite engine/session setup (WAL, busy timeout, explicit BEGIN control).
+
+Each household profile has its own database. The profile in effect is a context variable:
+the web middleware sets it from the signed-in session, background threads set it per
+profile, and everything that calls ``new_session()``/``get_engine()`` then works on that
+profile's data only. Profile 1 (the original installation) is the default.
+"""
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
-_engine: Engine | None = None
-_SessionLocal: sessionmaker[Session] | None = None
+_engines: dict[int, tuple[Engine, sessionmaker[Session]]] = {}
+_engines_lock = threading.Lock()
+_current: ContextVar[int] = ContextVar("locuvi_profile", default=1)
 
 
 def make_engine(db_path: Path) -> Engine:
@@ -41,25 +50,55 @@ def make_engine(db_path: Path) -> Engine:
     return engine
 
 
-def init_engine(db_path: Path) -> Engine:
-    global _engine, _SessionLocal
-    if _engine is not None:
-        _engine.dispose()
-    _engine = make_engine(db_path)
-    _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)
-    return _engine
+def init_engine(db_path: Path, profile_id: int = 1) -> Engine:
+    """Open (or reopen) the database of one profile; profile 1 by default."""
+    with _engines_lock:
+        old = _engines.pop(profile_id, None)
+        if old is not None:
+            old[0].dispose()
+        engine = make_engine(db_path)
+        _engines[profile_id] = (engine, sessionmaker(bind=engine, expire_on_commit=False))
+    return engine
+
+
+def close_profile(profile_id: int) -> None:
+    with _engines_lock:
+        old = _engines.pop(profile_id, None)
+    if old is not None:
+        old[0].dispose()
+
+
+def current_profile() -> int:
+    return _current.get()
+
+
+def set_profile(profile_id: int) -> None:
+    """Switch this thread/task to a profile (used at the start of a request or job)."""
+    _current.set(profile_id)
+
+
+@contextmanager
+def use_profile(profile_id: int) -> Iterator[None]:
+    token = _current.set(profile_id)
+    try:
+        yield
+    finally:
+        _current.reset(token)
+
+
+def _pair() -> tuple[Engine, sessionmaker[Session]]:
+    pair = _engines.get(_current.get())
+    if pair is None:
+        raise RuntimeError("database not initialised")
+    return pair
 
 
 def get_engine() -> Engine:
-    if _engine is None:
-        raise RuntimeError("database not initialised")
-    return _engine
+    return _pair()[0]
 
 
 def new_session() -> Session:
-    if _SessionLocal is None:
-        raise RuntimeError("database not initialised")
-    return _SessionLocal()
+    return _pair()[1]()
 
 
 @contextmanager

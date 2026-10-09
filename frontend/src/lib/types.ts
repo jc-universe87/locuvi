@@ -395,3 +395,12 @@ export interface BankTx {
   payment_ids: string[];
   source_name: string;
 }
+
+export interface HouseholdProfile {
+  id: number;
+  name: string;
+  is_admin: boolean;
+  password_set: boolean;
+  created_at: string;
+  deleted_at: string | null;
+}

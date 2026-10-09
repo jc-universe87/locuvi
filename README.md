@@ -296,15 +296,34 @@ docker compose run --rm --no-deps locuvi python -m locuvi.cli restore /backups/l
 # the passphrase comes from the secret, or add --passphrase-file
 docker compose up -d
 docker compose exec locuvi python -m locuvi.cli verify     # prints {"ok": true, ...}
-docker compose exec locuvi python -m locuvi.cli reset-password  # forgot the in-app password
+docker compose exec locuvi python -m locuvi.cli reset-password  # admin forgot their password
+docker compose exec locuvi python -m locuvi.cli reset-password --profile Sam  # or another profile
+docker compose restart locuvi   # then sign in with the password in secrets/locuvi_password.txt
 ```
 
 If the keys volume is lost, invoices are unaffected; re-enter the WebDAV app password and sign in again.
 
+### Household profiles
+
+Settings › Profiles (admin only) adds profiles for other people in your household. Each profile
+is a separate Locuvi — own diary, practices, invoices and numbering, pension forms, email
+accounts, Bevro tokens and calendar link — and nobody sees another profile's data. With more than
+one profile, everyone signs in with their **name** and password. The existing installation is
+profile 1, the admin; its data stays in `/data`. Other profiles live in `/data/profiles/<id>/`, and
+their nightly backups go to `/backups/profile-<id>/`. To run a CLI command for another profile,
+point it at that folder, e.g.
+`docker compose exec -e DATA_DIR=/data/profiles/2 -e BACKUP_DIR=/backups/profile-2 locuvi python -m locuvi.cli verify`.
+A removed profile is signed out at once and kept for 30 days (restorable in Settings › Profiles),
+then deleted with its backups. The list of profiles (names and password hashes) is copied to
+`/backups/profiles.db` every night; after rebuilding a server, put it back as `/data/profiles.db`
+before restoring each profile's backup into its folder.
+
 ## 6. Security model (summary)
 
 - Private by default: port bound to `127.0.0.1`; use Tailscale/VPN with HTTPS in front.
-- Auth (`LOCUVI_AUTH_MODE`): `password` (default) — single owner password from a secret file,
+- Auth (`LOCUVI_AUTH_MODE`): `password` (default) — the admin's first password comes from a
+  secret file; each household profile has its own scrypt-hashed password (sessions name the
+  profile and end when its password is changed or the profile removed),
   HttpOnly + SameSite=Strict signed session cookie, login rate-limited; or `gateway` — no
   in-app login, **only** when the gateway itself authenticates. Every state-changing request
   requires a CSRF header in both modes. See [ADR 0002](docs/decisions/0002-auth-model.md).

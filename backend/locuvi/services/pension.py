@@ -251,12 +251,17 @@ def mark_submitted(s: Session, month: str, submitted_on: date | None = None) -> 
     return sub
 
 
-def unmark_submitted(s: Session, month: str) -> None:
+def unmark_submitted(s: Session, month: str) -> str | None:
     sub = s.scalars(select(PensionSubmission).where(PensionSubmission.month == month)).first()
     if sub is not None:
+        from locuvi.services import trash
+
+        item = trash.bin_submission(s, sub)
         s.delete(sub)
         core.audit(s, "pension.unmarked_submitted", month=month)
         s.commit()
+        return item.id
+    return None
 
 
 # ------------------------------------------------------------------ Form A tracking

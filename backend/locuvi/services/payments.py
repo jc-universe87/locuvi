@@ -112,11 +112,21 @@ def record_payment(
     return p
 
 
-def delete_payment(s: Session, payment_id: str, *, commit: bool = True) -> Invoice:
+def delete_payment(
+    s: Session, payment_id: str, *, commit: bool = True, keep_copy: bool = True
+) -> tuple[Invoice, str | None]:
+    """Remove a payment. The owner's deletes keep a copy in Recently deleted (``keep_copy``);
+    undoing a bank match does not, because the bank line itself can be matched again.
+    Returns the invoice and the Recently deleted id (if a copy was kept)."""
     p = s.get(Payment, payment_id)
     if p is None:
         raise NotFound("payment.not_found", "Payment not found.")
     inv = p.invoice
+    trash_id = None
+    if keep_copy:
+        from locuvi.services import trash
+
+        trash_id = trash.bin_payment(s, p).id
     s.add(
         InvoiceEvent(
             invoice_id=inv.id, event_type="payment_removed", metadata_json={"amount": str(p.amount)}
@@ -128,7 +138,7 @@ def delete_payment(s: Session, payment_id: str, *, commit: bool = True) -> Invoi
         s.commit()
     else:
         s.flush()
-    return inv
+    return inv, trash_id
 
 
 def record_refund(

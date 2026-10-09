@@ -73,6 +73,7 @@ if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() =>
   step("sign in");
   await page.getByLabel("Password").fill(PASSWORD ?? "");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("heading", { name: "Sign in" }).waitFor({ state: "detached" });
 }
 
 step("welcome wizard (3 steps)");
@@ -269,8 +270,31 @@ await shot("10e-bank");
 await page.getByRole("button", { name: "Not payment for an invoice" }).click();
 await page.getByText("No new payments need checking.").waitFor();
 
-step("settings hub and sections");
+step("deleting asks first; Recently deleted can put it back");
+await page.getByRole("link", { name: /^Inbox/ }).click();
+await page.getByRole("button", { name: "Done" }).click();
+await page.getByRole("button", { name: /remittance\.txt/ }).click();
+await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+const askDelete = page.getByRole("dialog", { name: /^Delete “remittance\.txt” from your inbox\?$/ });
+await askDelete.getByText("You can restore it from Settings › Recently deleted for 30 days.").waitFor();
+await askDelete.getByRole("button", { name: "Cancel" }).click(); // Cancel keeps it
+await askDelete.waitFor({ state: "hidden" });
+await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+await askDelete.getByRole("button", { name: "Delete" }).click();
+await page.getByRole("status").getByText("File deleted").waitFor();
 await page.getByRole("link", { name: "Settings" }).click();
+await page.getByRole("link", { name: /Recently deleted/ }).click();
+await page.getByText(/^\d+ sessions · .+ · Example Medical Practice$/).waitFor(); // the undone repeat
+const binRow = page.locator(".list-row", { hasText: "Inbox file · remittance.txt" });
+await shot("10f-recently-deleted");
+await binRow.getByRole("button", { name: "Restore" }).click();
+await page.getByRole("status").getByText("Restored").waitFor();
+await binRow.waitFor({ state: "detached" });
+await page.getByRole("link", { name: "Today" }).first().click();
+await page.waitForURL(`${BASE}/`);
+
+step("settings hub and sections");
+await page.getByRole("link", { name: "Settings" }).first().click();
 await page.getByRole("link", { name: /Bank account/ }).click();
 await page.getByLabel("Account number").waitFor();
 if ((await page.getByLabel("Account number").getAttribute("placeholder")) !== "••••0000") await fail("masked account");
@@ -351,6 +375,32 @@ for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diar
   if (overflow) await fail(`horizontal overflow on mobile ${path}`);
   await shot(name, mp);
 }
+
+step("household profiles: add one, sign in as them, separate data");
+await page.goto(`${BASE}/settings/profiles`);
+await page.getByRole("button", { name: "Add a profile" }).click();
+const pf = page.getByRole("dialog");
+await pf.getByLabel(/^Name/).fill("Sam");
+await pf.getByLabel(/^Password/).fill("sam-e2e-password");
+await pf.getByLabel("Type your new password again").fill("sam-e2e-password");
+await pf.getByRole("button", { name: "Add profile" }).click();
+await page.getByRole("status").getByText("Sam can now sign in").waitFor();
+await shot("18-profiles");
+await page.goto(`${BASE}/settings`);
+await page.getByRole("button", { name: "Sign out" }).click();
+await page.getByLabel("Your name").fill("Sam");
+await page.getByLabel("Password").fill("sam-e2e-password");
+await page.getByRole("button", { name: "Sign in" }).click();
+// Sam starts with an empty Locuvi of their own
+await page.getByRole("heading", { name: "Let's set up your invoices" }).waitFor();
+await page.goto(`${BASE}/settings`);
+await page.getByText("Signed in as Sam").waitFor();
+if (await page.getByRole("link", { name: /Profiles/ }).count()) await fail("non-admin sees Profiles");
+await page.getByRole("button", { name: "Sign out" }).click();
+await page.getByLabel("Your name").fill("Owner");
+await page.getByLabel("Password").fill(PASSWORD ?? "");
+await page.getByRole("button", { name: "Sign in" }).click();
+await page.getByRole("heading", { name: "Sign in" }).waitFor({ state: "detached" });
 
 await browser.close();
 if (errors.length) {

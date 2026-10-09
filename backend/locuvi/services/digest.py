@@ -222,11 +222,33 @@ class DigestScheduler:
                 return
 
     def tick(self) -> None:
+        """Run the hourly jobs for every household profile, each on its own data."""
+        from locuvi import profiles
+
+        try:
+            removed = profiles.purge_removed(self.settings)
+            for pid in removed:
+                db.close_profile(pid)
+        except Exception:  # noqa: BLE001
+            log.exception("profile purge failed")
+        try:
+            profiles.backup_registry(self.settings)
+        except Exception:  # noqa: BLE001
+            log.exception("profile list backup failed")
+        for p in profiles.all_profiles(self.settings) or [None]:
+            pid = p.id if p else 1
+            try:
+                with db.use_profile(pid):
+                    self._tick_profile(profiles.settings_for(self.settings, pid))
+            except Exception:  # noqa: BLE001 — one profile must not stop the others
+                log.exception("hourly jobs failed for profile %s", pid)
+
+    def _tick_profile(self, settings: Settings) -> None:
         from locuvi.services import backups
 
         try:
-            if backups.nightly_due(self.settings):
-                backups.backup_now(self.settings)
+            if backups.nightly_due(settings):
+                backups.backup_now(settings)
         except DomainError as exc:
             log.warning("nightly backup not made: %s", exc.code)
         except Exception:  # noqa: BLE001
@@ -235,9 +257,16 @@ class DigestScheduler:
             from locuvi.services import documents
 
             with db.new_session() as s:
-                documents.purge_trash(s, self.settings)
+                documents.purge_trash(s, settings)
         except Exception:  # noqa: BLE001
             log.exception("document trash purge failed")
+        try:
+            from locuvi.services import trash
+
+            with db.new_session() as s:
+                trash.purge(s)
+        except Exception:  # noqa: BLE001
+            log.exception("recently deleted purge failed")
         try:
             from locuvi.assistant import providers
             from locuvi.services import mailbox
@@ -245,12 +274,12 @@ class DigestScheduler:
             with db.new_session() as s:
                 mailbox.purge_removed(s)
                 if mailbox.auto_scan_due(s):
-                    provider = providers.provider_for(s, self.settings, self.box)
+                    provider = providers.provider_for(s, settings, self.box)
                     for acc in mailbox.list_accounts(s):
                         if acc.enabled and acc.auto_scan:
                             try:
                                 mailbox.scan(
-                                    s, self.settings, self.box, provider=provider,
+                                    s, settings, self.box, provider=provider,
                                     account_id=acc.id,
                                 )  # fmt: skip
                             except DomainError as exc:
@@ -262,7 +291,7 @@ class DigestScheduler:
         try:
             with db.new_session() as s:
                 if due(s):
-                    send_now(s, self.settings, self.box)
+                    send_now(s, settings, self.box)
                     log.info("weekly digest sent")
         except DomainError as exc:
             log.warning("weekly digest not sent: %s", exc.code)
