@@ -24,9 +24,11 @@ from locuvi.models import (
     BankTransaction,
     Document,
     FindingDismissal,
+    FormARecord,
     Invoice,
     InvoiceStatus,
     MailboxConfig,
+    PcseRecord,
     Practice,
     Proposal,
     SessionStatus,
@@ -208,6 +210,27 @@ def _pension(s: Session, today: date) -> list[Finding]:
                 params={"month": m["month"], "pay": m["pensionable_pay"]},
                 ref={"type": "pension_month", "id": m["month"]},
                 action={"type": "open_pension", "month": m["month"]}, dismissible=False,
+            ))  # fmt: skip
+    for rec in s.scalars(select(FormARecord).where(FormARecord.status == "sent")):
+        if rec.sent_on and (today - rec.sent_on).days > 14:
+            name = rec.practice_key
+            p = s.get(Practice, rec.practice_key)
+            out.append(Finding(
+                key=f"form_a_chase:{rec.month}:{rec.practice_key}", kind="form_a_chase",
+                severity="warn",
+                params={"month": rec.month, "practice": p.name if p else name,
+                        "days": (today - rec.sent_on).days},
+                ref={"type": "pension_month", "id": rec.month},
+                action={"type": "open_pension", "month": rec.month},
+            ))  # fmt: skip
+    for rec in s.scalars(select(PcseRecord)):
+        fig = pension.month_figures(s, rec.month)
+        if fig["forms_a"] and fig["pcse"]["status"] == "mismatch":
+            out.append(Finding(
+                key=f"pcse_mismatch:{rec.month}", kind="pcse_mismatch", severity="warn",
+                params={"month": rec.month, "difference": fig["pcse"]["difference"]},
+                ref={"type": "pension_month", "id": rec.month},
+                action={"type": "open_pension", "month": rec.month},
             ))  # fmt: skip
     if months and profile.employee_rate is None:
         out.append(Finding(

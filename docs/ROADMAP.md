@@ -111,7 +111,7 @@ communicate from one place. Locuvi joins it as one connected agent/tool provider
 2. Checks engine and weekly digest.
 3. Document inbox, then paste-a-booking as the first AI feature. ✅ (Oct 2026)
 4. Bank CSV import. ✅ (Oct 2026)
-5. Form A tracking and PCSE import.
+5. Form A tracking and PCSE import. ✅ (Oct 2026)
 6. The full administrative agent.
 7. Bevro integration.
 
@@ -138,9 +138,13 @@ Each item is useful on its own and gives the AI something reliable to work with.
   with the practice named → exact amount → combined payment of 2–4 invoices of one practice.
   Ambiguous amounts are never guessed. "Confirm N matches" records payments (dated as the
   bank credit); manual pick, "Not an invoice", and undo for each. (Spec D)
-- 🧭 **Form A tracking**: per practice-month status (prepared → sent to practice → signed →
-  submitted), with dates and owner-recorded evidence. **PCSE statement import** to compare
-  expected and recorded contributions. (Spec C)
+- ✅ **Form A tracking**: per practice-month status (to send → sent → signed; Form B
+  "submitted" as before) with dates and an optional linked inbox document as evidence. A
+  finding asks to chase a Form A sent > 14 days ago and not signed. Progress never counts
+  as a figure change. (Spec C)
+- ✅ **PCSE comparison**: type in, or import as CSV (month + pensionable pay and/or
+  contributions; rows per practice are summed), what PCSE/NHS Pensions shows; Locuvi compares
+  with the expected figures from issued invoices and flags mismatches. (Spec C)
 - 🧭 **Correspondence log**: emails sent and received about an invoice or session, linked to
   it, so drafts can use context the owner has authorised. (Spec F)
 - ✅ **Audit log for proposals** (`Proposal` table, `services/proposals.py`): what was proposed,

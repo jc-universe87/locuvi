@@ -39,6 +39,10 @@ TEXT: dict[str, str] = {
     "backup_stale": "The last backup was {days} days ago.",
     "proposals_pending": "{n} suggested diary change(s) are waiting for you in the inbox.",
     "inbox_waiting": "{n} document(s) have been in your inbox for a few days.",
+    "form_a_chase": (
+        "Form A for {month_label} at {practice} was sent {days} days ago and isn't signed yet."
+    ),
+    "pcse_mismatch": "PCSE's record for {month_label} differs from your invoices by {difference}.",
     "bank_unmatched": "{n} payment(s) from your bank statement wait to be matched.",
     "mailbox_failed": "Checking your email folders failed — open Settings › Email folders.",
 }
@@ -51,7 +55,7 @@ def _fmt(f: checks.Finding) -> str:
     if "month" in p:
         y, m = (int(x) for x in str(p["month"]).split("-"))
         p["month_label"] = f"{MONTHS[m - 1]} {y}"
-    for k in ("total", "outstanding", "pay"):
+    for k in ("total", "outstanding", "pay", "difference"):
         if p.get(k) not in (None, ""):
             from decimal import Decimal
 

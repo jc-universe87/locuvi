@@ -16,8 +16,9 @@ from locuvi.services import invoices as svc
 
 
 def issue(settings, s, practice, month, days):
-    diary.add_sessions(s, [diary.SessionInput(practice.id, date.fromisoformat(f"{month}-{d:02d}"))
-                           for d in days])  # fmt: skip
+    diary.add_sessions(
+        s, [diary.SessionInput(practice.id, date.fromisoformat(f"{month}-{d:02d}")) for d in days]
+    )
     d = diary.invoice_month(s, practice.id, month)
     inv = svc.issue(settings, d.id, uuid.uuid4().hex).invoice
     s.expire_all()
@@ -119,8 +120,8 @@ def test_ambiguous_amount_is_not_guessed(settings, session, ready):
 
 def test_manual_match_part_payment_and_ignore(settings, session, ready):
     inv = issue(settings, session, ready, "2026-08", [3])
-    bank.import_statement(session, "x.csv",
-                          b"Date,Description,Amount\n01/10/2026,FPS,300.00\n02/10/2026,REFUND,5.00\n")  # fmt: skip
+    csv_text = b"Date,Description,Amount\n01/10/2026,FPS,300.00\n02/10/2026,REFUND,5.00\n"
+    bank.import_statement(session, "x.csv", csv_text)
     part, refund = sorted(
         session.query(BankTransaction).all(), key=lambda t: t.amount, reverse=True
     )
@@ -150,9 +151,13 @@ def test_api_bank_flow(settings):
 
     with TestClient(create_app(settings)) as c:
         h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
-        r = c.post("/api/v1/bank/import", headers=h,
-                   files={"file": ("s.csv", b"Date,Description,Amount\n01/10/2026,FPS,10.00\n",
-                                   "text/csv")})  # fmt: skip
+        r = c.post(
+            "/api/v1/bank/import",
+            headers=h,
+            files={
+                "file": ("s.csv", b"Date,Description,Amount\n01/10/2026,FPS,10.00\n", "text/csv")
+            },
+        )
         assert r.status_code == 201 and r.json()["unmatched"] == 1
         lst = c.get("/api/v1/bank/transactions").json()
         tx = lst["transactions"][0]

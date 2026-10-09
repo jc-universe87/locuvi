@@ -119,7 +119,8 @@ NHSBSA/PCSE guidance. When it changes, add a new dated rate in Settings → Pens
    matches**. Only money in is kept. Overdue invoices rise to the top of Today.
 5. **Pension** — after the month ends, open it to see the Form A figures per practice and the
    Form B summary, download the worksheet, copy the figures onto the official NHSBSA forms,
-   then tap **Mark submitted**.
+   track each practice's Form A (*To send → Sent → Signed*), then tap **Mark submitted**.
+   Later, type in or import (CSV) what PCSE shows and Locuvi flags any difference.
 6. **Reports** — tax-year totals any time; at year end download the CSV or the ZIP pack for
    your accountant.
 

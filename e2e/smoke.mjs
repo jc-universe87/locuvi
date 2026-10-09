@@ -144,9 +144,12 @@ const [ws] = await Promise.all([
   page.getByRole("dialog").getByRole("button", { name: "Worksheet" }).click(),
 ]);
 if (!ws.suggestedFilename().startsWith("nhs-pension-worksheet-")) await fail("worksheet name");
+await page.getByRole("dialog").getByRole("group", { name: "Form A status" }).getByRole("button", { name: "Signed" }).click();
+await page.getByRole("dialog").getByText(/^Signed \d/).waitFor();
 await shot("09-pension-month");
 await page.getByRole("dialog").getByRole("button", { name: "Mark submitted" }).click();
 await row.getByText("Submitted").waitFor();
+await row.getByText("Form A signed 1/1").waitFor();
 
 step("reports");
 await page.getByRole("link", { name: "Reports" }).first().click();

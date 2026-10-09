@@ -217,6 +217,8 @@ export interface PensionMonth {
   submitted_on: string | null;
   changed_since_submitted: boolean;
   ready: boolean;
+  forms_a_signed: number;
+  pcse: "none" | "match" | "mismatch";
 }
 
 export interface EmailConfig {

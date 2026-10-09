@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from locuvi.api import schemas as S
 from locuvi.api.auth import COOKIE, SessionManager, Unauthorized
 from locuvi.db import get_session
 from locuvi.errors import Conflict, DomainError, NotFound
-from locuvi.models import Invoice, InvoiceEvent, PensionPolicy, Practice
+from locuvi.models import Document, Invoice, InvoiceEvent, PensionPolicy, Practice
 from locuvi.services import core, diary, payments, pension, reports
 from locuvi.services import invoices as svc
 from locuvi.storage.local import resolve, sha256_file
@@ -992,6 +992,33 @@ def pension_unsubmitted(month: str, s: DB) -> dict[str, Any]:
     _check_month(month)
     pension.unmark_submitted(s, month)
     return {"months": pension.overview(s)}
+
+
+@api.post("/pension/{month}/form-a")
+def pension_form_a(month: str, body: S.FormAIn, s: DB) -> dict[str, Any]:
+    _check_month(month)
+    if body.document_id and s.get(Document, body.document_id) is None:
+        raise NotFound("document.not_found", "Document not found.")
+    pension.set_form_a(s, month, body.practice_key, body.status, body.on, body.document_id)
+    return pension.month_figures(s, month)
+
+
+@api.put("/pension/{month}/pcse")
+def pension_pcse(month: str, body: S.PcseIn, s: DB) -> dict[str, Any]:
+    _check_month(month)
+    pension.set_pcse(
+        s,
+        month,
+        Decimal(body.pensionable_pay) if body.pensionable_pay else None,
+        Decimal(body.contributions) if body.contributions else None,
+    )
+    return pension.month_figures(s, month)
+
+
+@api.post("/pension/pcse/import")
+def pension_pcse_import(s: DB, file: Annotated[UploadFile, File()]) -> dict[str, Any]:
+    out = pension.import_pcse(s, file.file.read(2 * 1024 * 1024 + 1))
+    return {**out, "months": pension.overview(s), "imported": out["months"]}
 
 
 def _check_month(month: str) -> None:

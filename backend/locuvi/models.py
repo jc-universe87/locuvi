@@ -508,3 +508,31 @@ class BankTransaction(Base):
     source_name: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class FormARecord(Base):
+    """Owner's progress on one practice's GP Locum Form A for a month (sent → signed)."""
+
+    __tablename__ = "form_a_record"
+    __table_args__ = (UniqueConstraint("month", "practice_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    practice_key: Mapped[str] = mapped_column(String(200))  # practice id, or billed name
+    status: Mapped[str] = mapped_column(String(10), default="sent")  # sent | signed
+    sent_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    document_id: Mapped[str | None] = mapped_column(ForeignKey("document.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class PcseRecord(Base):
+    """What PCSE / NHS Pensions shows as recorded for a month (imported or typed in)."""
+
+    __tablename__ = "pcse_record"
+
+    month: Mapped[str] = mapped_column(String(7), primary_key=True)
+    pensionable_pay: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
+    contributions: Mapped[Decimal | None] = mapped_column(DecimalString, nullable=True)
+    source: Mapped[str] = mapped_column(String(10), default="manual")  # manual | csv
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)

@@ -363,3 +363,15 @@ class BankAcceptIn(Strict):
         ]
         | None
     ) = None
+
+
+class FormAIn(Strict):
+    practice_key: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    status: Literal["to_send", "sent", "signed"]
+    on: date | None = None
+    document_id: Annotated[str, StringConstraints(max_length=36)] | None = None
+
+
+class PcseIn(Strict):
+    pensionable_pay: DecStr | None = None
+    contributions: DecStr | None = None
