@@ -21,23 +21,23 @@ await page.goto(`${BASE}/settings/assistant`);
 await page.getByRole("switch").click();
 await page.getByLabel("Anthropic API key").fill("sk-ant-e2e-fake-key-0000000000000000000000");
 await page.getByRole("button", { name: "Save" }).click();
-await page.getByText("Assistant is on").waitFor();
+await page.getByText("AI assistant is enabled").waitFor();
 if (await page.getByText("sk-ant-e2e").count()) throw new Error("key echoed");
 
 step("paste a booking -> AI suggestion, clearly labelled");
 await page.goto(`${BASE}/diary`);
-await page.getByRole("button", { name: "Paste a booking" }).click();
+await page.getByRole("button", { name: "Add bookings from a message" }).click();
 await page.getByLabel("Booking email or message").fill("Could you do 1st Dec morning and 2nd Dec afternoon?");
-await page.getByRole("button", { name: "Read booking" }).click();
-await page.getByText("Suggested by the assistant — please check").waitFor();
+await page.getByRole("button", { name: "Find work dates" }).click();
+await page.getByText("Suggested by AI — please check the details").waitFor();
 await page.getByRole("dialog").getByRole("button", { name: "Add 2 sessions" }).click();
 await page.getByRole("status").getByText("Added 2 sessions").waitFor();
 
 step("ask Locuvi");
 await page.getByRole("link", { name: "Ask Locuvi" }).click();
-await page.getByRole("button", { name: "Check all my outstanding admin" }).click();
+await page.getByRole("button", { name: "What do I need to do next?" }).click();
 await page.getByText("Your records look up to date.").waitFor();
-await page.getByText(/Looked at: overview, uninvoiced sessions/).waitFor();
+await page.getByText(/Records checked: your summary, work not yet invoiced/).waitFor();
 if (SHOTS) await page.screenshot({ path: `${SHOTS}/20-ask.png`, fullPage: true });
 await browser.close();
 if (errors.length) { console.error(errors.join("\n")); process.exit(1); }
