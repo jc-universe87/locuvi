@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import en, { type MessageKey } from "./en";
 import de from "./de";
 import es from "./es";
@@ -61,6 +61,9 @@ const Ctx = createContext<I18n>({
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  useEffect(() => {
+    document.documentElement.lang = locale === "en" ? "en-GB" : locale;
+  }, [locale]);
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     try {
@@ -68,7 +71,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    document.documentElement.lang = l === "en" ? "en-GB" : l;
   }, []);
   const value = useMemo<I18n>(
     () => ({

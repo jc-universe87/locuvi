@@ -60,6 +60,22 @@ describe("i18n catalogues", () => {
     }
   });
 
+
+  it("keeps all primary workflow sections translated in every supported language", () => {
+    const sections = new Set([
+      "nav", "auth", "common", "status", "archive", "archive_error",
+      "invoices", "editor", "unit", "totals", "issue", "detail",
+      "practices", "settings", "today", "welcome", "diary",
+      "pay", "pension", "reports",
+    ]);
+    const critical = Object.keys(en).filter((key) => sections.has(key.split(".")[0]));
+    for (const [locale, catalogue] of Object.entries(catalogues)) {
+      if (locale === "en") continue;
+      const missing = critical.filter((key) => !(key in catalogue));
+      expect(missing, `${locale}: primary UI must not fall back to English`).toEqual([]);
+    }
+  });
+
   it("falls back to English and interpolates", () => {
     expect(translate("de", "nav.invoices")).toBe("Rechnungen");
     expect(translate("de", "issue.confirm_total", { total: "£1.00" })).toBe("Total: £1.00");
