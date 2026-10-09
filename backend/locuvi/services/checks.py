@@ -22,6 +22,7 @@ from locuvi.models import (
     ArchiveJob,
     ArchiveStatus,
     BankTransaction,
+    CreditNote,
     Document,
     FindingDismissal,
     FormARecord,
@@ -342,9 +343,11 @@ def _archive(s: Session) -> list[Finding]:
                                                         ArchiveStatus.conflict]))
     ):  # fmt: skip
         inv = s.get(Invoice, job.invoice_id)
+        cn = s.get(CreditNote, job.credit_note_id) if job.credit_note_id else None
+        number = cn.number if cn else (inv.invoice_number if inv else "")
         out.append(Finding(
             key=f"archive:{job.id}:{job.status}", kind=f"archive_{job.status}", severity="warn",
-            params={"number": inv.invoice_number if inv else "", "error": job.last_error_class},
+            params={"number": number, "error": job.last_error_class},
             ref={"type": "invoice", "id": job.invoice_id},
             action={"type": "open_invoice", "invoice_id": job.invoice_id},
         ))  # fmt: skip

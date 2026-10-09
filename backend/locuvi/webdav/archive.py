@@ -20,7 +20,14 @@ from sqlalchemy.orm import Session
 from locuvi import db
 from locuvi.config import Settings
 from locuvi.errors import DomainError
-from locuvi.models import ArchiveJob, ArchiveStatus, Invoice, InvoiceEvent, StorageConfig
+from locuvi.models import (
+    ArchiveJob,
+    ArchiveStatus,
+    CreditNote,
+    Invoice,
+    InvoiceEvent,
+    StorageConfig,
+)
 from locuvi.secrets_store import SecretBox, SecretUnavailable
 from locuvi.services import core
 from locuvi.storage.local import resolve, sha256_bytes
@@ -170,6 +177,18 @@ def _retarget_unsynced_jobs(s: Session, cfg: StorageConfig) -> None:
         inv = s.get(Invoice, job.invoice_id)
         if inv is None or not cfg.enabled:
             continue
+        if job.credit_note_id:
+            cn = s.get(CreditNote, job.credit_note_id)
+            if cn is None:
+                continue
+            if credit_destination_for(cfg, cn)[0] == job.destination_key:
+                if job.status != ArchiveStatus.conflict:
+                    job.next_retry_at, job.status = now, ArchiveStatus.pending
+                    job.last_error_class, job.attempt_count = None, 0
+            else:
+                job.is_current = False
+                _make_credit_job(s, cfg, cn)
+            continue
         dest = destination_for(cfg, inv)
         if dest[0] == job.destination_key:
             if job.status == ArchiveStatus.conflict:
@@ -194,6 +213,67 @@ def destination_for(cfg: StorageConfig, inv: Invoice) -> tuple[str, str]:
     ]
     rel = encode_path(segments)
     return f"{cfg.target_url}|{cfg.username}|{rel}", rel
+
+
+def credit_destination_for(cfg: StorageConfig, cn: CreditNote) -> tuple[str, str]:
+    """Credit notes sit next to invoices: <base>/YYYY/MM/CN-0001.pdf by credit date."""
+    segments = validate_base_path(cfg.base_path) + [
+        f"{cn.credit_date.year:04d}",
+        f"{cn.credit_date.month:02d}",
+        validate_segment(f"{cn.number}.pdf"),
+    ]
+    rel = encode_path(segments)
+    return f"{cfg.target_url}|{cfg.username}|{rel}", rel
+
+
+def _make_credit_job(s: Session, cfg: StorageConfig, cn: CreditNote) -> ArchiveJob:
+    key, rel = credit_destination_for(cfg, cn)
+    now = datetime.now(UTC)
+    jobs = list(s.scalars(select(ArchiveJob).where(ArchiveJob.credit_note_id == cn.id)))
+    for old in jobs:
+        if old.is_current and old.destination_key != key:
+            old.is_current = False
+    job = next((j for j in jobs if j.destination_key == key), None)
+    if job is None:
+        job = ArchiveJob(
+            invoice_id=cn.invoice_id,
+            credit_note_id=cn.id,
+            destination_key=key,
+            destination_url_snapshot=cfg.target_url,
+            destination_path_snapshot=rel,
+            pdf_sha256=cn.local_pdf_sha256,
+            status=ArchiveStatus.pending,
+            next_retry_at=now,
+        )
+        s.add(job)
+    else:
+        job.is_current = True
+        if job.status != ArchiveStatus.synced:
+            job.status, job.next_retry_at = ArchiveStatus.pending, now
+            job.attempt_count, job.last_error_class = 0, None
+    return job
+
+
+def enqueue_credit_note(s: Session, cn: CreditNote) -> None:
+    """Called inside the credit-note issue transaction; never raises for remote problems."""
+    cfg = core.get_storage_config(s)
+    if not (cfg.enabled and cfg.auto_upload and cfg.target_url):
+        return
+    try:
+        _make_credit_job(s, cfg, cn)
+    except (ValueError, InvalidPath):
+        log.warning("archive job not created for credit note %s: invalid destination", cn.id)
+
+
+def credit_archive_status(s: Session, cn: CreditNote) -> str:
+    job = s.scalars(
+        select(ArchiveJob).where(
+            ArchiveJob.credit_note_id == cn.id, ArchiveJob.is_current.is_(True)
+        )
+    ).first()
+    if job is None:
+        return ArchiveStatus.not_configured
+    return ArchiveStatus.pending if job.status == ArchiveStatus.uploading else job.status
 
 
 def _make_job(s: Session, cfg: StorageConfig, inv: Invoice) -> ArchiveJob:
@@ -257,13 +337,17 @@ def request_upload(s: Session, inv: Invoice) -> ArchiveJob:
 
 
 def archive_backlog(s: Session) -> dict[str, int]:
-    """Counts of issued/voided invoices by archive state, for the bulk upload button."""
+    """Issued/voided invoices and credit notes by archive state, for the bulk upload button."""
     counts = {"not_archived": 0, "pending": 0, "synced": 0, "failed": 0, "conflict": 0}
     for inv in s.scalars(select(Invoice).where(Invoice.status != "draft")):
         job = next((j for j in inv.archive_jobs if j.is_current), None)
         state = job.status if job else "not_archived"
         if state == ArchiveStatus.uploading:
             state = "pending"
+        counts[state] = counts.get(state, 0) + 1
+    for cn in s.scalars(select(CreditNote)):
+        state = credit_archive_status(s, cn)
+        state = "not_archived" if state == ArchiveStatus.not_configured else state
         counts[state] = counts.get(state, 0) + 1
     return counts
 
@@ -286,6 +370,11 @@ def request_upload_all(s: Session) -> int:
         before = job.status if job else None
         job = _make_job(s, cfg, inv)
         if before == ArchiveStatus.failed or job.status == ArchiveStatus.pending:
+            queued += 1
+    for cn in s.scalars(select(CreditNote)):
+        state = credit_archive_status(s, cn)
+        if state in (ArchiveStatus.not_configured, ArchiveStatus.failed):
+            _make_credit_job(s, cfg, cn)
             queued += 1
     if queued:
         core.audit(s, "storage.archive_all_requested", queued=queued)
@@ -432,7 +521,10 @@ def process_job(ctx: ArchiveContext, job_id: str) -> str:
         try:
             if not cfg.enabled or job.destination_url_snapshot != cfg.target_url:
                 raise WebDavError("not_configured", "WebDAV disabled or destination changed")
-            data = resolve(ctx.settings.data_dir, inv.local_pdf_path or "").read_bytes()
+            source = s.get(CreditNote, job.credit_note_id) if job.credit_note_id else inv
+            if source is None:
+                raise WebDavError("local_file_missing", "credit note not found")
+            data = resolve(ctx.settings.data_dir, source.local_pdf_path or "").read_bytes()
             if sha256_bytes(data) != job.pdf_sha256:
                 raise WebDavError("local_integrity", "local PDF checksum mismatch")
             vurl = validate_base_url(cfg.target_url, ctx.settings)
@@ -450,7 +542,10 @@ def process_job(ctx: ArchiveContext, job_id: str) -> str:
                 InvoiceEvent(
                     invoice_id=inv.id,
                     event_type="archive_synced",
-                    metadata_json={"path": job.destination_path_snapshot},
+                    metadata_json={
+                        "path": job.destination_path_snapshot,
+                        **({"credit_note_id": job.credit_note_id} if job.credit_note_id else {}),
+                    },
                 )
             )
         except (WebDavError, UrlBlocked, OSError) as exc:

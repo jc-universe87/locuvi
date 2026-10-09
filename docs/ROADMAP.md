@@ -63,7 +63,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Atomic multi-invoice bank matching (all payments + "matched" in one transaction; failure-injection tests) | ✅ |
 | Refund owed after a credit note on a paid invoice: "refund_due" state, finding, "Record refund" (negative payment with undo), netted in cash reports and Form B | ✅ |
 | AI attachments only with explicit per-document approval (audited; automatic email scans never send files); stronger redaction (patient lines dropped; emails, phones, postcodes, bank details, NHS and long numbers masked) | ✅ |
-| Credit notes archived to Nextcloud | 🔜 |
+| Credit notes archived to Nextcloud | ✅ | Own jobs at `<base>/YYYY/MM/CN-….pdf`, SHA-256 verified, never overwritten; status on the invoice page; included in "Archive all" |
 | Encrypted off-server backups + automatic restore drill | 🔜 |
 | CI on GitHub Actions; `main` as the stable branch | 🔜 |
 

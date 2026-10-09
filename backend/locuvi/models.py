@@ -237,8 +237,14 @@ class Invoice(TimestampMixin, Base):
     credit_notes: Mapped[list[CreditNote]] = relationship(
         "CreditNote", order_by="CreditNote.created_at", viewonly=True
     )
+    # The invoice's own archive copies (credit-note copies have credit_note_id set).
     archive_jobs: Mapped[list[ArchiveJob]] = relationship(
-        back_populates="invoice", order_by="ArchiveJob.created_at", lazy="selectin"
+        back_populates="invoice",
+        order_by="ArchiveJob.created_at",
+        lazy="selectin",
+        primaryjoin=(
+            "and_(Invoice.id == ArchiveJob.invoice_id, ArchiveJob.credit_note_id.is_(None))"
+        ),
     )
 
 
@@ -306,6 +312,10 @@ class ArchiveJob(TimestampMixin, Base):
     remote_etag: Mapped[str | None] = mapped_column(String(200), nullable=True)
     verified_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Set when this job archives a credit note (of invoice_id) rather than the invoice itself.
+    credit_note_id: Mapped[str | None] = mapped_column(
+        ForeignKey("credit_note.id"), nullable=True, index=True
+    )
 
     invoice: Mapped[Invoice] = relationship(back_populates="archive_jobs")
 

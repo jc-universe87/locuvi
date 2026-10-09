@@ -591,3 +591,55 @@ def test_conflict_moves_to_new_destination_on_config_change(ctx, session, ready,
     assert list(archive.run_due_jobs(ctx).values()) == ["synced"]
     assert (dav.root / "Locuvi/Archive/2026/10/LOC-2026-0001.pdf").exists()
     assert target.read_bytes() == b"someone else's file"
+
+
+def credit(ctx, inv, **kw):
+    from locuvi.services import credit_notes
+
+    s = db.new_session()
+    full = s.get(Invoice, inv.id)
+    return credit_notes.issue(
+        ctx.settings, full.id, [ln.id for ln in full.lines], "Session cancelled",
+        uuid.uuid4().hex, **kw,
+    )  # fmt: skip
+
+
+def test_credit_note_archived_and_verified_independently(ctx, session, ready, dav):
+    configure(session, ctx, dav)
+    inv = issue(ctx, session, ready)
+    cn = credit(ctx, inv, after_issue=archive.enqueue_credit_note)
+    s = db.new_session()
+    assert archive.credit_archive_status(s, s.get(type(cn), cn.id)) == "pending"
+    assert sorted(archive.run_due_jobs(ctx).values()) == ["synced", "synced"]
+    remote = dav.root / "Locuvi/Invoices" / f"{cn.credit_date:%Y/%m}" / f"{cn.number}.pdf"
+    assert remote.read_bytes() == (ctx.settings.data_dir / cn.local_pdf_path).read_bytes()
+    s = db.new_session()
+    job = s.scalars(
+        __import__("sqlalchemy").select(ArchiveJob).where(ArchiveJob.credit_note_id == cn.id)
+    ).one()
+    assert job.verified_sha256 == cn.local_pdf_sha256
+    # the invoice's own archive copy is untouched by the credit note's job
+    assert job_for(inv.id).verified_sha256 == inv.local_pdf_sha256
+    assert archive.archive_backlog(s)["synced"] == 2
+
+
+def test_credit_note_conflict_never_overwritten_and_backlog(ctx, session, ready, dav):
+    inv = issue(ctx, session, ready)
+    cn = credit(ctx, inv, after_issue=archive.enqueue_credit_note)  # WebDAV off: no job
+    s = db.new_session()
+    assert archive.credit_archive_status(s, s.get(type(cn), cn.id)) == "not_configured"
+    configure(db.new_session(), ctx, dav)
+    s = db.new_session()
+    assert archive.archive_backlog(s)["not_archived"] == 2
+    target = dav.root / "Locuvi/Invoices" / f"{cn.credit_date:%Y/%m}" / f"{cn.number}.pdf"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"someone else's file")
+    assert archive.request_upload_all(s) == 2
+    results = sorted(archive.run_due_jobs(ctx).values())
+    assert results == ["conflict", "synced"]
+    assert target.read_bytes() == b"someone else's file"
+    from locuvi.services import checks
+
+    found = [f for f in checks.run_checks(db.new_session(), ctx.settings)
+             if f.kind == "archive_conflict"]  # fmt: skip
+    assert [f.params["number"] for f in found] == [cn.number]

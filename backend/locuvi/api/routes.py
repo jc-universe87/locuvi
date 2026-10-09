@@ -500,6 +500,7 @@ def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
                     "reason": c.reason,
                     "grand_total": str(c.grand_total),
                     "line_ids": c.line_ids,
+                    "archive": archive.credit_archive_status(s, c),
                 }
                 for c in inv.credit_notes
             ],
@@ -704,7 +705,12 @@ def credit_issue(
     from locuvi.services import credit_notes
 
     cn = credit_notes.issue(
-        state(request).settings, invoice_id, body.line_ids, body.reason, idempotency_key
+        state(request).settings,
+        invoice_id,
+        body.line_ids,
+        body.reason,
+        idempotency_key,
+        after_issue=archive.enqueue_credit_note,
     )
     return credit_notes.as_dict(cn)
 

@@ -155,6 +155,7 @@ def issue(
     idempotency_key: str,
     *,
     render: Any = render_invoice_pdf,
+    after_issue: Any = None,
 ) -> CreditNote:
     reason = (reason or "").strip()[:1000]
     if not reason:
@@ -194,6 +195,8 @@ def issue(
         s.add(InvoiceEvent(invoice_id=inv.id, event_type="credited",
                            metadata_json={"number": number, "amount": str(totals.grand_total),
                                           "at": utcnow().isoformat()}))  # fmt: skip
+        if after_issue is not None:
+            after_issue(s, cn)  # queues the Nextcloud copy in the same transaction
         s.commit()
         log.info("credit note issued number=%s invoice=%s", number, inv.invoice_number)
         return cn

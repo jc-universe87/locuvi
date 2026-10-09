@@ -252,6 +252,12 @@ export default function InvoiceDetailPage() {
                 <span className="list-title">{c.number} · −{gbp(c.grand_total)}</span>
                 <span className="list-sub">{ukDate(c.credit_date)} · {c.reason}</span>
               </span>
+              {c.archive && c.archive !== "not_configured" && (
+                <span className={`pill ${c.archive}`}>
+                  {c.archive === "synced" && "✓ "}
+                  {t(`archive.${c.archive}` as MessageKey)}
+                </span>
+              )}
               <button className="btn ghost small" onClick={async () => {
                 try {
                   downloadBlob(await api.blob("GET", `/credit-notes/${c.id}/pdf`), `${c.number}.pdf`);
