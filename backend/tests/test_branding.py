@@ -242,3 +242,20 @@ def test_api_svg_logo_served_safely(settings, session, ready):
         assert got.headers["content-type"].startswith("image/svg+xml")
         assert "sandbox" in got.headers["content-security-policy"]
         assert "script" not in got.text
+
+
+def test_svg_with_bom_is_accepted_and_masks_refused(session, ready):
+    plain = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">'
+        b'<rect width="20" height="10"/></svg>'
+    )
+    p = branding.set_logo(session, b"\xef\xbb\xbf" + plain)
+    assert p.logo_svg and p.logo_png is None
+    masked = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><defs><mask id="m">'
+        b'<rect width="10" height="10" fill="#fff"/></mask></defs>'
+        b'<rect width="20" height="10" mask="url(#m)"/></svg>'
+    )
+    with pytest.raises(DomainError) as e:
+        branding.clean_svg(masked)
+    assert e.value.code == "branding.svg_mask"

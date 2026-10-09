@@ -50,13 +50,16 @@ SVG_ELEMENTS = {
     "svg", "g", "defs", "symbol", "use", "title", "desc", "style",
     "path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
     "text", "tspan", "textPath",
-    "linearGradient", "radialGradient", "stop", "clipPath", "mask", "pattern",
+    "linearGradient", "radialGradient", "stop", "clipPath", "pattern",
 }  # fmt: skip
 _BAD_CSS = re.compile(r"@import|expression\s*\(|url\(\s*['\"]?(?!#)", re.I)
 
 
+_BOM = b"\xef\xbb\xbf"
+
+
 def looks_like_svg(data: bytes) -> bool:
-    head = data[:4096].lstrip().lower()
+    head = data[:4096].removeprefix(_BOM).lstrip().lower()
     return head.startswith((b"<?xml", b"<svg", b"<!--")) and b"<svg" in data[:65536].lower()
 
 
@@ -75,6 +78,15 @@ def clean_svg(data: bytes) -> str:
     except etree.XMLSyntaxError:
         raise DomainError("branding.svg_invalid", "This SVG could not be read.") from None
     tree = root.getroottree()
+    # svglib cannot draw masks, so the printed logo would differ from the preview: refuse.
+    if any(
+        isinstance(el.tag, str) and etree.QName(el).localname == "mask" for el in root.iter()
+    ) or any("mask" in el.attrib or "mask:" in el.attrib.get("style", "") for el in root.iter()):
+        raise DomainError(
+            "branding.svg_mask",
+            "This SVG uses masks, which can't be printed exactly. Export it without masks, "
+            "or use a PNG.",
+        )
     if tree.docinfo.doctype or tree.docinfo.internalDTD is not None:
         raise DomainError("branding.svg_invalid", "This SVG could not be read.")
     if etree.QName(root).localname != "svg":

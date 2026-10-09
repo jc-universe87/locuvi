@@ -545,6 +545,7 @@ const en = {
   "error.branding.logo_too_large": "This logo file is too large.",
   "error.branding.logo_format": "Use an SVG, PNG, JPEG or WebP image.",
   "error.branding.logo_size": "This image is too large or too small.",
+  "error.branding.svg_mask": "This SVG uses masks, which can't be printed exactly. Export it without masks, or use a PNG.",
   "error.branding.svg_invalid": "This SVG could not be read. Try exporting it again, or use a PNG.",
   "look.logo_help": "SVG (sharpest), PNG, JPEG or WebP. Locuvi removes hidden data and anything that could run, trims empty edges and sizes it to fit the top of the invoice.",
   "look.colour": "Accent colour",
