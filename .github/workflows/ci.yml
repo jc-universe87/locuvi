@@ -59,8 +59,16 @@ jobs:
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
-      # Base images come through Google's Docker Hub mirror: same images, no anonymous
-      # Docker Hub rate limit (429) on shared runners.
+      # Docker Hub images (BuildKit, QEMU helper, base images) come through Google's mirror
+      # first and fall back to Docker Hub: no anonymous rate limit (429) or outage on
+      # shared runners stops the build.
+      - name: Use the Docker Hub mirror
+        run: |
+          f=/etc/docker/daemon.json
+          sudo sh -c "[ -s $f ] || echo '{}' > $f"
+          sudo jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' $f | sudo tee $f.new > /dev/null
+          sudo mv $f.new $f
+          sudo systemctl restart docker
       - uses: docker/setup-buildx-action@v3
         with:
           buildkitd-config-inline: |
@@ -81,6 +89,16 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+      # Docker Hub images (BuildKit, QEMU helper, base images) come through Google's mirror
+      # first and fall back to Docker Hub: no anonymous rate limit (429) or outage on
+      # shared runners stops the build.
+      - name: Use the Docker Hub mirror
+        run: |
+          f=/etc/docker/daemon.json
+          sudo sh -c "[ -s $f ] || echo '{}' > $f"
+          sudo jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' $f | sudo tee $f.new > /dev/null
+          sudo mv $f.new $f
+          sudo systemctl restart docker
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
         with:
