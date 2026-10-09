@@ -227,7 +227,7 @@ def put_mailbox(account_id: int, body: S.MailboxIn, request: Request, s: DB) -> 
 
 @api.delete("/settings/mailboxes/{account_id}")
 def remove_mailbox(account_id: int, s: DB) -> dict[str, Any]:
-    """Remove an account (undo with /restore until it is purged a day later)."""
+    """Remove an account (restore it from Recently deleted until it is purged after 30 days)."""
     from locuvi.services import mailbox
 
     return mailbox.account_public(mailbox.remove_account(s, account_id))

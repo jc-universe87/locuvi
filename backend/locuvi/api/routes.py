@@ -464,19 +464,22 @@ def branding_preview(s: DB) -> Response:
     )
 
 
-@api.delete("/settings/pension-policies/{policy_id}", status_code=204)
-def delete_policy(policy_id: str, s: DB) -> Response:
+@api.delete("/settings/pension-policies/{policy_id}")
+def delete_policy(policy_id: str, s: DB) -> dict[str, Any]:
     p = s.get(PensionPolicy, policy_id)
     if p is None:
         raise NotFound("policy.not_found", "Rate not found.")
     if _policy_out(s, p)["in_use"]:
         raise Conflict("policy.in_use", "This rate is used by issued invoices and is kept.")
+    from locuvi.services import trash
+
     for inv in s.scalars(select(Invoice).where(Invoice.pension_policy_id == p.id)):
         inv.pension_policy_id = None
+    item = trash.bin_policy(s, p)
     s.delete(p)
     core.audit(s, "settings.policy_deleted", effective_from=p.effective_from.isoformat())
     s.commit()
-    return Response(status_code=204)
+    return {"trash_id": item.id}
 
 
 # -------------------------------------------------------------------- practices
@@ -818,10 +821,10 @@ def patch_invoice(invoice_id: str, body: S.InvoiceIn, s: DB) -> dict[str, Any]:
     return _detail(s, _save(s, svc.get_invoice(s, invoice_id), body))
 
 
-@api.delete("/invoices/{invoice_id}", status_code=204)
-def delete_invoice(invoice_id: str, s: DB) -> Response:
-    svc.delete_draft(s, svc.get_invoice(s, invoice_id))
-    return Response(status_code=204)
+@api.delete("/invoices/{invoice_id}")
+def delete_invoice(invoice_id: str, s: DB) -> dict[str, Any]:
+    """Drafts only (issued invoices are voided, never deleted). Kept in Recently deleted."""
+    return {"trash_id": svc.delete_draft(s, svc.get_invoice(s, invoice_id))}
 
 
 @api.post("/invoices/{invoice_id}/preview")
@@ -1155,10 +1158,9 @@ def patch_session(session_id: str, body: S.SessionPatch, s: DB) -> dict[str, Any
     return _session_out(s, diary.update_session(s, ws, **data))
 
 
-@api.delete("/sessions/{session_id}", status_code=204)
-def delete_session(session_id: str, s: DB) -> Response:
-    diary.delete_session(s, diary.get_session_or_404(s, session_id))
-    return Response(status_code=204)
+@api.delete("/sessions/{session_id}")
+def delete_session(session_id: str, s: DB) -> dict[str, Any]:
+    return {"trash_id": diary.delete_session(s, diary.get_session_or_404(s, session_id))}
 
 
 @api.get("/sessions/suggest-rate")
@@ -1217,8 +1219,26 @@ def add_refund(invoice_id: str, body: S.RefundIn, s: DB) -> dict[str, Any]:
 
 @api.delete("/payments/{payment_id}")
 def remove_payment(payment_id: str, s: DB) -> dict[str, Any]:
-    inv = payments.delete_payment(s, payment_id)
-    return _detail(s, svc.get_invoice(s, inv.id))
+    inv, trash_id = payments.delete_payment(s, payment_id)
+    return {**_detail(s, svc.get_invoice(s, inv.id)), "trash_id": trash_id}
+
+
+# ------------------------------------------------------------- recently deleted
+
+
+@api.get("/trash")
+def list_trash(s: DB) -> dict[str, Any]:
+    """Everything deleted in the last 30 days (newest first), restorable."""
+    from locuvi.services import trash
+
+    return {"items": trash.listing(s), "keep_days": trash.KEEP_DAYS}
+
+
+@api.post("/trash/{item_id}/restore")
+def restore_trash(item_id: str, s: DB) -> dict[str, Any]:
+    from locuvi.services import trash
+
+    return trash.restore(s, item_id)
 
 
 # ------------------------------------------------------------------------ email
@@ -1319,8 +1339,8 @@ def pension_submitted(month: str, body: S.PensionSubmitIn, s: DB) -> dict[str, A
 @api.delete("/pension/{month}/submitted")
 def pension_unsubmitted(month: str, s: DB) -> dict[str, Any]:
     _check_month(month)
-    pension.unmark_submitted(s, month)
-    return {"months": pension.overview(s)}
+    trash_id = pension.unmark_submitted(s, month)
+    return {"months": pension.overview(s), "trash_id": trash_id}
 
 
 @api.post("/pension/{month}/form-a")

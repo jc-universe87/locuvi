@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Dialog, ErrorAlert, Field, SavedIndicator, Toggle, useIssueText } from "../components/ui";
+import { Dialog, ErrorAlert, Field, SavedIndicator, Toggle, useConfirm, useIssueText, useToast } from "../components/ui";
+import { restoreFromBin } from "../lib/trash";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob, newIdempotencyKey, openPendingTab } from "../lib/api";
@@ -83,7 +84,9 @@ export default function InvoiceEditor() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmIssue, setConfirmIssue] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { tn } = useT();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [newPractice, setNewPractice] = useState(false);
   const issueKey = useRef<string | null>(null);
   const touched = useRef(false);
@@ -302,9 +305,20 @@ export default function InvoiceEditor() {
 
   const deleteDraft = async () => {
     if (!saved) return;
+    const name = practice?.name;
+    const ok = await confirm({
+      title: name ? t("trash.ask_draft", { practice: name }) : t("trash.ask_draft_blank"),
+      body: t("editor.delete_confirm"),
+      confirm: t("editor.delete_draft"),
+    });
+    if (!ok) return;
     try {
-      await api.del(`/invoices/${saved.id}`);
+      const r = await api.del<{ trash_id: string }>(`/invoices/${saved.id}`);
       nav("/invoices");
+      toast({
+        text: t("trash.draft_deleted"),
+        undo: () => void restoreFromBin(r.trash_id, t, tn, toast).then((out) => out && nav(`/invoices/${saved.id}/edit`)),
+      });
     } catch (e) {
       setError(e);
     }
@@ -498,7 +512,7 @@ export default function InvoiceEditor() {
             </button>
             <p className="hint" style={{ margin: 0, textAlign: "center" }}>{t("editor.autosave_hint")}</p>
             {saved && (
-              <button className="btn ghost small" style={{ color: "var(--err)" }} onClick={() => setConfirmDelete(true)}>{t("editor.delete_draft")}</button>
+              <button className="btn ghost small" style={{ color: "var(--err)" }} onClick={deleteDraft}>{t("editor.delete_draft")}</button>
             )}
           </div>
         </aside>
@@ -537,20 +551,6 @@ export default function InvoiceEditor() {
               : t("issue.confirm_no_pension")}
           </li>
         </ul>
-      </Dialog>
-
-      <Dialog
-        open={confirmDelete}
-        title={t("editor.delete_draft")}
-        onClose={() => setConfirmDelete(false)}
-        footer={
-          <>
-            <button className="btn secondary" onClick={() => setConfirmDelete(false)}>{t("common.cancel")}</button>
-            <button className="btn danger" onClick={deleteDraft}>{t("common.delete")}</button>
-          </>
-        }
-      >
-        <p>{t("editor.delete_confirm")}</p>
       </Dialog>
 
       {newPractice && (

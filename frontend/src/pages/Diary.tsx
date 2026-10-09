@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BookingSheet } from "../components/Booking";
 import { RateFields, rateBody, rateFieldsValid } from "../components/RateFields";
-import { Dialog, ErrorAlert, Field, Icon, PageHead, Segmented, Toggle, useToast } from "../components/ui";
+import { Dialog, ErrorAlert, Field, Icon, PageHead, Segmented, Toggle, useConfirm, useToast } from "../components/ui";
+import { restoreFromBin } from "../lib/trash";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
@@ -361,7 +362,9 @@ export default function DiaryPage() {
 }
 
 function SessionSheet({ session, onClose, onChanged }: { session: WorkSession; onClose: () => void; onChanged: () => void }) {
-  const { t } = useT();
+  const { t, tn } = useT();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [s, setS] = useState(session);
   const [error, setError] = useState<unknown>(null);
   const locked = session.invoice?.status === "issued";
@@ -377,9 +380,15 @@ function SessionSheet({ session, onClose, onChanged }: { session: WorkSession; o
     }
   };
   const remove = async () => {
+    const ok = await confirm({
+      title: t("trash.ask_session", { date: weekdayDate(session.date), unit: t(`unit.${session.unit}` as MessageKey), practice: session.practice_name }),
+      confirm: t("common.delete"),
+    });
+    if (!ok) return;
     try {
-      await api.del(`/sessions/${s.id}`);
+      const r = await api.del<{ trash_id: string }>(`/sessions/${s.id}`);
       onChanged();
+      toast({ text: t("trash.session_deleted"), undo: () => void restoreFromBin(r.trash_id, t, tn, toast).then(onChanged) });
     } catch (e) {
       setError(e);
     }
@@ -390,7 +399,7 @@ function SessionSheet({ session, onClose, onChanged }: { session: WorkSession; o
         <Link className="btn" to={`/invoices/${session.invoice!.id}`}>{t("diary.open_invoice", { number: session.invoice!.invoice_number ?? "" })}</Link>
       ) : (
         <>
-          <button className="btn danger" onClick={remove}>{t("common.remove")}</button>
+          <button className="btn danger" onClick={remove}>{t("common.delete")}</button>
           <button className="btn" onClick={save}>{t("common.save")}</button>
         </>
       )}>

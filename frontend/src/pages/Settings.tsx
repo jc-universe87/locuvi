@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useToast } from "../components/ui";
+import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useConfirm, useToast } from "../components/ui";
+import { TrashSection } from "../components/Trash";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, openPendingTab, setCsrf } from "../lib/api";
@@ -10,10 +11,10 @@ import type { AssistantConfig, Branding, HouseholdProfile, EmailConfig, MailboxC
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "password", "profiles"] as const;
+const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "trash", "password", "profiles"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", password: "settings", profiles: "settings",
+  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
 };
 
 export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?: () => void; profile?: HouseholdProfile | null }) {
@@ -39,6 +40,7 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
         {section === "agents" && <AgentsSection />}
+        {section === "trash" && <TrashSection />}
         {section === "password" && <PasswordSection profile={profile} />}
         {section === "profiles" && profile && <ProfilesSection me={profile} />}
       </>
@@ -202,6 +204,7 @@ const LOGO_ACCEPT = "image/png,image/jpeg,image/webp,image/svg+xml,.svg,.png,.jp
 
 function LookSection() {
   const { t } = useT();
+  const confirm = useConfirm();
   const [b, setB] = useState<Branding | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -229,6 +232,8 @@ function LookSection() {
     }
   };
   const remove = async () => {
+    const ok = await confirm({ title: t("trash.ask_logo"), body: t("trash.ask_logo_body"), confirm: t("look.remove_logo"), bin: false });
+    if (!ok) return;
     setError(null);
     try {
       await api.del("/settings/branding/logo");
@@ -782,6 +787,7 @@ function MailAccountEditor({ initial, onBack, onRemoved }: {
   initial: MailboxConfig; onBack: () => void; onRemoved: (acc: MailboxConfig) => void;
 }) {
   const { t, tn } = useT();
+  const confirm = useConfirm();
   const [cfg, setCfg] = useState<MailboxConfig>(initial);
   const kind = mailKind(initial);
   const [password, setPassword] = useState("");
@@ -867,10 +873,17 @@ function MailAccountEditor({ initial, onBack, onRemoved }: {
     setMsg(scanSummary(t, tn, r));
     await reload();
   });
-  const remove = () => run(async () => {
-    if (cfg.id) await api.del(base);
-    onRemoved(cfg);
-  });
+  const remove = async () => {
+    if (cfg.id) {
+      const name = cfg.label || cfg.username || cfg.host;
+      const ok = await confirm({ title: t("trash.ask_mailbox", { name }), body: t("trash.ask_mailbox_body"), confirm: t("common.remove") });
+      if (!ok) return;
+    }
+    await run(async () => {
+      if (cfg.id) await api.del(base);
+      onRemoved(cfg);
+    });
+  };
   const toggleFolder = (name: string, on: boolean) =>
     set({ folders: on ? [...cfg.folders, name] : cfg.folders.filter((f) => f !== name) });
   const shown: Folder[] = folders ?? cfg.folders.map((f) => ({ name: f, label: cfg.folder_labels[f] ?? f }));

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArchivePill, Dialog, ErrorAlert, Field, Icon, InvoicePill, useToast } from "../components/ui";
+import { ArchivePill, Dialog, ErrorAlert, Field, Icon, InvoicePill, useConfirm, useToast } from "../components/ui";
+import { restoreFromBin } from "../lib/trash";
 import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob, newIdempotencyKey } from "../lib/api";
@@ -8,7 +9,8 @@ import { dateTime, gbp, pct, period, todayLondon, ukDate } from "../lib/format";
 import type { ArchiveStatus, InvoiceDetail } from "../lib/types";
 
 export default function InvoiceDetailPage() {
-  const { t } = useT();
+  const { t, tn } = useT();
+  const confirm = useConfirm();
   const { id } = useParams();
   const nav = useNavigate();
   const toast = useToast();
@@ -76,9 +78,25 @@ export default function InvoiceDetailPage() {
       setError(e);
     }
   };
-  const removePayment = async (pid: string) => {
+  const removePayment = async (p: InvoiceDetail["payments"][number]) => {
+    const refund = Number(p.amount) < 0;
+    const amount = gbp(refund ? p.amount.replace(/^-/, "") : p.amount);
+    const ok = await confirm({
+      title: t(refund ? "trash.ask_refund" : "trash.ask_payment", { amount, date: ukDate(p.paid_on) }),
+      body: refund ? undefined : t("trash.ask_payment_body", { number: inv.invoice_number ?? "" }),
+      confirm: t("common.remove"),
+    });
+    if (!ok) return;
     try {
-      setInv(await api.del(`/payments/${pid}`).then(() => api.get<InvoiceDetail>(`/invoices/${inv.id}`)));
+      const r = await api.del<InvoiceDetail & { trash_id: string | null }>(`/payments/${p.id}`);
+      setInv(r);
+      if (r.trash_id) {
+        const tid = r.trash_id;
+        toast({
+          text: t("trash.payment_removed"),
+          undo: () => void restoreFromBin(tid, t, tn, toast).then(() => api.get<InvoiceDetail>(`/invoices/${inv.id}`)).then(setInv, () => undefined),
+        });
+      }
     } catch (e) {
       setError(e);
     }
@@ -211,7 +229,7 @@ export default function InvoiceDetailPage() {
                   <span className="list-title">{gbp(p.amount)}</span>
                   <span className="list-sub">{ukDate(p.paid_on)} · {t(`pay.method_${p.method}` as MessageKey)}{p.reference ? ` · ${p.reference}` : ""}</span>
                 </span>
-                <button className="btn ghost small" onClick={() => removePayment(p.id)}>{t("common.remove")}</button>
+                <button className="btn ghost small" onClick={() => removePayment(p)}>{t("common.remove")}</button>
               </li>
             ))}
           </ul>

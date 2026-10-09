@@ -367,7 +367,7 @@ def undo(s: Session, tx: BankTransaction) -> None:
     if tx.status == "matched":
         for pid in tx.payment_ids or []:
             if s.get(Payment, pid) is not None:
-                payments.delete_payment(s, pid, commit=False)
+                payments.delete_payment(s, pid, commit=False, keep_copy=False)
         tx.payment_ids = []
     elif tx.status != "ignored":
         raise Conflict("bank.not_decided", "There is nothing to undo.")

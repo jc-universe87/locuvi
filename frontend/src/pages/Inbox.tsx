@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookingSheet, ProposalReview, useAssistant, usePractices } from "../components/Booking";
-import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useToast } from "../components/ui";
+import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useConfirm, useToast } from "../components/ui";
 import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, ApiError, downloadBlob } from "../lib/api";
@@ -213,6 +213,7 @@ function DocSheet({
 }) {
   const { t } = useT();
   const toast = useToast();
+  const confirm = useConfirm();
   const assistant = useAssistant();
   const [d, setD] = useState<Doc | null>(doc);
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
@@ -254,6 +255,7 @@ function DocSheet({
     }
   };
   const remove = async () => {
+    if (!(await confirm({ title: d.title || d.filename ? t("trash.ask_document", { title: d.title || d.filename || "" }) : t("trash.ask_document_blank"), confirm: t("common.delete") }))) return;
     try {
       await api.del(`/documents/${d.id}`);
       onClose();

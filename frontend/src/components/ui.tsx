@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -148,6 +149,7 @@ export function Dialog({
 }) {
   const { t } = useT();
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -170,12 +172,12 @@ export function Dialog({
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      aria-labelledby="sheet-title"
+      aria-labelledby={titleId}
     >
       {open && (
         <>
           <div className="sheet-head">
-            <h2 id="sheet-title">{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             <button type="button" className="icon-btn" onClick={onClose} aria-label={t("common.close")}>
               <Icon name="close" />
             </button>
@@ -249,6 +251,55 @@ export function Segmented<T extends string>({
       ))}
     </div>
   );
+}
+
+/* ---------------------------------------------------------------- confirm */
+
+export interface ConfirmOptions {
+  /** The question, naming what will go: "Delete the session on Mon 13 Oct (AM)?" */
+  title: string;
+  body?: string;
+  /** The destructive button's label, e.g. "Delete". */
+  confirm: string;
+  /** Mention that it can be restored from Recently deleted (default true). */
+  bin?: boolean;
+}
+type Ask = (o: ConfirmOptions) => Promise<boolean>;
+const ConfirmCtx = createContext<Ask>((o) => Promise.resolve(window.confirm(o.title)));
+
+/** One shared "Are you sure?" sheet. Cancel is focused first, and Escape cancels. */
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useT();
+  const [req, setReq] = useState<(ConfirmOptions & { resolve: (ok: boolean) => void }) | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const ask = useCallback<Ask>((o) => new Promise<boolean>((resolve) => setReq({ ...o, resolve })), []);
+  const done = (ok: boolean) => {
+    req?.resolve(ok);
+    setReq(null);
+  };
+  useEffect(() => {
+    if (req) cancelRef.current?.focus();
+  }, [req]);
+  return (
+    <ConfirmCtx.Provider value={ask}>
+      {children}
+      <Dialog open={req !== null} title={req?.title ?? ""} onClose={() => done(false)}
+        footer={req && (
+          <>
+            <button ref={cancelRef} type="button" className="btn secondary" onClick={() => done(false)}>{t("common.cancel")}</button>
+            <button type="button" className="btn destructive" onClick={() => done(true)}>{req.confirm}</button>
+          </>
+        )}>
+        {req?.body && <p>{req.body}</p>}
+        {req && req.bin !== false && <p className="hint">{t("trash.confirm_note")}</p>}
+      </Dialog>
+    </ConfirmCtx.Provider>
+  );
+}
+
+/** `if (await confirm({...})) remove()` */
+export function useConfirm() {
+  return useContext(ConfirmCtx);
 }
 
 /* ---------------------------------------------------------------- toast */

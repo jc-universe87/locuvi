@@ -261,6 +261,13 @@ class DigestScheduler:
         except Exception:  # noqa: BLE001
             log.exception("document trash purge failed")
         try:
+            from locuvi.services import trash
+
+            with db.new_session() as s:
+                trash.purge(s)
+        except Exception:  # noqa: BLE001
+            log.exception("recently deleted purge failed")
+        try:
             from locuvi.assistant import providers
             from locuvi.services import mailbox
 
