@@ -314,29 +314,29 @@ def accept(s: Session, tx: BankTransaction, invoice_ids: list[str] | None = None
             left -= part
         if not plan:
             raise DomainError("bank.choose_invoice", "Choose the invoice this payment is for.")
-    created: list[str] = []
+    # One transaction: every payment and the "matched" mark commit together, or nothing does.
     try:
+        created: list[str] = []
         for iid, amt in plan:
             inv = s.get(Invoice, iid)
             if inv is None:
                 raise NotFound("invoice.not_found", "Invoice not found.")
             p = payments.record_payment(s, inv, amount=amt, paid_on=tx.booked_on,
                                         method="bank_transfer",
-                                        reference=tx.description[:100] or None)  # fmt: skip
+                                        reference=tx.description[:100] or None,
+                                        commit=False)  # fmt: skip
             created.append(p.id)
-    except Exception:
-        for pid in created:  # all or nothing
-            if s.get(Payment, pid) is not None:
-                payments.delete_payment(s, pid)
+        tx.status = "matched"
+        tx.payment_ids = created
+        tx.decided_at = utcnow()
+        core.audit(s, "bank.matched", transaction_id=tx.id, payments=len(created),
+                   kind=(tx.suggestion_json or {}).get("kind", "manual") if invoice_ids is None
+                   else "manual")  # fmt: skip
+        rematch(s)
+        s.commit()
+    except BaseException:
+        s.rollback()
         raise
-    tx.status = "matched"
-    tx.payment_ids = created
-    tx.decided_at = utcnow()
-    core.audit(s, "bank.matched", transaction_id=tx.id, payments=len(created),
-               kind=(tx.suggestion_json or {}).get("kind", "manual") if invoice_ids is None
-               else "manual")  # fmt: skip
-    rematch(s)
-    s.commit()
 
 
 def accept_all(s: Session) -> int:
@@ -367,7 +367,7 @@ def undo(s: Session, tx: BankTransaction) -> None:
     if tx.status == "matched":
         for pid in tx.payment_ids or []:
             if s.get(Payment, pid) is not None:
-                payments.delete_payment(s, pid)
+                payments.delete_payment(s, pid, commit=False)
         tx.payment_ids = []
     elif tx.status != "ignored":
         raise Conflict("bank.not_decided", "There is nothing to undo.")

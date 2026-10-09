@@ -168,3 +168,67 @@ def test_api_bank_flow(settings):
         )
         assert c.post("/api/v1/bank/transactions/accept-all", headers=h).json()["recorded"] == 0
         assert c.get("/api/v1/bank/transactions?status=bogus").status_code == 400
+
+
+def test_combined_match_is_all_or_nothing(settings, session, ready, monkeypatch):
+    """A failure (or crash) part-way through a multi-invoice match leaves nothing recorded."""
+    from locuvi import db
+    from locuvi.models import Payment
+
+    other = make_practice(session, name="Riverside Surgery")
+    c = issue(settings, session, other, "2026-08", [5])
+    d = issue(settings, session, other, "2026-09", [6])
+    day = core.today_london().strftime("%d/%m/%Y")
+    bank.import_statement(
+        session, "x.csv", f"Date,Description,Amount\n{day},RIVERSIDE SURGERY,1355.30\n".encode()
+    )
+    tx = session.query(BankTransaction).one()
+    assert tx.suggestion_json["kind"] == "combined"
+
+    real = payments.record_payment
+    calls = []
+
+    def flaky(*a, **kw):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("simulated crash after the first payment")
+        return real(*a, **kw)
+
+    monkeypatch.setattr(payments, "record_payment", flaky)
+    with pytest.raises(RuntimeError):
+        bank.accept(session, tx)
+    other_conn = db.new_session()  # what another process would see
+    assert other_conn.query(Payment).count() == 0
+    assert other_conn.get(BankTransaction, tx.id).status == "suggested"
+    other_conn.close()
+
+    monkeypatch.setattr(payments, "record_payment", real)
+    session.expire_all()
+    bank.accept(session, session.get(BankTransaction, tx.id))
+    check = db.new_session()
+    assert check.query(Payment).count() == 2
+    assert check.get(BankTransaction, tx.id).status == "matched"
+    check.close()
+    for inv in (c, d):
+        session.expire_all()
+        assert payments.payment_state(svc.get_invoice(session, inv.id))["state"] == "paid"
+
+
+def test_stale_suggestion_fails_cleanly(settings, session, ready):
+    """If an invoice was paid by hand after the suggestion, confirming records nothing."""
+    from locuvi.models import Payment
+
+    inv = issue(settings, session, ready, "2026-08", [3])
+    day = core.today_london().strftime("%d/%m/%Y")
+    bank.import_statement(
+        session,
+        "x.csv",
+        f"Date,Description,Amount\n{day},BACS {inv.invoice_number},677.65\n".encode(),
+    )
+    tx = session.query(BankTransaction).one()
+    payments.record_payment(session, svc.get_invoice(session, inv.id))  # paid by hand meanwhile
+    from locuvi.errors import Conflict
+
+    with pytest.raises(Conflict):  # "Nothing is owed on this invoice."
+        bank.accept(session, tx)
+    assert session.query(Payment).count() == 1 and tx.status == "suggested"

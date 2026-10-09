@@ -67,7 +67,10 @@ def record_payment(
     paid_on: date | None = None,
     method: str = "bank_transfer",
     reference: str | None = None,
+    commit: bool = True,
 ) -> Payment:
+    """Record money received. ``commit=False`` lets a caller add several payments (and its own
+    changes) and commit them as one transaction."""
     if inv.status != InvoiceStatus.issued:
         raise Conflict("payment.not_issued", "Only issued invoices can be paid.")
     outstanding = round_money((inv.grand_total or ZERO) - credited_total(inv) - paid_total(inv))
@@ -97,11 +100,14 @@ def record_payment(
             metadata_json={"amount": str(amount), "paid_on": paid_on.isoformat()},
         )
     )
-    s.commit()
+    if commit:
+        s.commit()
+    else:
+        s.flush()
     return p
 
 
-def delete_payment(s: Session, payment_id: str) -> Invoice:
+def delete_payment(s: Session, payment_id: str, *, commit: bool = True) -> Invoice:
     p = s.get(Payment, payment_id)
     if p is None:
         raise NotFound("payment.not_found", "Payment not found.")
@@ -113,5 +119,8 @@ def delete_payment(s: Session, payment_id: str) -> Invoice:
     )
     inv.payments.remove(p)
     s.delete(p)
-    s.commit()
+    if commit:
+        s.commit()
+    else:
+        s.flush()
     return inv
