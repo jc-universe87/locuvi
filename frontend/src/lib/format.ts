@@ -10,14 +10,24 @@ export function gbp(value: string | null | undefined): string {
   return `${neg ? "-" : ""}£${grouped || "0"}.${pennies}`;
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Date formatting follows the active interface language; invoice amounts remain GBP. */
+function displayLocale(): string {
+  const lang = typeof document !== "undefined" ? document.documentElement.lang : "en-GB";
+  return lang === "en" || !lang ? "en-GB" : lang;
+}
+function isoDate(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day ? date : null;
+}
 
-/** ISO yyyy-mm-dd → "8 Oct 2026" (UK order, no timezone shifting). */
+/** ISO date-only display: no timezone shift, selected interface language. */
 export function ukDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return `${d} ${MONTHS[m - 1]} ${y}`;
+  const d = isoDate(iso);
+  return d ? new Intl.DateTimeFormat(displayLocale(), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(d) : iso;
 }
 
 export function period(start?: string | null, end?: string | null): string {
@@ -29,7 +39,7 @@ export function period(start?: string | null, end?: string | null): string {
 export function dateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString("en-GB", { timeZone: "Europe/London", dateStyle: "medium", timeStyle: "short" });
+  return d.toLocaleString(displayLocale(), { timeZone: "Europe/London", dateStyle: "medium", timeStyle: "short" });
 }
 
 export function pct(fraction: string | null | undefined): string {
@@ -60,17 +70,14 @@ export function addDays(iso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-/** "2026-10" → "October 2026" */
+/** Month names in the selected interface language. */
 export function monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  return `${LONG_MONTHS[m - 1]} ${y}`;
+  const d = isoDate(ym + "-01");
+  return d ? new Intl.DateTimeFormat(displayLocale(), { month: "long", year: "numeric", timeZone: "UTC" }).format(d) : ym;
 }
-
-/** "2026-10" → "Oct" */
 export function monthShort(ym: string): string {
-  return MONTHS[Number(ym.split("-")[1]) - 1];
+  const d = isoDate(ym + "-01");
+  return d ? new Intl.DateTimeFormat(displayLocale(), { month: "short", timeZone: "UTC" }).format(d) : ym;
 }
 
 /** Whole pounds for headline numbers: "1411.78" → "£1,412" */
@@ -81,7 +88,12 @@ export function gbpRound(value: string | null | undefined): string {
 }
 
 export function weekdayDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const wd = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
-  return `${wd} ${d} ${MONTHS[m - 1]}`;
+  const d = isoDate(iso);
+  if (!d) return iso;
+  const locale = displayLocale();
+  if (locale === "en-GB") {
+    const wd = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(d);
+    return `${wd} ${d.getUTCDate()} ${monthShort(iso.slice(0, 7))}`;
+  }
+  return new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(d);
 }

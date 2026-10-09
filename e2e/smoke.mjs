@@ -84,14 +84,14 @@ await page.getByLabel("Postcode").fill("ex1 1aa");
 await page.getByLabel("Email").fill("alex@example.invalid");
 await page.getByRole("button", { name: "Continue" }).click();
 await page.getByRole("heading", { name: "Where practices should pay you" }).waitFor();
-if ((await page.getByLabel("Account name").inputValue()) !== "Dr Alex Example") await fail("account name not prefilled");
+if ((await page.getByLabel("Name on bank account").inputValue()) !== "Dr Alex Example") await fail("account name not prefilled");
 await page.getByLabel("Sort code").fill("00-00-00");
 await page.getByLabel("Account number").fill("00000000");
 await page.getByRole("button", { name: "Continue" }).click();
 await page.getByRole("heading", { name: "Add your first practice" }).waitFor();
 await page.getByLabel("Practice name").fill("Example Medical Practice");
 await page.getByLabel("Billing address").fill("2 Test Road\nSampleford\nSF1 2BB");
-await page.getByLabel("Session rate (£)").fill("600.00");
+await page.getByLabel("Agreed fee per session (£)").fill("600.00");
 await shot("02-welcome-practice");
 await page.getByRole("button", { name: "Get started" }).click();
 
@@ -211,7 +211,7 @@ await page.getByRole("link", { name: "Diary" }).first().click();
 await page.getByRole("button", { name: "Add bookings from a message" }).click();
 const next = new Date(Date.now() + 40 * 86400000);
 const nm = next.toLocaleDateString("en-GB", { month: "long", timeZone: "Europe/London" });
-await page.getByLabel("Booking email or message").fill(
+await page.getByLabel("Email or message confirming your work").fill(
   `Hi Dr Example,\nConfirming locum cover at Example Medical Practice:\n20 ${nm} AM\n21 ${nm} 14:00-18:00\nFee £600 per session.`,
 );
 await page.getByRole("button", { name: "Find work dates" }).click();
@@ -221,7 +221,7 @@ await page.getByRole("dialog").getByRole("button", { name: "Add 2 sessions" }).c
 await page.getByRole("status").getByText("Added 2 sessions").waitFor();
 
 step("diary: repeating booking (every Wednesday) with undo");
-await page.getByRole("button", { name: "Repeat…" }).click();
+await page.getByRole("button", { name: "Add repeating sessions…" }).click();
 await page.getByRole("dialog").getByRole("group", { name: "Days" }).getByRole("button", { name: "Wed" }).click();
 const addRepeat = page.getByRole("dialog").getByRole("button", { name: /^Add \d+ sessions?$/ });
 await addRepeat.waitFor();
@@ -301,7 +301,7 @@ await page.locator("input[type=file]").setInputFiles({
 });
 await page.getByRole("img", { name: "Your logo" }).waitFor();
 await page.getByRole("radio", { name: "Teal" }).click();
-await page.getByLabel(/Line at the bottom of every invoice/).fill("Thank you — GMC 0000000");
+await page.getByLabel(/Message at the bottom of each invoice/).fill("Thank you — GMC 0000000");
 await page.getByText("✓ Saved").waitFor();
 if ((await page.getByRole("radio", { name: "Teal" }).getAttribute("aria-checked")) !== "true") await fail("accent not selected");
 const sampleShown = new Promise((resolve) => {
@@ -325,7 +325,7 @@ await page.getByRole("button", { name: "More" }).click();
 await page.getByRole("button", { name: "Correct with a credit note" }).click();
 const creditSheet = page.getByRole("dialog");
 await creditSheet.getByRole("checkbox").first().check();
-await creditSheet.getByLabel("Reason").fill("Session cancelled by the practice");
+await creditSheet.getByLabel("Why does the invoice need correcting?").fill("Session cancelled by the practice");
 const [cnPdf] = await Promise.all([
   page.waitForEvent("download"),
   creditSheet.getByRole("button", { name: /Issue credit note for £677\.65/ }).click(),

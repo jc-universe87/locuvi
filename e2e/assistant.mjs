@@ -19,7 +19,7 @@ if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() =>
 step("turn on the assistant");
 await page.goto(`${BASE}/settings/assistant`);
 await page.getByRole("switch").click();
-await page.getByLabel("Anthropic API key").fill("sk-ant-e2e-fake-key-0000000000000000000000");
+await page.getByLabel("Anthropic AI access key").fill("sk-ant-e2e-fake-key-0000000000000000000000");
 await page.getByRole("button", { name: "Save" }).click();
 await page.getByText("AI assistant is enabled").waitFor();
 if (await page.getByText("sk-ant-e2e").count()) throw new Error("key echoed");
@@ -27,7 +27,7 @@ if (await page.getByText("sk-ant-e2e").count()) throw new Error("key echoed");
 step("paste a booking -> AI suggestion, clearly labelled");
 await page.goto(`${BASE}/diary`);
 await page.getByRole("button", { name: "Add bookings from a message" }).click();
-await page.getByLabel("Booking email or message").fill("Could you do 1st Dec morning and 2nd Dec afternoon?");
+await page.getByLabel("Email or message confirming your work").fill("Could you do 1st Dec morning and 2nd Dec afternoon?");
 await page.getByRole("button", { name: "Find work dates" }).click();
 await page.getByText("Suggested by AI — please check the details").waitFor();
 await page.getByRole("dialog").getByRole("button", { name: "Add 2 sessions" }).click();
