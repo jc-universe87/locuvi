@@ -318,9 +318,20 @@ def delete_logo(s: DB) -> dict[str, Any]:
     return branding.public(branding.remove_logo(s))
 
 
-@api.get("/settings/branding/logo.png")
-def logo_png(s: DB) -> Response:
+@api.get("/settings/branding/logo")
+def logo_file(s: DB) -> Response:
     p = core.get_profile(s)
+    if p.logo_svg:
+        # Cleaned on upload; still served so it can never run anything if opened directly.
+        return Response(
+            p.logo_svg,
+            media_type="image/svg+xml",
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
     if not p.logo_png:
         raise NotFound("branding.no_logo", "No logo saved.")
     return Response(p.logo_png, media_type="image/png", headers={"Cache-Control": "no-store"})

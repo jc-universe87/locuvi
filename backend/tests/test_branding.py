@@ -144,12 +144,12 @@ def test_api_branding(settings, session, ready):
         h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
         b = c.get("/api/v1/settings/branding").json()
         assert b["has_logo"] is False and b["accent"] == "steel" and "navy" in b["accents"]
-        assert c.get("/api/v1/settings/branding/logo.png").status_code == 404
+        assert c.get("/api/v1/settings/branding/logo").status_code == 404
 
         r = c.post("/api/v1/settings/branding/logo", headers=h,
                   files={"file": ("logo.png", png(), "image/png")})  # fmt: skip
         assert r.status_code == 200 and r.json()["has_logo"] is True
-        logo = c.get("/api/v1/settings/branding/logo.png")
+        logo = c.get("/api/v1/settings/branding/logo")
         assert logo.headers["content-type"] == "image/png"
         bad = c.post("/api/v1/settings/branding/logo", headers=h,
                     files={"file": ("x.png", b"nope", "image/png")})  # fmt: skip
@@ -168,3 +168,77 @@ def test_api_branding(settings, session, ready):
         assert "Dr Alex Example" in text and "Thank you" in text and pdf_images(pdf.content) == 1
 
         assert c.delete("/api/v1/settings/branding/logo", headers=h).json()["has_logo"] is False
+
+
+# ------------------------------------------------------------------- SVG logos
+
+SVG = b"""<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="300" height="100"
+     viewBox="0 0 300 100" onload="alert(1)" inkscape:version="1.3">
+  <metadata>editor data</metadata>
+  <script>alert(1)</script>
+  <style>@import url(https://example.invalid/x.css); .t { fill: #1D5C58 }</style>
+  <defs><linearGradient id="g"><stop offset="0" stop-color="#294D63"/></linearGradient></defs>
+  <rect width="100" height="100" fill="url(#g)" onclick="steal()"/>
+  <circle cx="50" cy="50" r="20" style="fill: url(https://example.invalid/track)"/>
+  <image href="https://example.invalid/pixel.png" width="10" height="10"/>
+  <a href="javascript:alert(1)"><text x="0" y="0">bad</text></a>
+  <foreignObject><div xmlns="http://www.w3.org/1999/xhtml">html</div></foreignObject>
+  <use xlink:href="https://example.invalid/sprite.svg#a"/>
+  <text x="120" y="60" class="t" font-size="30">EXAMPLELOGO</text>
+</svg>"""
+
+
+def test_svg_logo_is_cleaned():
+    out = branding.clean_svg(SVG)
+    for bad in ("script", "onload", "onclick", "foreignObject", "<image", "javascript:",
+                "example.invalid", "metadata", "inkscape", "@import"):  # fmt: skip
+        assert bad not in out, bad
+    assert 'fill="url(#g)"' in out and "EXAMPLELOGO" in out and "<rect" in out
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b'<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]>'
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>&x;</text></svg>',
+        b'<svg xmlns="http://www.w3.org/2000/svg"><rect',
+        b'<html xmlns="http://www.w3.org/1999/xhtml"><svg/></html>',
+        b"<svg>" + b"x" * (branding.MAX_SVG_BYTES + 1) + b"</svg>",
+    ],
+)
+def test_bad_svgs_refused(data):
+    with pytest.raises(DomainError):
+        branding.clean_svg(data)
+
+
+def test_svg_logo_on_invoice_is_vector(settings, session, ready):
+    branding.set_logo(session, SVG)
+    p = core.get_profile(session)
+    assert p.logo_svg and p.logo_png is None
+    inv = issue(settings, session, ready, date(2026, 8, 3))
+    look = inv.immutable_snapshot_json["presentation"]
+    assert "logo_svg" in look and "logo_png_b64" not in look
+    stored = (settings.data_dir / inv.local_pdf_path).read_bytes()
+    assert "EXAMPLELOGO" in pdf_text(stored) and pdf_images(stored) == 0  # drawn, not a bitmap
+    # switching back to a bitmap replaces the vector logo
+    branding.set_logo(session, png())
+    p = core.get_profile(session)
+    assert p.logo_png and p.logo_svg is None
+
+
+def test_api_svg_logo_served_safely(settings, session, ready):
+    from fastapi.testclient import TestClient
+
+    from locuvi.main import create_app
+
+    with TestClient(create_app(settings)) as c:
+        h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
+        r = c.post("/api/v1/settings/branding/logo", headers=h,
+                   files={"file": ("logo.svg", SVG, "image/svg+xml")})  # fmt: skip
+        assert r.status_code == 200 and r.json()["logo_format"] == "svg"
+        got = c.get("/api/v1/settings/branding/logo")
+        assert got.headers["content-type"].startswith("image/svg+xml")
+        assert "sandbox" in got.headers["content-security-policy"]
+        assert "script" not in got.text

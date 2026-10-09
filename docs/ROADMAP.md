@@ -103,7 +103,7 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
   calendar): private secret link (encrypted at rest, regenerate/turn off), no fees unless
   chosen, cancelled sessions marked cancelled, RFC 5545 folding/escaping.
 - ✅ Personalisation (owner request, Settings › Personalisation): own logo on invoices and
-  credit notes (PNG/JPEG/WebP, cleaned: metadata dropped, empty edges trimmed, resized; kept in
+  credit notes (SVG kept as a sanitised vector, or PNG/JPEG/WebP cleaned: metadata dropped, empty edges trimmed, resized; kept in
   the database so backups cover it), accent colour from print-safe presets, one-line footer on
   every invoice page, email sign-off for drafted emails, sample-invoice preview. Frozen into each
   issued snapshot (`presentation`), so issued documents never change (migration 0018).

@@ -198,6 +198,25 @@ def _logo(b64: Any) -> Image | None:
     return img
 
 
+def _svg_logo(svg: Any) -> Any:
+    """The frozen vector logo (already cleaned on upload), scaled into the same box."""
+    if not isinstance(svg, str) or not svg:
+        return None
+    from svglib.svglib import svg2rlg
+
+    try:
+        d = svg2rlg(io.BytesIO(svg.encode()))
+    except Exception:  # noqa: BLE001 - a logo must never stop an invoice rendering
+        return None
+    if d is None or not d.width or not d.height:
+        return None
+    scale = min(LOGO_MAX_W / d.width, LOGO_MAX_H / d.height)
+    d.scale(scale, scale)
+    d.width, d.height = d.width * scale, d.height * scale
+    d.hAlign = "LEFT"
+    return d
+
+
 def _styles(accent: colors.Color = STEEL) -> dict[str, ParagraphStyle]:
     base = ParagraphStyle("base", fontName="Inter", fontSize=9, leading=12.5, textColor=INK)
     return {
@@ -302,7 +321,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     if contact:
         seller_lines.append(_esc(" · ".join(contact)))
     seller_par: Any = Paragraph("<br/>".join(seller_lines), st["base"])
-    logo = _logo(look.get("logo_png_b64"))
+    logo = _svg_logo(look.get("logo_svg")) or _logo(look.get("logo_png_b64"))
     if logo is not None:
         seller_par = [logo, Spacer(1, 3 * mm), seller_par]
 
