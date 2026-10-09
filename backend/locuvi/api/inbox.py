@@ -126,9 +126,17 @@ def restore_document(doc_id: str, s: DB) -> dict[str, Any]:
 
 
 @api.post("/documents/{doc_id}/read", status_code=201)
-def read_document(doc_id: str, request: Request, s: DB) -> dict[str, Any]:
+def read_document(
+    doc_id: str, request: Request, s: DB, body: S.ReadDocumentIn | None = None
+) -> dict[str, Any]:
     doc = documents.get(s, doc_id)
-    prop = proposals.read_booking(s, state(request).settings, doc, _provider(request, s))
+    prop = proposals.read_booking(
+        s,
+        state(request).settings,
+        doc,
+        _provider(request, s),
+        send_attachment=bool(body and body.send_attachment),
+    )
     return proposals.as_dict(prop)
 
 

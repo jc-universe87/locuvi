@@ -148,8 +148,9 @@ most providers work; Microsoft 365/NHSmail (OAuth only) does not yet.
 itself. Settings → Assistant turns on an AI reader (Anthropic Claude) for free-form emails and
 scanned PDFs/photos: paste an API key (stored encrypted) or mount one as a Docker secret and
 set `ANTHROPIC_API_KEY_FILE`. Only the booking text, your practice names and today's date are
-sent — long numbers and dates of birth are removed first; never passwords, bank details or
-invoices. Refused requests are retried on a fallback model by the provider; the model used is
+sent — lines about patients are dropped and email addresses, phone numbers, postcodes, NHS and
+account numbers removed first; never passwords, bank details or invoices. A scan or photo can't
+be redacted, so it is only sent after you approve that file. Refused requests are retried on a fallback model by the provider; the model used is
 recorded with every suggestion. It only suggests — calculations never use AI. With the assistant on, the ✨ icon opens **Ask
 Locuvi**: ask "Check all my outstanding admin", "Which practices still owe me money?" or
 "Prepare invoices for last month" — it looks things up with Locuvi's own functions and can

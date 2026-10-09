@@ -62,7 +62,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Cash-basis (default, HMRC) and invoiced-income reports, switchable and remembered; payments-received CSV in the year pack; 12 tax months (6th–5th) instead of 13 calendar months | ✅ |
 | Atomic multi-invoice bank matching (all payments + "matched" in one transaction; failure-injection tests) | ✅ |
 | Refund owed after a credit note on a paid invoice: "refund_due" state, finding, "Record refund" (negative payment with undo), netted in cash reports and Form B | ✅ |
-| AI attachments only with explicit approval; stronger redaction | 🔜 |
+| AI attachments only with explicit per-document approval (audited; automatic email scans never send files); stronger redaction (patient lines dropped; emails, phones, postcodes, bank details, NHS and long numbers masked) | ✅ |
 | Credit notes archived to Nextcloud | 🔜 |
 | Encrypted off-server backups + automatic restore drill | 🔜 |
 | CI on GitHub Actions; `main` as the stable branch | 🔜 |

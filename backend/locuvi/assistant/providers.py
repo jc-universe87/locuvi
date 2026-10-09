@@ -89,15 +89,34 @@ not resolve into "questions" as short plain-English questions to the doctor. "su
 sentence describing the booking. If the text is not a booking, return no items and say so in
 the summary."""
 
+# Whole lines that are about a patient (or carry identifiers) are dropped, not just masked.
+_PATIENT_LINE = re.compile(
+    r"\b(patients?|pt\.?|nhs\s*(no|number)|hospital\s*(no|number)|mrn|chi\s*(no|number)|"
+    r"dob|d\.o\.b\.?|date of birth|born|next of kin|diagnos\w*|referral for)\b",
+    re.I,
+)
 _REDACT = [
+    (re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+"), "[email removed]"),
+    (re.compile(r"\b\d{2}-\d{2}-\d{2}\s+\d{8}\b"), "[bank details removed]"),
     (re.compile(r"\b\d{3}[ -]?\d{3}[ -]?\d{4}\b"), "[number removed]"),  # NHS-number shaped
-    (re.compile(r"\b\d{8,}\b"), "[number removed]"),
-    (re.compile(r"\b(dob|d\.o\.b\.|date of birth)\s*:?\s*\S+", re.I), "[removed]"),
+    (
+        re.compile(r"(?<![\d/])(?:\+44\s?(?:\(0\)\s?)?|\b0)\d(?:[\s-]?\d){8,9}\b"),
+        "[phone removed]",
+    ),  # fmt: skip
+    (re.compile(r"\b\d{8,}\b"), "[number removed]"),  # account and other long numbers
+    (re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b"), "[postcode removed]"),
 ]
 
 
 def minimise(text: str) -> str:
-    """Remove long numbers (NHS numbers, account numbers) and DOBs before text leaves Locuvi."""
+    """Best-effort removal of personal data before text leaves Locuvi.
+
+    Drops lines about patients; masks email addresses, phone numbers, NHS-number-shaped and
+    other long numbers, sort codes next to account details, and postcodes. Dates, times, fees,
+    practice names and session words are kept — they are what the booking reader needs.
+    """
+    kept = [ln for ln in text.splitlines() if not _PATIENT_LINE.search(ln)]
+    text = "\n".join(kept)
     for pattern, repl in _REDACT:
         text = pattern.sub(repl, text)
     return text[:MAX_PROMPT_CHARS]

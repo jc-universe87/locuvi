@@ -198,8 +198,12 @@ def read_booking(
     provider: Provider | None,
     *,
     today: date | None = None,
+    send_attachment: bool = False,
 ) -> Proposal:
-    """Turn a document into a proposal with the AI provider if enabled, else the rules."""
+    """Turn a document into a proposal with the AI provider if enabled, else the rules.
+
+    Text is minimised before it leaves; a file (scan/photo) is only sent with
+    ``send_attachment=True``, i.e. after the owner approved it for this document."""
     today = today or core.today_london()
     if provider is None:
         if not document.text_content.strip():
@@ -217,6 +221,16 @@ def read_booking(
             raise DomainError("assistant.no_text", "There is no readable text in this document.")
         if path.stat().st_size > 10 * 1024 * 1024:
             raise DomainError("document.too_large", "Files up to 10 MB can be read.")
+        if not send_attachment:
+            # A scan or photo can't be redacted: the owner must approve sending this file.
+            raise DomainError(
+                "assistant.attachment_consent",
+                "This document is a scan or photo. Reading it means sending the file itself to "
+                "the AI provider, unredacted. Approve this to continue.",
+                document_id=document.id,
+            )
+        core.audit(s, "assistant.attachment_sent", document_id=document.id,
+                   content_type=document.content_type, size=path.stat().st_size)  # fmt: skip
         attachment = (path.read_bytes(), str(document.content_type))
     _, by_name = _practice_lookup(s)
     practices = [{"id": p.id, "name": p.name} for p in by_name.values()]

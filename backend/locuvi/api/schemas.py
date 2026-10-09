@@ -431,3 +431,7 @@ class RefundIn(Strict):
     amount: DecStr | None = None
     paid_on: _dt.date | None = None
     reference: Annotated[str, StringConstraints(max_length=100)] | None = None
+
+
+class ReadDocumentIn(Strict):
+    send_attachment: bool = False

@@ -245,7 +245,11 @@ def fake_client(msgs):
 def test_anthropic_provider_request_shape_and_minimisation():
     msgs = FakeMessages({"summary": "s", "items": [], "questions": []})
     p = providers.AnthropicProvider("sk-test", "claude-opus-5-5", client=fake_client(msgs))
-    text = "Cover 12 Oct AM. Patient NHS no 943 476 5919, DOB: 01/02/1960. Acct 12345678."
+    text = (
+        "Cover 12 Oct AM at Example Medical Practice.\n"
+        "Patient NHS no 943 476 5919, DOB: 01/02/1960.\n"
+        "Acct 12345678, call 07700 900123, rota@example.invalid"
+    )
     out = p.read_booking(
         text=text,
         attachment=None,
@@ -261,6 +265,7 @@ def test_anthropic_provider_request_shape_and_minimisation():
     assert "thinking" not in kw and "tool_choice" not in kw
     sent = json.dumps(kw["messages"])
     assert "943 476 5919" not in sent and "01/02/1960" not in sent and "12345678" not in sent
+    assert "Patient" not in sent and "07700" not in sent and "rota@example.invalid" not in sent
     assert "12 Oct AM" in sent and "Example Medical Practice" in sent
     assert "sk-test" not in sent
 
@@ -470,3 +475,27 @@ def test_correspondence_links_documents_to_invoices(settings, session, ready):
     log = documents.correspondence(session, inv.id)
     assert sorted(x["type"] for x in log) == ["document", "document", "sent"]
     assert {x.get("id") for x in log if x["type"] == "document"} == {remit.id, other.id}
+
+
+def test_scans_need_explicit_approval_before_sending(settings, session, ready):
+    """A file can't be redacted, so it is only sent to the AI after the owner approves."""
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    doc = documents.add_upload(session, settings, "rota.png", "image/png", png)
+    assert doc.text_content == ""
+
+    class Spy:
+        engine = "ai:fake"
+        calls: list = []
+
+        def read_booking(self, *, text, attachment, practices, today):
+            self.calls.append(attachment)
+            return {"summary": "", "items": [], "questions": []}
+
+    spy = Spy()
+    with pytest.raises(DomainError) as e:
+        proposals.read_booking(session, settings, doc, spy, today=TODAY)
+    assert e.value.code == "assistant.attachment_consent" and spy.calls == []
+    proposals.read_booking(session, settings, doc, spy, today=TODAY, send_attachment=True)
+    assert spy.calls[0][1] == "image/png"
+    events = [e.event_type for e in session.query(AuditEvent).all()]
+    assert "assistant.attachment_sent" in events

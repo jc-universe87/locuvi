@@ -697,7 +697,7 @@ const en = {
   "assistant.on": "Assistant is on",
   "assistant.privacy_title": "What the assistant sees",
   "assistant.privacy_1": "Only the booking text you choose to read, your practice names and today's date.",
-  "assistant.privacy_2": "Long numbers (NHS, account and phone numbers) and dates of birth are removed first.",
+  "assistant.privacy_2": "Lines about patients are dropped and email addresses, phone numbers, postcodes, NHS and account numbers removed first. Scans and photos are only sent if you approve each one.",
   "assistant.privacy_3": "Never your passwords, bank details, invoices or payments. It never calculates money.",
   "assistant.privacy_4": "It only suggests. Nothing is saved or sent until you tap to accept.",
   "assistant.model": "Model: {model}",
@@ -980,6 +980,9 @@ const en = {
   "event.refund_recorded": "Refund recorded",
   "error.refund.none_due": "No refund is owed on this invoice.",
   "error.refund.too_high": "That is more than the refund owed ({due}).",
+  "inbox.consent_title": "Send this file to the assistant?",
+  "inbox.consent_text": "This is a scan or photo, so Locuvi can't remove personal details from it first. To read it, the file itself goes to the AI provider (Anthropic). Only send it if it contains no patient information.",
+  "inbox.consent_send": "Send this file",
 } as const;
 
 export type MessageKey = keyof typeof en;

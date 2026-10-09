@@ -4,7 +4,7 @@ import { BookingSheet, ProposalReview, useAssistant, usePractices } from "../com
 import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useToast } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
-import { api, downloadBlob } from "../lib/api";
+import { api, ApiError, downloadBlob } from "../lib/api";
 import { ukDate } from "../lib/format";
 import type { Doc, DocKind, InvoiceSummary, MailboxConfig, Proposal, ScanResult } from "../lib/types";
 
@@ -216,9 +216,11 @@ function DocSheet({
   }, [doc]);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [consent, setConsent] = useState(false);
   useEffect(() => {
     setD(doc);
     setError(null);
+    setConsent(false);
   }, [doc]);
   if (!d) return <Dialog open={false} onClose={onClose} title="">{null}</Dialog>;
 
@@ -231,14 +233,17 @@ function DocSheet({
       setError(e);
     }
   };
-  const read = async () => {
+  const read = async (sendAttachment = false) => {
     setBusy(true);
     setError(null);
     try {
-      onProposal(await api.post<Proposal>(`/documents/${d.id}/read`));
+      onProposal(await api.post<Proposal>(`/documents/${d.id}/read`, { send_attachment: sendAttachment }));
+      setConsent(false);
       onChanged();
     } catch (e) {
-      setError(e);
+      // A scan/photo can't be redacted: ask before the file itself leaves Locuvi.
+      if (e instanceof ApiError && e.body.code === "assistant.attachment_consent") setConsent(true);
+      else setError(e);
     } finally {
       setBusy(false);
     }
@@ -271,7 +276,7 @@ function DocSheet({
       footer={
         <div className="actions" style={{ width: "100%" }}>
           {d.kind === "booking" && canRead && (
-            <button className="btn" disabled={busy} onClick={read}>
+            <button className="btn" disabled={busy} onClick={() => void read()}>
               <Icon name={assistant?.ready ? "sparkle" : "diary"} size={16} /> {busy ? t("booking.reading") : t("inbox.read_booking")}
             </button>
           )}
@@ -281,6 +286,16 @@ function DocSheet({
         </div>
       }>
       <ErrorAlert error={error} />
+      {consent && (
+        <div className="alert warn" role="alertdialog" aria-label={t("inbox.consent_title")}>
+          <strong>{t("inbox.consent_title")}</strong>
+          <p style={{ margin: "0.4rem 0 0.6rem" }}>{t("inbox.consent_text")}</p>
+          <div className="actions">
+            <button className="btn small" disabled={busy} onClick={() => void read(true)}>{t("inbox.consent_send")}</button>
+            <button className="btn ghost small" onClick={() => setConsent(false)}>{t("common.cancel")}</button>
+          </div>
+        </div>
+      )}
       <div className="form-list">
         <div className="form-row">
           <label htmlFor="doc-kind">{t("inbox.kind")}</label>
