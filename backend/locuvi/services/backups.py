@@ -49,6 +49,32 @@ def backup_now(settings: Settings) -> dict:
     }
 
 
+def before_upgrade(settings: Settings, engine: Any) -> Path | None:
+    """Back up the database and PDFs before an update migrates them (needs BACKUP_DIR).
+
+    Never blocks start-up: if the copy cannot be made the reason is logged and the health
+    check / integrity findings show the underlying problem.
+    """
+    from locuvi import cli, migrate
+
+    if settings.backup_dir is None:
+        return None
+    current, head = migrate.pending(engine)
+    if current is None or current == head:
+        return None  # new install, or nothing to migrate
+    folder = Path(settings.backup_dir)
+    stamp = datetime.now(UTC).astimezone(core.LONDON).strftime("%Y-%m-%d-%H%M%S")
+    dest = folder / f"locuvi-{stamp}-before-{head}.tar.gz"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        cli.backup(settings, dest)
+    except (SystemExit, Exception) as exc:  # noqa: BLE001
+        log.error("backup before upgrade %s -> %s failed: %s", current, head, exc)
+        return None
+    log.info("backup before upgrade %s -> %s written: %s", current, head, dest.name)
+    return dest
+
+
 # ------------------------------------------------------------------ off-server copy
 
 OFFSITE_MARKER = ".offsite_backup.json"

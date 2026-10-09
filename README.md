@@ -38,7 +38,7 @@ Requirements: a Linux host with Docker Engine + Compose v2. By default Locuvi li
 `127.0.0.1` only; reach it through Tailscale, or publish it on your LAN (see below).
 
 ```bash
-git clone <this repository> locuvi && cd locuvi
+git clone https://github.com/jc-universe87/GP-Locum-Manager.git locuvi && cd locuvi
 cp .env.example .env                       # adjust if needed
 
 # Owner sign-in password (a long passphrase). Stored as a Docker secret, not in git.
@@ -48,7 +48,12 @@ install -d -m 0700 secrets
 # Directory for backup archives, writable by the container user (uid 10001)
 sudo install -d -m 0700 -o 10001 -g 10001 backups
 
-docker compose up -d --build
+# The app image is private: log in once with a GitHub token that has only `read:packages`
+# (github.com → Settings → Developer settings → Personal access tokens (classic)).
+echo '<token>' | docker login ghcr.io -u <your-github-username> --password-stdin
+
+docker compose pull
+docker compose up -d
 docker compose ps                          # wait for "healthy"
 ```
 
@@ -81,6 +86,34 @@ your router are what keep it off the internet.
 
 **Behind a TLS-intercepting proxy?** Pass its CA to the build only:
 `docker build --secret id=build_ca,src=/path/ca.pem -t locuvi:1.0.0 .` then `docker compose up -d --no-build`.
+
+### Updates
+
+Every change merged into `main` is tested by GitHub Actions and published as a new image
+(`ghcr.io/jc-universe87/gp-locum-manager:latest`, plus a `sha-…` tag per release). To update:
+
+```bash
+./update.sh            # git pull (compose/docs), docker compose pull, restart, wait for healthy
+# or by hand:
+docker compose pull && docker compose up -d
+```
+
+No `--build` needed. When an update changes the database, Locuvi first writes a backup
+(`backups/locuvi-…-before-NNNN.tar.gz`) and only then migrates; existing data upgrades in place.
+
+**Going back** to an earlier release: set `LOCUVI_TAG=sha-1a2b3c4` (the previous tag, from the
+package page) in `.env`, then restore the backup taken before the update, because database
+changes only go forward:
+
+```bash
+docker compose stop locuvi
+docker compose run --rm --no-deps locuvi python -m locuvi.cli restore /backups/locuvi-…-before-NNNN.tar.gz --force
+docker compose up -d
+```
+
+Local settings that are not in git (such as the backup passphrase secret below) go in
+`docker-compose.override.yml`, which Compose reads automatically, so `git pull` never clashes
+with them. To build the image yourself instead: `docker compose up -d --build`.
 
 ### Data and volumes
 
@@ -218,8 +251,17 @@ Archives contain bank details. To keep an **encrypted copy off the server**, giv
 backup passphrase (at least 12 characters, kept somewhere other than this server, e.g. your
 password manager — without it the off-server copies cannot be read):
 ```bash
-openssl rand -base64 24 > secrets/backup_passphrase.txt && chmod 600 secrets/backup_passphrase.txt
-# then uncomment the two `backup_passphrase` lines in docker-compose.yml and:
+( umask 022; openssl rand -base64 24 | tr -d '\n' > secrets/backup_passphrase.txt )  # readable by the container user
+cat secrets/backup_passphrase.txt; echo     # store it in your password manager
+cat > docker-compose.override.yml <<'YAML'
+services:
+  locuvi:
+    secrets:
+      - backup_passphrase
+secrets:
+  backup_passphrase:
+    file: ./secrets/backup_passphrase.txt
+YAML
 docker compose up -d
 ```
 Every backup is then encrypted (scrypt + AES-256-GCM, tamper-evident) and uploaded to your

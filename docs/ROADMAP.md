@@ -46,7 +46,8 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Nightly backup | ✅ | Automatic after 02:00 into `/backups` (30 days kept), "Back up now" on Today |
 | Off-server encrypted copy of `backups/` | 🔜 | Built in: create `secrets/backup_passphrase.txt` and enable it in compose (README §5) |
 | Restore drill on the real server (once) | 🔜 | `locuvi.cli restore` into a scratch volume, then `verify` |
-| Merge working branch into `main`; deploy from `main` | 🔜 | Owner to approve PR |
+| Merge working branch into `main`; deploy from `main` | ✅ | PR #1 merged 9 Oct 2026 |
+| One-command updates: image published to GHCR on every green push to `main`; `./update.sh` (or `docker compose pull && docker compose up -d`); automatic backup before any database upgrade | ✅ | README "Updates"; one-time `docker login ghcr.io` (repo is private) |
 | HTTPS on the intranet (Caddy internal CA or Tailscale serve) | 🧭 | Plain http on LAN is readable by others on that network |
 | Connect Nextcloud (app password, allowlist if private) | 🧭 | Optional |
 | Go-live check of rules against GOV.UK invoice requirements and NHSBSA/PCSE guidance | 🔜 | `docs/handover/SOURCES.md` |

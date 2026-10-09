@@ -30,3 +30,4 @@ coverage/
 .idea/
 .vscode/
 *.tsbuildinfo
+docker-compose.override.yml

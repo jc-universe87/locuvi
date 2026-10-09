@@ -166,3 +166,26 @@ def test_no_passphrase_means_local_only_finding(settings, session, ready, tmp_pa
     assert not list(st.backup_dir.glob("*.enc"))
     assert "backup_offsite_off" in kinds(session, st)
     assert "correct horse" not in repr(replace(st, backup_passphrase=PASS))
+
+
+def test_backup_before_upgrade(settings, session, ready, tmp_path):
+    from alembic import command
+
+    from locuvi import migrate
+
+    st = replace(settings, backup_dir=tmp_path / "bk")
+    issue_one(st, session, ready)
+    session.commit()
+    engine = db.get_engine()
+    assert backups.before_upgrade(st, engine) is None  # already at head: nothing to do
+    cfg = migrate.alembic_config()
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.downgrade(cfg, "0017")  # pretend the server still runs the previous release
+    current, head = migrate.pending(engine)
+    assert current == "0017" and head != current
+    dest = backups.before_upgrade(st, engine)
+    assert dest is not None and dest.name.endswith(f"-before-{head}.tar.gz")
+    assert cli.check_backup(dest)["issued_invoices"] == 1  # a restorable copy of the old data
+    migrate.upgrade(engine)
+    assert backups.before_upgrade(replace(st, backup_dir=None), engine) is None
