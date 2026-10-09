@@ -98,3 +98,50 @@ def test_0019_marks_inclusive_draft_lines_and_hourly_rates(tmp_path):
     assert flags == {"w1": 1, "w2": 0, "w3": 1}
     assert hourly == "95.00"
     eng.dispose()
+
+
+def test_upgrade_from_0001_with_invoices_referencing_practices(tmp_path):
+    """Table rebuilds (SQLite batch mode) must work with real, referenced rows."""
+    eng = db.init_engine(tmp_path / "v1.db")
+    upgrade(eng, "0001")
+    now = "'2026-10-01 00:00:00'"
+    with eng.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO practice (id, name, billing_address, default_unit, default_pensionable,"
+                f" rate_includes_pension, is_archived, created_at, updated_at) VALUES"
+                f" ('p1', 'Example Medical Practice', '', 'am', 1, 0, 0, {now}, {now})"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO invoice (id, status, practice_id, currency, pension_enabled, created_at,"
+                f" updated_at) VALUES ('i1', 'draft', 'p1', 'GBP', 1, {now}, {now})"
+            )
+        )
+    upgrade(eng)
+    with eng.connect() as c:
+        assert c.execute(text("SELECT practice_id FROM invoice")).scalar() == "p1"
+        assert c.execute(text("PRAGMA foreign_keys")).scalar() == 1  # enforcement back on
+        assert c.execute(text("PRAGMA foreign_key_check")).fetchall() == []
+    eng.dispose()
+
+
+def test_upgrade_rolls_back_on_broken_reference(tmp_path):
+    import pytest
+
+    eng = db.init_engine(tmp_path / "bad.db")
+    upgrade(eng, "0018")
+    now = "'2026-10-01 00:00:00'"
+    with eng.connect() as c:
+        c.connection.dbapi_connection.execute("PRAGMA foreign_keys=OFF")
+        c.exec_driver_sql(
+            "INSERT INTO invoice (id, status, practice_id, currency, pension_enabled, created_at,"
+            f" updated_at) VALUES ('i1', 'draft', 'missing', 'GBP', 1, {now}, {now})"
+        )
+        c.commit()
+    with pytest.raises(RuntimeError, match="broken reference"):
+        upgrade(eng)
+    with eng.connect() as c:  # nothing was applied
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0018"
+    eng.dispose()
