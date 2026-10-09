@@ -4,6 +4,7 @@ import { Icon, Logo, ToastProvider } from "./components/ui";
 import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
+import type { HouseholdProfile } from "./lib/types";
 import DiaryPage from "./pages/Diary";
 import AskPage from "./pages/Ask";
 import BankPage from "./pages/Bank";
@@ -21,7 +22,10 @@ import WelcomePage from "./pages/Welcome";
 interface SessionInfo {
   authenticated: boolean;
   auth_mode: "password" | "gateway";
+  login_required?: boolean;
+  multi?: boolean;
   csrf_token: string | null;
+  profile?: HouseholdProfile | null;
 }
 
 const TABS: { to: string; icon: string; label: MessageKey; end?: boolean }[] = [
@@ -58,10 +62,12 @@ export default function App() {
   }, []);
 
   if (!session) return null;
-  if (!session.authenticated) return <LoginPage onSignedIn={refresh} />;
+  if (!session.authenticated) return <LoginPage multi={!!session.multi} onSignedIn={refresh} />;
 
   const signOut = async () => {
     await api.post("/auth/logout");
+    // Start the next person (another household profile) on the start page, not here.
+    window.history.replaceState(null, "", "/");
     await refresh();
   };
 
@@ -106,8 +112,8 @@ export default function App() {
             <Route path="/ask" element={<AskPage />} />
             <Route path="/pension" element={<PensionPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/settings" element={<SettingsPage onSignOut={session.auth_mode === "password" ? signOut : undefined} />} />
-            <Route path="/settings/:section" element={<SettingsPage onSignOut={session.auth_mode === "password" ? signOut : undefined} />} />
+            <Route path="/settings" element={<SettingsPage profile={session.profile ?? null} onSignOut={session.login_required ?? session.auth_mode === "password" ? signOut : undefined} />} />
+            <Route path="/settings/:section" element={<SettingsPage profile={session.profile ?? null} onSignOut={session.login_required ?? session.auth_mode === "password" ? signOut : undefined} />} />
             <Route path="/practices" element={<Navigate to="/settings/practices" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

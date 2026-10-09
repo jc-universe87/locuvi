@@ -440,12 +440,15 @@ feeds = APIRouter()
 @feeds.get("/calendar/{token}.ics", include_in_schema=False)
 def calendar_ics(token: str, request: Request) -> Response:
     """Public by secret link (calendar apps can't sign in). Unknown link → 404."""
-    from locuvi import db
+    from locuvi import db, profiles
     from locuvi.services import calendar
 
     if len(token) > 100:
         raise NotFound("calendar.not_found", "Not found.")
-    with db.new_session() as s:
+    pid = profiles.find(request.app.state.settings, lambda s: calendar.lookup(s, token) is not None)
+    if pid is None:
+        raise NotFound("calendar.not_found", "Not found.")
+    with db.use_profile(pid), db.new_session() as s:
         feed = calendar.lookup(s, token)
         if feed is None:
             raise NotFound("calendar.not_found", "Not found.")

@@ -662,18 +662,21 @@ def run_due_jobs(ctx: ArchiveContext) -> dict[str, str]:
 class ArchiveWorker:
     """Single background thread; processes due jobs sequentially."""
 
-    def __init__(self, ctx: ArchiveContext) -> None:
+    def __init__(self, ctx: ArchiveContext, profile_id: int = 1) -> None:
         self.ctx = ctx
+        self.profile_id = profile_id  # each household profile has its own worker and queue
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
-        with db.new_session() as s:
+        with db.use_profile(self.profile_id), db.new_session() as s:
             n = recover_interrupted(s)
         if n:
             log.info("recovered %d interrupted archive job(s)", n)
-        self._thread = threading.Thread(target=self._run, name="archive-worker", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name=f"archive-worker-{self.profile_id}", daemon=True
+        )
         self._thread.start()
 
     def wake(self) -> None:
@@ -686,6 +689,7 @@ class ArchiveWorker:
             self._thread.join(timeout=30)
 
     def _run(self) -> None:
+        db.set_profile(self.profile_id)
         while not self._stop.is_set():
             try:
                 run_due_jobs(self.ctx)

@@ -170,18 +170,21 @@ def restore(
     return manifest
 
 
-def reset_password(settings: Settings) -> None:
-    """Lost the in-app password: fall back to the secret file and sign out all sessions."""
-    from locuvi import db
-    from locuvi.models import AuthConfig
+def reset_password(settings: Settings, name: str | None = None) -> None:
+    """Lost a password: that profile (the admin by default) gets the password from the
+    secret file again, and all its sessions are signed out."""
+    from locuvi import profiles
+    from locuvi.api.auth import hash_password
 
-    db.init_engine(settings.db_path)
-    with db.new_session() as s:
-        cfg = s.get(AuthConfig, 1)
-        if cfg is not None:
-            cfg.password_hash = None
-            cfg.session_epoch = (cfg.session_epoch or 0) + 1
-            s.commit()
+    if not settings.password:
+        raise SystemExit("set LOCUVI_PASSWORD_FILE first: its password becomes the new one")
+    profile = profiles.by_name(settings, name) if name else profiles.get(settings, 1)
+    if profile is None:
+        if name:
+            raise SystemExit(f"no profile called {name!r}")
+        profiles.ensure_first(settings, "Owner", hash_password(settings.password))
+        return
+    profiles.set_password(settings, profile.id, hash_password(settings.password))
 
 
 def verify(settings: Settings) -> dict:
@@ -294,7 +297,10 @@ def main(argv: list[str] | None = None) -> int:
     x.add_argument("dest", type=Path)
     x.add_argument("--passphrase-file", type=Path)
     sub.add_parser("verify")
-    sub.add_parser("reset-password", help="forget the in-app password; use the secret file again")
+    rp = sub.add_parser(
+        "reset-password", help="a profile (the admin by default) gets the secret-file password"
+    )
+    rp.add_argument("--profile", help="profile name (default: the admin)")
     e = sub.add_parser("example-pdf")
     e.add_argument("out", type=Path)
     args = ap.parse_args(argv)
@@ -330,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, indent=2))
         return 0 if result["ok"] else 1
     elif args.cmd == "reset-password":
-        reset_password(settings)
+        reset_password(settings, args.profile)
         print("in-app password removed: sign in with the password from the secret file")
         print("restart the app for the change to take effect")
     elif args.cmd == "example-pdf":

@@ -73,6 +73,7 @@ if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() =>
   step("sign in");
   await page.getByLabel("Password").fill(PASSWORD ?? "");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("heading", { name: "Sign in" }).waitFor({ state: "detached" });
 }
 
 step("welcome wizard (3 steps)");
@@ -351,6 +352,32 @@ for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diar
   if (overflow) await fail(`horizontal overflow on mobile ${path}`);
   await shot(name, mp);
 }
+
+step("household profiles: add one, sign in as them, separate data");
+await page.goto(`${BASE}/settings/profiles`);
+await page.getByRole("button", { name: "Add a profile" }).click();
+const pf = page.getByRole("dialog");
+await pf.getByLabel(/^Name/).fill("Sam");
+await pf.getByLabel(/^Password/).fill("sam-e2e-password");
+await pf.getByLabel("Type your new password again").fill("sam-e2e-password");
+await pf.getByRole("button", { name: "Add profile" }).click();
+await page.getByRole("status").getByText("Sam can now sign in").waitFor();
+await shot("18-profiles");
+await page.goto(`${BASE}/settings`);
+await page.getByRole("button", { name: "Sign out" }).click();
+await page.getByLabel("Your name").fill("Sam");
+await page.getByLabel("Password").fill("sam-e2e-password");
+await page.getByRole("button", { name: "Sign in" }).click();
+// Sam starts with an empty Locuvi of their own
+await page.getByRole("heading", { name: "Let's set up your invoices" }).waitFor();
+await page.goto(`${BASE}/settings`);
+await page.getByText("Signed in as Sam").waitFor();
+if (await page.getByRole("link", { name: /Profiles/ }).count()) await fail("non-admin sees Profiles");
+await page.getByRole("button", { name: "Sign out" }).click();
+await page.getByLabel("Your name").fill("Owner");
+await page.getByLabel("Password").fill(PASSWORD ?? "");
+await page.getByRole("button", { name: "Sign in" }).click();
+await page.getByRole("heading", { name: "Sign in" }).waitFor({ state: "detached" });
 
 await browser.close();
 if (errors.length) {

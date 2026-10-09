@@ -283,3 +283,14 @@ before enabling a cloud model.
 - Before starting work, pick the next 🔜 item with the owner; move it to ✅ when merged,
   with a link to the PR/commit and any ADR.
 - New ideas go under "Later ideas" first; the owner decides when they become a version.
+
+## Household profiles (owner request, 9 Oct 2026) ✅
+
+- Separate Locuvi per person: own database and files (`profiles.py`; profile 1 stays in
+  `DATA_DIR`, others in `DATA_DIR/profiles/<id>`), selected per request from the signed-in
+  session (`db` context variable); hourly jobs, archive workers, backups, Bevro tokens and
+  calendar links all work per profile.
+- The first user (the existing owner) is the admin: adds, renames, resets passwords of and
+  removes profiles (removal is restorable for 30 days). Sign-in asks for a name once there is
+  more than one profile.
+

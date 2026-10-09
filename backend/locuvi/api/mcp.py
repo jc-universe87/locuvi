@@ -110,7 +110,7 @@ def tools_for(token: AgentToken) -> list[dict[str, Any]]:
     return out
 
 
-def _handle(s: Session, request: Request, token: AgentToken, msg: dict[str, Any]) -> Any:
+def _handle(s: Session, settings: Any, token: AgentToken, msg: dict[str, Any]) -> Any:
     method, id_ = msg.get("method"), msg.get("id")
     params = msg.get("params") or {}
     if method == "initialize":
@@ -139,7 +139,7 @@ def _handle(s: Session, request: Request, token: AgentToken, msg: dict[str, Any]
         extra = [k for k in args if k not in schema["properties"]]
         if missing or extra:
             return _err(id_, -32602, f"Invalid arguments (missing {missing}, unexpected {extra})")
-        tools = agent.Tools(s, request.app.state.settings)
+        tools = agent.Tools(s, settings)
         try:
             result = tools.run(name, args)
             is_error = False
@@ -163,8 +163,15 @@ async def mcp_post(request: Request) -> Response:
     body = await request.body()
     if len(body) > 256 * 1024:
         return JSONResponse(_err(None, -32600, "Request too large."), 413)
+    from locuvi import profiles
+
+    base = request.app.state.settings
+    pid = profiles.find(base, lambda s: _authenticate(s, request) is not None)
+    if pid is not None:
+        db.set_profile(pid)  # the token belongs to this household profile
+    settings = request.app.state.profile_settings.get(pid or 1, base)
     with db.new_session() as s:
-        token = _authenticate(s, request)
+        token = _authenticate(s, request) if pid is not None else None
         if token is None:
             return JSONResponse(
                 _err(None, -32001, "Unauthorized"), 401,
@@ -179,7 +186,7 @@ async def mcp_post(request: Request) -> Response:
         batch = payload if isinstance(payload, list) else [payload]
         if not batch or not all(isinstance(m, dict) and m.get("jsonrpc") == "2.0" for m in batch):
             return JSONResponse(_err(None, -32600, "Invalid request"), 400)
-        replies = [r for m in batch[:20] if (r := _handle(s, request, token, m)) is not None]
+        replies = [r for m in batch[:20] if (r := _handle(s, settings, token, m)) is not None]
     if not replies:
         return Response(status_code=202)
     return JSONResponse(replies if isinstance(payload, list) else replies[0])

@@ -9,7 +9,9 @@ only, never in calculations, owner approves every consequential action). Do not 
 never submit pension forms or send email without an explicit owner tap.
 
 ## Layout
-- `backend/locuvi/` FastAPI app: `money.py` (Decimal rules), `services/invoices.py` (draft,
+- `backend/locuvi/` FastAPI app: `profiles.py` (household profiles: each has its own DB + data
+  dir; `db.use_profile()`/the request middleware pick it — never mix profiles' data),
+  `money.py` (Decimal rules), `services/invoices.py` (draft,
   analyse, issue, void, split), `services/diary.py`, `services/payments.py`,
   `services/pension.py`, `services/reports.py` (+ Today overview), `services/checks.py`
   (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,

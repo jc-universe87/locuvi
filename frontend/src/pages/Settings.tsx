@@ -1,25 +1,26 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useToast } from "../components/ui";
+import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useToast } from "../components/ui";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, openPendingTab, setCsrf } from "../lib/api";
 import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
-import type { AssistantConfig, Branding, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
+import type { AssistantConfig, Branding, HouseholdProfile, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "password"] as const;
+const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "password", "profiles"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", password: "settings",
+  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", password: "settings", profiles: "settings",
 };
 
-export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
+export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?: () => void; profile?: HouseholdProfile | null }) {
   const { t, locale, setLocale } = useT();
   const { section } = useParams();
-  if (section && (SECTIONS as readonly string[]).includes(section)) {
+  const visible = (s: Section) => (s !== "password" || !!onSignOut) && (s !== "profiles" || !!profile?.is_admin);
+  if (section && (SECTIONS as readonly string[]).includes(section) && visible(section as Section)) {
     return (
       <>
         <p style={{ margin: "0.5rem 0 0" }}>
@@ -38,15 +39,17 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
         {section === "agents" && <AgentsSection />}
-        {section === "password" && <PasswordSection />}
+        {section === "password" && <PasswordSection profile={profile} />}
+        {section === "profiles" && profile && <ProfilesSection me={profile} />}
       </>
     );
   }
   return (
     <>
       <h1>{t("nav.settings")}</h1>
+      {profile && onSignOut && <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("profiles.signed_in_as", { name: profile.name })}</p>}
       <div className="form-list">
-        {SECTIONS.filter((s) => s !== "password" || onSignOut).map((s) => (
+        {SECTIONS.filter(visible).map((s) => (
           <Link key={s} to={`/settings/${s}`} className="list-row">
             <span className="task-icon" style={{ width: "2rem", height: "2rem", borderRadius: 9 }}><Icon name={ICON[s]} size={18} /></span>
             <span className="list-main">
@@ -998,6 +1001,132 @@ function MailAccountEditor({ initial, onBack, onRemoved }: {
   );
 }
 
+/** Household profiles (admin only): each person has their own, separate Locuvi. */
+function ProfilesSection({ me }: { me: HouseholdProfile }) {
+  const { t } = useT();
+  const toast = useToast();
+  const [list, setList] = useState<{ profiles: HouseholdProfile[]; removed: HouseholdProfile[] } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<HouseholdProfile | null>(null);
+  const [removing, setRemoving] = useState<HouseholdProfile | null>(null);
+  const load = () => api.get<{ profiles: HouseholdProfile[]; removed: HouseholdProfile[] }>("/profiles").then(setList, setError);
+  useEffect(() => { void load(); }, []);
+  if (!list) return <ErrorAlert error={error} />;
+  const restore = async (p: HouseholdProfile) => {
+    setError(null);
+    try { await api.post(`/profiles/${p.id}/restore`); await load(); toast({ text: t("profiles.restored", { name: p.name }) }); }
+    catch (e) { setError(e); }
+  };
+  const remove = async (p: HouseholdProfile) => {
+    setError(null);
+    try {
+      await api.del(`/profiles/${p.id}`);
+      setRemoving(null);
+      await load();
+      toast({ text: t("profiles.removed", { name: p.name }), undo: () => void restore(p) });
+    } catch (e) { setError(e); }
+  };
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("profiles.intro")}</p>
+      {!me.password_set && <div className="alert info" role="note">{t("profiles.set_own_password")}</div>}
+      <ErrorAlert error={error} />
+      <div className="form-list">
+        {list.profiles.map((p) => (
+          <button key={p.id} type="button" className="list-row" onClick={() => setEditing(p)}>
+            <span className="list-main">
+              <span className="list-title">{p.name}{p.id === me.id ? ` (${t("profiles.you")})` : ""}</span>
+              <span className="list-sub">{p.is_admin ? t("profiles.admin") : t("profiles.member")}</span>
+            </span>
+            <span className="chev"><Icon name="chevron" size={18} /></span>
+          </button>
+        ))}
+        <button type="button" className="list-row" onClick={() => setAdding(true)} style={{ color: "var(--steel)", fontWeight: 600 }}>
+          <Icon name="plus" size={18} /> {t("profiles.add")}
+        </button>
+      </div>
+      {list.removed.length > 0 && (
+        <>
+          <h3>{t("profiles.removed_title")}</h3>
+          <p className="muted" style={{ marginTop: 0 }}>{t("profiles.removed_hint")}</p>
+          <div className="form-list">
+            {list.removed.map((p) => (
+              <div key={p.id} className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>
+                <span>{p.name}<span className="hint" style={{ display: "block" }}>{t("profiles.removed_on", { when: dateTime(p.deleted_at ?? "") })}</span></span>
+                <button className="btn secondary small" onClick={() => void restore(p)}>{t("profiles.restore")}</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {adding && <ProfileSheet onClose={() => setAdding(false)} onSaved={async (p) => { setAdding(false); await load(); toast({ text: t("profiles.added", { name: p.name }) }); }} />}
+      {editing && (
+        <ProfileSheet profile={editing} canRemove={!editing.is_admin && editing.id !== me.id}
+          onClose={() => setEditing(null)}
+          onRemove={() => { setRemoving(editing); setEditing(null); }}
+          onSaved={async () => { setEditing(null); await load(); toast({ text: t("common.saved") }); }} />
+      )}
+      {removing && (
+        <Dialog open title={t("profiles.remove_title", { name: removing.name })} onClose={() => setRemoving(null)}
+          footer={<>
+            <button className="btn ghost" autoFocus onClick={() => setRemoving(null)}>{t("common.cancel")}</button>
+            <button className="btn danger" onClick={() => void remove(removing)}>{t("profiles.remove_confirm")}</button>
+          </>}>
+          <p style={{ marginTop: 0 }}>{t("profiles.remove_body", { name: removing.name })}</p>
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+function ProfileSheet({ profile, canRemove = false, onClose, onSaved, onRemove }: {
+  profile?: HouseholdProfile; canRemove?: boolean; onClose: () => void; onSaved: (p: HouseholdProfile) => void | Promise<void>; onRemove?: () => void;
+}) {
+  const { t } = useT();
+  const [name, setName] = useState(profile?.name ?? "");
+  const [password, setPassword] = useState("");
+  const [again, setAgain] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const mismatch = again.length > 0 && password !== again;
+  const passwordOk = profile ? (!password || (password.length >= 10 && password === again)) : (password.length >= 10 && password === again);
+  const save = async () => {
+    setBusy(true); setError(null);
+    try {
+      const body: Record<string, string> = {};
+      if (!profile || name.trim() !== profile.name) body.name = name.trim();
+      if (password) body.password = password;
+      const p = profile
+        ? await api.patch<HouseholdProfile>(`/profiles/${profile.id}`, body)
+        : await api.post<HouseholdProfile>("/profiles", body);
+      await onSaved(p);
+    } catch (e) { setError(e); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open title={profile ? profile.name : t("profiles.add")} onClose={onClose}
+      footer={<>
+        {canRemove && onRemove && <button className="btn ghost" style={{ color: "var(--err)", marginRight: "auto" }} onClick={onRemove}>{t("profiles.remove")}</button>}
+        <button className="btn ghost" onClick={onClose}>{t("common.cancel")}</button>
+        <button className="btn" disabled={busy || !name.trim() || !passwordOk} onClick={() => void save()}>{profile ? t("common.save") : t("profiles.add_button")}</button>
+      </>}>
+      <ErrorAlert error={error} />
+      <div className="form-list">
+        <Row id="pf-name" label={t("profiles.name")} hint={t("profiles.name_hint")}>
+          <input id="pf-name" type="text" maxLength={40} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+        </Row>
+        <Row id="pf-pass" label={profile ? t("profiles.new_password") : t("profiles.password")} hint={t(profile ? "profiles.reset_hint" : "password.new_hint")}>
+          <input id="pf-pass" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Row>
+        <Row id="pf-again" label={t("password.again")}>
+          <input id="pf-again" type="password" autoComplete="new-password" value={again} aria-invalid={mismatch} onChange={(e) => setAgain(e.target.value)} />
+        </Row>
+      </div>
+      {mismatch && <p className="hint" style={{ color: "var(--err)" }}>{t("password.mismatch")}</p>}
+    </Dialog>
+  );
+}
+
 interface AgentTok { id: string; name: string; hint: string; allow_drafts: boolean; created_at: string; last_used_at: string | null; revoked: boolean }
 
 function AgentsSection() {
@@ -1139,8 +1268,9 @@ function CalendarSection() {
   );
 }
 
-function PasswordSection() {
+function PasswordSection({ profile }: { profile: HouseholdProfile | null }) {
   const { t } = useT();
+  const needCurrent = profile?.password_set ?? true;
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -1164,9 +1294,11 @@ function PasswordSection() {
       <ErrorAlert error={error} />
       {done && <div className="alert ok" role="status">✓ {t("password.changed")}</div>}
       <div className="form-list">
-        <Row id="pw-cur" label={t("password.current")}>
-          <input id="pw-cur" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
-        </Row>
+        {needCurrent && (
+          <Row id="pw-cur" label={t("password.current")}>
+            <input id="pw-cur" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </Row>
+        )}
         <Row id="pw-new" label={t("password.new")} hint={t("password.new_hint")}>
           <input id="pw-new" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
         </Row>
@@ -1177,9 +1309,9 @@ function PasswordSection() {
       </div>
       {mismatch && <p className="hint" style={{ color: "var(--err)" }}>{t("password.mismatch")}</p>}
       <div className="actions" style={{ marginTop: "0.5rem" }}>
-        <button className="btn" disabled={!current || next.length < 10 || next !== again} onClick={save}>{t("password.save")}</button>
+        <button className="btn" disabled={(needCurrent && !current) || next.length < 10 || next !== again} onClick={save}>{t("password.save")}</button>
       </div>
-      <p className="form-foot">{t("password.forgot")}</p>
+      <p className="form-foot">{t(profile && !profile.is_admin ? "password.forgot_member" : "password.forgot")}</p>
     </>
   );
 }

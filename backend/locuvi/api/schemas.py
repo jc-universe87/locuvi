@@ -248,7 +248,18 @@ class WebDavTestIn(Strict):
 
 
 class LoginIn(Strict):
+    name: Annotated[str, StringConstraints(max_length=40)] | None = None
     password: Annotated[str, StringConstraints(min_length=1, max_length=500)]
+
+
+class HouseholdProfileIn(Strict):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=40)]
+    password: Annotated[str, StringConstraints(min_length=10, max_length=500)]
+
+
+class HouseholdProfilePatch(Strict):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=40)] | None = None
+    password: Annotated[str, StringConstraints(min_length=10, max_length=500)] | None = None
 
 
 class Page(BaseModel):
