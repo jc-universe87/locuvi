@@ -10,10 +10,10 @@ import type { AssistantConfig, EmailConfig, MailboxConfig, ScanResult, Numbering
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "mailbox", "assistant"] as const;
+const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "mailbox", "assistant", "agents"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", mailbox: "inbox", assistant: "sparkle",
+  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", mailbox: "inbox", assistant: "sparkle", agents: "send",
 };
 
 export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
@@ -35,6 +35,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         {section === "storage" && <StorageSection />}
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
+        {section === "agents" && <AgentsSection />}
       </>
     );
   }
@@ -663,6 +664,97 @@ function MailboxSection() {
         <li>{t("mailbox.privacy_2")}</li>
         <li>{t("mailbox.privacy_3")}</li>
         <li>{t("mailbox.privacy_4")}</li>
+      </ul>
+    </>
+  );
+}
+
+interface AgentTok { id: string; name: string; hint: string; allow_drafts: boolean; created_at: string; last_used_at: string | null; revoked: boolean }
+
+function AgentsSection() {
+  const { t } = useT();
+  const [tokens, setTokens] = useState<AgentTok[] | null>(null);
+  const [name, setName] = useState("Bevro");
+  const [drafts, setDrafts] = useState(false);
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const endpoint = `${window.location.origin}/mcp`;
+  const load = () => api.get<{ tokens: AgentTok[] }>("/settings/agents").then((r) => setTokens(r.tokens), setError);
+  useEffect(() => { void load(); }, []);
+  const create = async () => {
+    setError(null);
+    try {
+      const r = await api.post<AgentTok & { token: string }>("/settings/agents", { name: name.trim() || "Bevro", allow_drafts: drafts });
+      setFresh(r.token);
+      await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const revoke = async (id: string) => {
+    try {
+      await api.del(`/settings/agents/${id}`);
+      await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const copy = (text: string) => void navigator.clipboard?.writeText(text).catch(() => undefined);
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("agents.intro")}</p>
+      <ErrorAlert error={error} />
+      <div className="form-list">
+        <Row id="ag-url" label={t("agents.endpoint")} hint={t("agents.endpoint_hint")}>
+          <span className="row" style={{ gap: "0.4rem", justifyContent: "flex-end" }}>
+            <code id="ag-url" style={{ wordBreak: "break-all" }}>{endpoint}</code>
+            <button className="btn ghost small" onClick={() => copy(endpoint)} aria-label={t("agents.copy_url")}><Icon name="copy" size={16} /></button>
+          </span>
+        </Row>
+      </div>
+      {fresh && (
+        <div className="alert ok" role="status">
+          <strong>{t("agents.token_once")}</strong>
+          <div className="row" style={{ gap: "0.4rem", marginTop: "0.4rem" }}>
+            <code style={{ wordBreak: "break-all", flex: 1 }}>{fresh}</code>
+            <button className="btn small secondary" onClick={() => copy(fresh)}>{t("agents.copy")}</button>
+          </div>
+        </div>
+      )}
+      <h3>{t("agents.new_title")}</h3>
+      <div className="form-list">
+        <Row id="ag-name" label={t("agents.name")}>
+          <input id="ag-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+        </Row>
+        <SwitchRow label={t("agents.allow_drafts")} hint={t("agents.allow_drafts_hint")} checked={drafts} onChange={setDrafts} />
+      </div>
+      <div className="actions" style={{ marginTop: "0.5rem" }}>
+        <button className="btn" onClick={create}>{t("agents.create")}</button>
+      </div>
+      {tokens && tokens.length > 0 && (
+        <>
+          <h3>{t("agents.tokens")}</h3>
+          <div className="form-list">
+            {tokens.map((k) => (
+              <div key={k.id} className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>
+                <span>
+                  <span style={{ fontWeight: 500 }}>{k.name} · …{k.hint}</span>
+                  <span className="hint" style={{ display: "block" }}>
+                    {k.allow_drafts ? t("agents.scope_drafts") : t("agents.scope_read")} ·{" "}
+                    {k.revoked ? t("agents.revoked") : k.last_used_at ? t("agents.last_used", { when: dateTime(k.last_used_at) }) : t("agents.never_used")}
+                  </span>
+                </span>
+                {!k.revoked && <button className="btn ghost small" onClick={() => void revoke(k.id)}>{t("agents.revoke")}</button>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <h3>{t("agents.safety_title")}</h3>
+      <ul className="muted bullets">
+        <li>{t("agents.safety_1")}</li>
+        <li>{t("agents.safety_2")}</li>
+        <li>{t("agents.safety_3")}</li>
       </ul>
     </>
   );

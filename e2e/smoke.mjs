@@ -223,6 +223,12 @@ await page.getByRole("link", { name: /^You/ }).click();
 await page.getByLabel("Telephone").fill("01234 567890");
 await page.getByText("✓ Saved").waitFor(); // autosave
 await shot("11-settings-you");
+await page.getByRole("link", { name: "Settings" }).first().click();
+await page.getByRole("link", { name: /Connected agents/ }).click();
+await page.getByRole("button", { name: "Create token" }).click();
+await page.getByText("Copy this token now").waitFor();
+await page.getByText(/Bevro · …/).waitFor();
+await shot("11b-agents");
 
 step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

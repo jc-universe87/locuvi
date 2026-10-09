@@ -149,7 +149,12 @@ invoices. Refused requests are retried on a fallback model by the provider; the 
 recorded with every suggestion. It only suggests — calculations never use AI. With the assistant on, the ✨ icon opens **Ask
 Locuvi**: ask "Check all my outstanding admin", "Which practices still owe me money?" or
 "Prepare invoices for last month" — it looks things up with Locuvi's own functions and can
-prepare invoice drafts and email drafts, but never issues, sends, pays or submits. See
+prepare invoice drafts and email drafts, but never issues, sends, pays or submits.
+
+**Bevro and other agents (optional).** Settings → Connected agents creates a token for your
+agent platform. Point it at `http://<your Locuvi address>/mcp` (an MCP server; use the
+private Tailscale/LAN address). Tokens are read-only unless you allow drafts, can be revoked,
+and every call is in the audit log. See
 [`docs/specs/AI_AND_AGENTS.md`](docs/specs/AI_AND_AGENTS.md).
 
 You can still create an invoice by hand (Invoices → New invoice). Pensionable lines in two

@@ -549,3 +549,21 @@ class AgentConversation(Base):
     steps_json: Mapped[list[Any]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AgentToken(Base):
+    """Access token for an external agent platform (Bevro) using Locuvi's MCP endpoint.
+
+    Only a SHA-256 of the token is stored; the token is shown once when created.
+    """
+
+    __tablename__ = "agent_token"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(100), default="Bevro")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    hint: Mapped[str] = mapped_column(String(12), default="")  # last characters, for recognition
+    allow_drafts: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

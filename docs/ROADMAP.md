@@ -113,7 +113,7 @@ communicate from one place. Locuvi joins it as one connected agent/tool provider
 4. Bank CSV import. ✅ (Oct 2026)
 5. Form A tracking and PCSE import. ✅ (Oct 2026)
 6. The full administrative agent. ✅ (Oct 2026)
-7. Bevro integration.
+7. Bevro integration. ✅ (Oct 2026)
 
 ### Phase 1 — Foundation without AI — ✅ (v1.0)
 Structured sessions, deterministic invoice engine, payments, pension figures, Nextcloud archive.
@@ -202,17 +202,21 @@ Each item is useful on its own and gives the AI something reliable to work with.
   Figures come from the services, never from AI estimates. (G)
 - 🧭 Correspondence log (emails sent/received per invoice) as further context. (F)
 
-### Phase 4 — Extended integration — 💭 (v3)
-- 💭 Scheduled multi-step reviews (e.g. a Monday-morning admin brief).
-- 💭 Email (IMAP) and calendar connectors with narrowly scoped access.
-- 💭 Better document processing (scanned PDFs and photos of rota sheets).
-- 💭 **Bevro integration**: Locuvi exposes its tools (the Phase 3 list) to Bevro, the owner's
-  agent platform, most likely as an MCP server. Each Bevro agent gets a token with per-tool
-  scopes (read-only by default). Writes become proposals the owner approves in Locuvi or in
-  Bevro. Every call is audit-logged, and secrets and bank details are never exposed. Bevro can
-  then combine Locuvi with the owner's other agents (e.g. calendar or email agents feeding
-  bookings in).
-- 💭 Optional local models for maximum privacy.
+### Phase 4 — Extended integration — 🔜 partly done (v3)
+- ✅ **Bevro integration** (`api/mcp.py`, Settings › Connected agents): Locuvi is an **MCP
+  server** at `/mcp` (JSON-RPC over streamable HTTP; `initialize`, `tools/list`,
+  `tools/call`, `ping`, batches). Same tools as Ask Locuvi. Each connection gets a bearer
+  token (shown once, SHA-256 stored, revocable, last-used shown); **read-only by default**,
+  "allow drafts" adds only the two draft tools — nothing can issue, send, pay or submit.
+  Browser-origin requests are refused; every call is audit-logged with the connection name.
+  Verified with the official MCP Python client.
+- ✅ Email connector: read-only IMAP of chosen folders (see Phase 2 › Email folders).
+- ✅ Better document processing: scanned PDFs and photos are read by the assistant when on.
+- 💭 Scheduled multi-step reviews (e.g. a Monday-morning admin brief written by the agent;
+  today the weekly digest is rule-based).
+- 💭 Calendar connector (bookings from a calendar feed).
+- 💭 Microsoft 365 / NHSmail OAuth for the email connector.
+- 💭 Optional local models for maximum privacy (the provider interface is ready).
 - 💭 Controlled execution of workflows the owner has approved in advance.
 
 ### Privacy guardrails (binding for every AI item)

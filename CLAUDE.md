@@ -17,7 +17,8 @@ never submit pension forms or send email without an explicit owner tap.
   `services/bank.py` (CSV statement → credits only → deterministic matches), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
   read tools + draft-only tools, never send/issue/pay/submit), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
-  queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
+  queue/worker), `api/` (routes, auth, schemas, `inbox.py`, `mcp.py` = Bevro MCP server with
+  revocable bearer tokens), `migrations/` (Alembic), `cli.py`.
 - `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Bank, Invoices, InvoiceEditor,
   InvoiceDetail, Pension, Reports, Settings, Welcome), `components/Booking.tsx` (paste + review), `components/ui.tsx` (sheets, toggles, segmented,
   toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.

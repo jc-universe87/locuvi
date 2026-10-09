@@ -380,3 +380,8 @@ class PcseIn(Strict):
 class AgentAskIn(Strict):
     question: Annotated[str, StringConstraints(min_length=1, max_length=4000)]
     conversation_id: Annotated[str, StringConstraints(max_length=36)] | None = None
+
+
+class AgentTokenIn(Strict):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=100)] = "Bevro"
+    allow_drafts: bool = False

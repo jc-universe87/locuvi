@@ -329,3 +329,32 @@ def agent_conversation(conversation_id: str, s: DB) -> dict[str, Any]:
             if text.strip() and not any(b.get("type") == "tool_use" for b in m["content"]):
                 turns.append({"role": "assistant", "text": text.strip()})
     return {"id": c.id, "title": c.title, "turns": turns, "steps": c.steps_json or []}
+
+
+# ------------------------------------------------------- connected agents (Bevro)
+
+
+@api.get("/settings/agents")
+def list_agent_tokens(request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.api import mcp
+    from locuvi.models import AgentToken
+
+    rows = s.scalars(select(AgentToken).order_by(AgentToken.created_at.desc()))
+    return {"endpoint_path": "/mcp", "tokens": [mcp.token_public(t) for t in rows]}
+
+
+@api.post("/settings/agents", status_code=201)
+def create_agent_token(body: S.AgentTokenIn, s: DB) -> dict[str, Any]:
+    """Returns the token once; only its hash is kept."""
+    from locuvi.api import mcp
+
+    row, token = mcp.create_token(s, body.name, body.allow_drafts)
+    return {**mcp.token_public(row), "token": token}
+
+
+@api.delete("/settings/agents/{token_id}", status_code=204)
+def revoke_agent_token(token_id: str, s: DB) -> Response:
+    from locuvi.api import mcp
+
+    mcp.revoke_token(s, token_id)
+    return Response(status_code=204)
