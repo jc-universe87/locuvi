@@ -161,6 +161,11 @@ private Tailscale/LAN address). Tokens are read-only unless you allow drafts, ca
 and every call is in the audit log. See
 [`docs/specs/AI_AND_AGENTS.md`](docs/specs/AI_AND_AGENTS.md).
 
+**Credit notes.** If a practice has already booked an invoice and a session needs taking off,
+open the invoice → More → **Issue credit note**, tick the lines and give a reason. It gets its own
+number (CN-0001…) and PDF; the invoice itself never changes. What's owed, pension figures and
+reports are reduced to match.
+
 You can still create an invoice by hand (Invoices → New invoice). Pensionable lines in two
 calendar months block issuing with a one-tap *Split by month*.
 

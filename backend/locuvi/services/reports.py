@@ -70,7 +70,23 @@ def summary(s: Session, year: int) -> dict[str, Any]:
         totals["employer"] += inv.employer_contribution or ZERO
         totals["pensionable_pay"] += inv.pensionable_pay or ZERO
         totals["paid"] += paid
-        totals["outstanding"] += max(gt - paid, ZERO)
+        totals["outstanding"] += payments.outstanding(inv)
+    # Credit notes reduce income in the tax year of the credit note's date.
+    from locuvi.models import CreditNote
+
+    totals["credited"] = ZERO
+    for cn in s.scalars(
+        select(CreditNote).where(CreditNote.credit_date >= start, CreditNote.credit_date <= end)
+    ):
+        totals["credited"] += cn.grand_total
+        totals["invoiced"] -= cn.grand_total
+        totals["fees"] -= cn.fee_subtotal
+        totals["employer"] -= cn.employer_contribution
+        totals["pensionable_pay"] -= cn.pensionable_pay
+        by_month[f"{cn.credit_date.year:04d}-{cn.credit_date.month:02d}"] -= cn.grand_total
+        name = cn.snapshot_json.get("bill_to", {}).get("name", "")
+        if name in by_practice:
+            by_practice[name]["total"] -= cn.grand_total
     months = []
     d = start.replace(day=1)
     while d <= end:

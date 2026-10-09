@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArchivePill, Dialog, ErrorAlert, Field, Icon, InvoicePill, useToast } from "../components/ui";
 import { hasKey, useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
-import { api, downloadBlob } from "../lib/api";
+import { api, downloadBlob, newIdempotencyKey } from "../lib/api";
 import { dateTime, gbp, pct, period, todayLondon, ukDate } from "../lib/format";
 import type { ArchiveStatus, InvoiceDetail } from "../lib/types";
 
@@ -16,7 +16,7 @@ export default function InvoiceDetailPage() {
   const issuedNumber = (location.state as { issued?: string } | null)?.issued;
   const [inv, setInv] = useState<InvoiceDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [sheet, setSheet] = useState<null | "void" | "email" | "pay" | "more">(null);
+  const [sheet, setSheet] = useState<null | "void" | "email" | "pay" | "more" | "credit">(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -225,6 +225,27 @@ export default function InvoiceDetailPage() {
         </section>
       )}
 
+      {inv.credit_notes && inv.credit_notes.length > 0 && (
+        <section className="card flush" aria-labelledby="h-credits">
+          <h2 id="h-credits" className="card-pad-title">{t("credit.title")}</h2>
+          {inv.credit_notes.map((c) => (
+            <div key={c.id} className="list-row">
+              <span className="list-main">
+                <span className="list-title">{c.number} · −{gbp(c.grand_total)}</span>
+                <span className="list-sub">{ukDate(c.credit_date)} · {c.reason}</span>
+              </span>
+              <button className="btn ghost small" onClick={async () => {
+                try {
+                  downloadBlob(await api.blob("GET", `/credit-notes/${c.id}/pdf`), `${c.number}.pdf`);
+                } catch (e) {
+                  setError(e);
+                }
+              }}><Icon name="download" size={16} /> PDF</button>
+            </div>
+          ))}
+        </section>
+      )}
+
       {inv.correspondence && inv.correspondence.length > 0 && (
         <section className="card flush" aria-labelledby="h-corr">
           <h2 id="h-corr" className="card-pad-title">{t("corr.title")}</h2>
@@ -272,7 +293,10 @@ export default function InvoiceDetailPage() {
           {a.webdav_enabled && a.status === "synced" && (
             <button className="btn secondary block" onClick={retry}>{t("archive.reverify")}</button>
           )}
-          {inv.status === "issued" && inv.payments.length === 0 && (
+          {inv.status === "issued" && inv.lines.some((ln) => !(inv.credit_notes ?? []).some((c) => c.line_ids.includes(ln.id ?? ""))) && (
+            <button className="btn secondary block" onClick={() => setSheet("credit")}>{t("credit.open")}</button>
+          )}
+          {inv.status === "issued" && inv.payments.length === 0 && !(inv.credit_notes?.length) && (
             <button className="btn danger block" onClick={() => setSheet("void")}>{t("detail.void")}</button>
           )}
           <p className="hint" style={{ textAlign: "center" }}>{t("detail.immutable")}</p>
@@ -280,6 +304,7 @@ export default function InvoiceDetailPage() {
       </Dialog>
       {sheet === "void" && <VoidSheet inv={inv} onClose={() => setSheet(null)} onDone={(d) => { setInv(d); setSheet(null); }} />}
       {sheet === "email" && <EmailSheet inv={inv} onClose={() => setSheet(null)} onSent={() => { setSheet(null); toast({ text: t("email.sent") }); void load(); }} />}
+      {sheet === "credit" && <CreditSheet inv={inv} onClose={() => setSheet(null)} onDone={() => { setSheet(null); void load(); }} />}
       {sheet === "pay" && <PaySheet inv={inv} onClose={() => setSheet(null)} onDone={(d) => { setInv(d); setSheet(null); }} />}
     </>
   );
@@ -383,6 +408,61 @@ function EmailSheet({ inv, onClose, onSent }: { inv: InvoiceDetail; onClose: () 
           <p className="hint" style={{ margin: 0 }}>{t("email.attachment", { file: `${inv.invoice_number}.pdf` })}</p>
         </div>
       )}
+    </Dialog>
+  );
+}
+
+function CreditSheet({ inv, onClose, onDone }: { inv: InvoiceDetail; onClose: () => void; onDone: () => void }) {
+  const { t } = useT();
+  const credited = new Set((inv.credit_notes ?? []).flatMap((c) => c.line_ids));
+  const open = inv.lines.filter((ln): ln is typeof ln & { id: string } => !!ln.id && !credited.has(ln.id));
+  const [picked, setPicked] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const [total, setTotal] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const [key] = useState(() => newIdempotencyKey());
+  useEffect(() => {
+    if (!picked.length) { setTotal(null); return; }
+    api.post<{ grand_total: string }>(`/invoices/${inv.id}/credit-notes/preview`, { line_ids: picked })
+      .then((r) => setTotal(r.grand_total), setError);
+  }, [picked, inv.id]);
+  const issue = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const cn = await api.post<{ id: string; number: string }>(`/invoices/${inv.id}/credit-notes`,
+        { line_ids: picked, reason }, { "Idempotency-Key": key });
+      downloadBlob(await api.blob("GET", `/credit-notes/${cn.id}/pdf`), `${cn.number}.pdf`);
+      onDone();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog open title={t("credit.sheet_title", { number: inv.invoice_number ?? "" })} onClose={onClose}
+      footer={<button className="btn" disabled={busy || !picked.length || !reason.trim()} onClick={issue}>
+        {total ? t("credit.issue_total", { total: gbp(total) }) : t("credit.issue")}</button>}>
+      <p className="muted" style={{ marginTop: 0 }}>{t("credit.explain")}</p>
+      <ErrorAlert error={error} />
+      <ul className="list proposal-items">
+        {open.map((ln) => (
+          <li key={ln.id}>
+            <input id={`cl-${ln.id}`} type="checkbox" checked={picked.includes(ln.id)}
+              onChange={(e) => setPicked((p) => (e.target.checked ? [...p, ln.id] : p.filter((x) => x !== ln.id)))} />
+            <label htmlFor={`cl-${ln.id}`} className="list-main">
+              <span className="list-title">{ukDate(ln.service_date)} · {ln.description}</span>
+              <span className="list-sub">{gbp(ln.amount)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <Field id="cr-reason" label={t("credit.reason")}>
+        <textarea id="cr-reason" rows={2} value={reason} placeholder={t("credit.reason_placeholder")} onChange={(e) => setReason(e.target.value)} />
+      </Field>
+      <p className="hint">{t("credit.immutable")}</p>
     </Dialog>
   );
 }

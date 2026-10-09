@@ -62,11 +62,22 @@ def month_figures(s: Session, month: str, invoices: list[Invoice] | None = None)
                 "employer": ZERO,
             },
         )
+        credits = list(inv.credit_notes)
+        credited_lines = {i for c in credits for i in c.line_ids}
         a["invoices"].append(inv.invoice_number)
-        a["session_dates"].update(ln.service_date for ln in inv.lines if ln.pensionable)
-        a["fees"] += inv.pensionable_basic_total or ZERO
-        a["pensionable_pay"] += inv.pensionable_pay or ZERO
-        a["employer"] += inv.employer_contribution or ZERO
+        a.setdefault("credit_notes", []).extend(c.number for c in credits)
+        a["session_dates"].update(
+            ln.service_date for ln in inv.lines if ln.pensionable and ln.id not in credited_lines
+        )
+        a["fees"] += (inv.pensionable_basic_total or ZERO) - sum(
+            (c.pensionable_basic_total for c in credits), ZERO
+        )
+        a["pensionable_pay"] += (inv.pensionable_pay or ZERO) - sum(
+            (c.pensionable_pay for c in credits), ZERO
+        )
+        a["employer"] += (inv.employer_contribution or ZERO) - sum(
+            (c.employer_contribution for c in credits), ZERO
+        )
     rows = []
     for a in forms_a.values():
         rows.append(

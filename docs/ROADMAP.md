@@ -74,7 +74,13 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
 
 ### Next — 🔜 driven by owner feedback
 - 🔜 Owner feedback after a month of real use (list items here).
-- 🧭 Credit notes (own number series) for corrections after a practice has booked an invoice.
+- ✅ Credit notes (own number series, `CN-0001`…) for corrections after a practice has booked
+  an invoice: credit whole lines, priced with the invoice's frozen pension rates (the last
+  credit takes exactly what remains, so a fully credited invoice nets to £0.00); issued like
+  invoices (BEGIN IMMEDIATE, idempotency key, immutable PDF in `invoices/credit/`, PDF failure
+  doesn't use a number); reduces what's owed, bank matching, pension month figures and the
+  tax-year report; covered by integrity checks and backups; invoices with credit notes can't be
+  voided. (WebDAV archiving of credit-note PDFs: 💭.)
 - ✅ Repeating bookings ("every Tuesday AM at X until December") in the Diary: Repeat… →
   weekdays, weekly/fortnightly, from/until, live preview; days already booked are skipped;
   one undo removes the whole series.

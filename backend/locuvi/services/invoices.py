@@ -738,6 +738,10 @@ def void(s: Session, inv: Invoice, reason: str) -> Invoice:
         raise Conflict("invoice.void_draft", "Drafts can be deleted instead of voided.")
     if inv.status == InvoiceStatus.voided:
         raise Conflict("invoice.already_voided", "This invoice is already void.")
+    if inv.credit_notes:
+        raise Conflict(
+            "invoice.void_has_credits", "This invoice has credit notes; it can't be voided."
+        )
     if inv.payments:
         raise Conflict(
             "invoice.void_has_payments",

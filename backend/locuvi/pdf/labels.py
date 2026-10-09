@@ -48,6 +48,23 @@ EN_GB: dict[str, str] = {
     ),
     "pdf.page_x_of_y": "Page {page} of {total}",
     "pdf.qty_hours": "{qty} h",
+    "pdf.credit_note": "Credit note",
+    "pdf.pension_footnote_credit": (
+        "The employer NHS pension contribution credited is the matching share of the "
+        "contribution on the original invoice, so the pensionable pay for these sessions "
+        "is reduced accordingly."
+    ),
+    "pdf.credit_title": "CREDIT NOTE",
+    "pdf.credit_number": "Credit note no.",
+    "pdf.credit_date": "Date",
+    "pdf.credits_invoice": "Credits invoice",
+    "pdf.original_date": "Invoice date",
+    "pdf.total_credited": "Total credited (GBP)",
+    "pdf.credit_reason_h": "Reason",
+    "pdf.credit_effect": (
+        "This credit note reduces the amount due on invoice {invoice} by the total above. "
+        "If that invoice has already been paid in full, this amount will be refunded."
+    ),
 }
 
 

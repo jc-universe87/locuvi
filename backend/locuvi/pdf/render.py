@@ -229,6 +229,8 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     totals = snapshot["totals"]
     pension = snapshot["pension"]
     number = inv.get("number") or label("pdf.draft_number")
+    credit = snapshot.get("credit") if snapshot.get("kind") == "credit_note" else None
+    doc_label = label("pdf.credit_note") if credit else label("pdf.invoice")
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -238,7 +240,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         rightMargin=18 * mm,
         topMargin=14 * mm,
         bottomMargin=22 * mm,
-        title=f"{label('pdf.invoice')} {number}",
+        title=f"{doc_label} {number}",
         author=seller.get("legal_name", ""),
         subject=label("pdf.subject"),
         creator="Locuvi",
@@ -259,16 +261,24 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         seller_lines.append(_esc(" · ".join(contact)))
     seller_par = Paragraph("<br/>".join(seller_lines), st["base"])
 
-    meta_rows = [
-        [label("pdf.invoice_number"), number],
-        [label("pdf.issue_date"), uk_date(inv.get("invoice_date")) or label("pdf.not_issued")],
-        [label("pdf.due_date"), uk_date(inv.get("due_date"))],
-    ]
-    if inv.get("work_start_date"):
+    if credit:
+        meta_rows = [
+            [label("pdf.credit_number"), number],
+            [label("pdf.credit_date"), uk_date(inv.get("invoice_date"))],
+            [label("pdf.credits_invoice"), credit["invoice_number"]],
+            [label("pdf.original_date"), uk_date(credit.get("invoice_date"))],
+        ]
+    else:
+        meta_rows = [
+            [label("pdf.invoice_number"), number],
+            [label("pdf.issue_date"), uk_date(inv.get("invoice_date")) or label("pdf.not_issued")],
+            [label("pdf.due_date"), uk_date(inv.get("due_date"))],
+        ]
+    if inv.get("work_start_date") and not credit:
         meta_rows.append(
             [label("pdf.work_period"), uk_period(inv["work_start_date"], inv.get("work_end_date"))]
         )
-    if inv.get("reference"):
+    if inv.get("reference") and not credit:
         meta_rows.append([label("pdf.reference"), inv["reference"]])
     meta = Table(
         [[Paragraph(_esc(k), st["muted"]), Paragraph(_esc(v), st["right"])] for k, v in meta_rows],
@@ -284,7 +294,8 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
             ]
         ),
     )
-    right_col = [Paragraph(label("pdf.invoice_title"), st["title"]), Spacer(1, 4 * mm), meta]
+    title_text = label("pdf.credit_title") if credit else label("pdf.invoice_title")
+    right_col = [Paragraph(title_text, st["title"]), Spacer(1, 4 * mm), meta]
     header = Table(
         [[seller_par, right_col]],
         colWidths=[width - 80 * mm, 80 * mm],
@@ -409,7 +420,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
     ]
     tdata.append(
         [
-            Paragraph(label("pdf.total_due"), st["totall"]),
+            Paragraph(label("pdf.total_credited" if credit else "pdf.total_due"), st["totall"]),
             Paragraph(fmt_gbp(Decimal(totals["grand_total"])), st["total"]),
         ]
     )
@@ -452,7 +463,10 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         hAlign="LEFT",
     )
     pension_note = (
-        Paragraph(_esc(label("pdf.pension_footnote")), st["small"])
+        Paragraph(
+            _esc(label("pdf.pension_footnote_credit" if credit else "pdf.pension_footnote")),
+            st["small"],
+        )
         if pension_on and basic > 0
         else None
     )
@@ -467,10 +481,23 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
                 [("FONTNAME", (0, 0), (-1, -1), "Inter"), ("LEFTPADDING", (0, 0), (-1, -1), 3)]
             ),
         ),
-        Spacer(1, 5 * mm),
-        Paragraph(label("pdf.payment_details").upper(), st["h"]),
-        pay,
     ]
+    if credit:
+        closing += [
+            Spacer(1, 5 * mm),
+            Paragraph(label("pdf.credit_reason_h").upper(), st["h"]),
+            Paragraph(_esc(credit.get("reason", "")), st["base"]),
+            Spacer(1, 3 * mm),
+            Paragraph(
+                _esc(label("pdf.credit_effect", invoice=credit["invoice_number"])), st["small"]
+            ),
+        ]
+    else:
+        closing += [
+            Spacer(1, 5 * mm),
+            Paragraph(label("pdf.payment_details").upper(), st["h"]),
+            pay,
+        ]
     story.append(KeepTogether(closing))
 
     if inv.get("notes"):
@@ -485,7 +512,7 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         ]
 
     footer = seller.get("legal_name", "")
-    footer_left = f"{footer} · {label('pdf.invoice')} {number}" if footer else number
+    footer_left = f"{footer} · {doc_label} {number}" if footer else number
     watermark = label("pdf.draft_watermark") if draft else None
 
     def canvasmaker(*args: Any, **kwargs: Any) -> _NumberedCanvas:

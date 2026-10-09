@@ -159,7 +159,7 @@ def _norm(s: str) -> str:
 def _open_invoices(s: Session) -> list[tuple[Invoice, Decimal]]:
     out = []
     for inv in s.scalars(select(Invoice).where(Invoice.status == InvoiceStatus.issued)):
-        owed = round_money((inv.grand_total or ZERO) - payments.paid_total(inv))
+        owed = payments.outstanding(inv)
         if owed > 0:
             out.append((inv, owed))
     return out
@@ -306,7 +306,7 @@ def accept(s: Session, tx: BankTransaction, invoice_ids: list[str] | None = None
             inv = s.get(Invoice, iid)
             if inv is None or inv.status != InvoiceStatus.issued:
                 raise NotFound("invoice.not_found", "Invoice not found.")
-            owed = round_money((inv.grand_total or ZERO) - payments.paid_total(inv))
+            owed = payments.outstanding(inv)
             part = min(owed, left)
             if part <= 0:
                 break

@@ -65,6 +65,7 @@ export function InvoicePill({ status, payment, due }: { status: InvoiceStatus; p
   if (status === "voided") return <span className="pill voided">{t("status.voided")}</span>;
   const st = payment?.state ?? "unpaid";
   if (st === "paid") return <span className="pill paid">✓ {t("pay.paid")}</span>;
+  if (st === "credited") return <span className="pill voided" style={{ textDecoration: "none" }}>{t("credit.credited")}</span>;
   if (st === "overdue")
     return <span className="pill overdue">{t("pay.overdue_days", { n: payment?.days_overdue ?? 0 })}</span>;
   if (st === "part_paid") return <span className="pill part_paid">{t("pay.part_paid")}</span>;

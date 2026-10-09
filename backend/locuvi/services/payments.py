@@ -18,14 +18,28 @@ def paid_total(inv: Invoice) -> Decimal:
     return round_money(sum((p.amount for p in inv.payments), ZERO))
 
 
+def credited_total(inv: Invoice) -> Decimal:
+    return round_money(sum((c.grand_total for c in inv.credit_notes), ZERO))
+
+
+def outstanding(inv: Invoice) -> Decimal:
+    """What is still owed: total − credit notes − payments (never below zero)."""
+    if inv.grand_total is None:
+        return ZERO
+    return max(round_money(inv.grand_total - credited_total(inv) - paid_total(inv)), ZERO)
+
+
 def payment_state(inv: Invoice, today: date | None = None) -> dict[str, Any]:
-    """unpaid | part_paid | paid | overdue (unpaid/part after due date) | n/a for drafts/voids."""
+    """unpaid | part_paid | paid | overdue | credited (fully credited, nothing paid) | n/a."""
     if inv.status != InvoiceStatus.issued or inv.grand_total is None:
         return {"state": "n/a", "paid": None, "outstanding": None, "days_overdue": 0}
     today = today or core.today_london()
     paid = paid_total(inv)
-    outstanding = round_money(inv.grand_total - paid)
-    if outstanding <= 0:
+    credited = credited_total(inv)
+    outstanding = round_money(inv.grand_total - credited - paid)
+    if credited > 0 and credited >= inv.grand_total and paid == 0:
+        state = "credited"
+    elif outstanding <= 0:
         state = "paid"
     elif inv.due_date and today > inv.due_date:
         state = "overdue"
@@ -37,6 +51,7 @@ def payment_state(inv: Invoice, today: date | None = None) -> dict[str, Any]:
     last = max((p.paid_on for p in inv.payments), default=None)
     return {
         "state": state,
+        "credited": str(credited),
         "paid": str(paid),
         "outstanding": str(max(outstanding, ZERO)),
         "days_overdue": days,
@@ -55,9 +70,9 @@ def record_payment(
 ) -> Payment:
     if inv.status != InvoiceStatus.issued:
         raise Conflict("payment.not_issued", "Only issued invoices can be paid.")
-    outstanding = round_money((inv.grand_total or ZERO) - paid_total(inv))
+    outstanding = round_money((inv.grand_total or ZERO) - credited_total(inv) - paid_total(inv))
     if outstanding <= 0:
-        raise Conflict("payment.already_paid", "This invoice is already paid.")
+        raise Conflict("payment.already_paid", "Nothing is owed on this invoice.")
     amount = outstanding if amount is None else amount
     if amount <= 0 or amount.as_tuple().exponent < -2:  # type: ignore[operator]
         raise DomainError("payment.amount_invalid", "Enter an amount above £0.00.")

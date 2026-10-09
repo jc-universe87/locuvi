@@ -34,6 +34,8 @@ never submit pension forms or send email without an explicit owner tap.
 ## Rules that must not regress
 - Never use float for money; amounts cross the API as decimal strings.
 - Issued invoices are immutable: number, snapshot, PDF. No edit/delete; void keeps them.
+  Corrections after booking are credit notes (`services/credit_notes.py`, own series, same
+  issue guarantees, PDFs in `invoices/credit/` — keep integrity + backup covering them).
 - Issue stays a single `BEGIN IMMEDIATE` transaction with idempotency key; PDF failure must
   not consume a number.
 - Local DB + PDF are authoritative; WebDAV never decides issue state, never overwrites

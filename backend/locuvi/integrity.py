@@ -36,12 +36,27 @@ def check(s: Session, settings: Settings, *, quarantine: bool = True) -> dict[st
         elif sha256_file(path) != inv.local_pdf_sha256:
             problems.append({"invoice_id": inv.id, "problem": "pdf_checksum_mismatch"})
 
+    from locuvi.models import CreditNote
+
+    credits = s.scalars(select(CreditNote)).all()
+    for cn in credits:
+        referenced.add(cn.local_pdf_path)
+        path = settings.data_dir / cn.local_pdf_path
+        if not path.is_file():
+            problems.append({"invoice_id": cn.invoice_id, "problem": "credit_pdf_missing"})
+        elif sha256_file(path) != cn.local_pdf_sha256:
+            problems.append(
+                {"invoice_id": cn.invoice_id, "problem": "credit_pdf_checksum_mismatch"}
+            )
+
     # PDFs that no issued row references come from an issue that never committed.
     quarantined = 0
-    issued_dir = settings.issued_dir
-    if quarantine and issued_dir.is_dir():
-        for f in issued_dir.iterdir():
-            rel = f"invoices/issued/{f.name}"
+    for folder in ("issued", "credit"):
+        d = settings.data_dir / "invoices" / folder
+        if not (quarantine and d.is_dir()):
+            continue
+        for f in d.iterdir():
+            rel = f"invoices/{folder}/{f.name}"
             if f.name.startswith(".") and f.name.endswith(".tmp"):
                 f.unlink(missing_ok=True)
                 continue

@@ -255,6 +255,22 @@ const icsUrl = (await page.locator("code").first().innerText()).trim();
 const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
 if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
 
+step("credit note for one line (own number series, PDF downloads)");
+await page.getByRole("link", { name: "Invoices" }).first().click();
+await page.getByRole("link", { name: new RegExp(invoiceNumber) }).first().click();
+await page.getByRole("button", { name: "More" }).click();
+await page.getByRole("button", { name: "Issue credit note" }).click();
+const creditSheet = page.getByRole("dialog");
+await creditSheet.getByRole("checkbox").first().check();
+await creditSheet.getByLabel("Reason").fill("Session cancelled by the practice");
+const [cnPdf] = await Promise.all([
+  page.waitForEvent("download"),
+  creditSheet.getByRole("button", { name: /Issue credit note of £677\.65/ }).click(),
+]);
+if (cnPdf.suggestedFilename() !== "CN-0001.pdf") await fail(`credit note file ${cnPdf.suggestedFilename()}`);
+await page.getByRole("heading", { name: "Credit notes" }).waitFor();
+await shot("11c-credit-note");
+
 step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await mobile.addCookies(await ctx.cookies());

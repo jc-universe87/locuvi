@@ -40,6 +40,13 @@ def backup(settings: Settings, dest: Path) -> dict:
         rows = dst.execute(
             "SELECT local_pdf_path, local_pdf_sha256 FROM invoice WHERE status != 'draft'"
         ).fetchall()
+        n_invoices = len(rows)
+        try:  # credit notes (migration 0012+) are immutable PDFs too
+            rows += dst.execute(
+                "SELECT local_pdf_path, local_pdf_sha256 FROM credit_note"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            pass
         src.close()
         dst.close()
         from locuvi.storage.local import sha256_file
@@ -59,7 +66,8 @@ def backup(settings: Settings, dest: Path) -> dict:
             )
         manifest = {
             "created_at": datetime.now(UTC).isoformat(),
-            "issued_invoices": len(rows),
+            "issued_invoices": n_invoices,
+            "credit_notes": len(rows) - n_invoices,
             "pdfs": {p: sha for p, sha in rows},
         }
         (Path(tmp) / MANIFEST).write_text(json.dumps(manifest, indent=2))

@@ -142,6 +142,8 @@ class InvoiceSequence(TimestampMixin, Base):
     prefix: Mapped[str] = mapped_column(String(40), default="LOC-2026-")
     next_number: Mapped[int] = mapped_column(Integer, default=1)
     padding: Mapped[int] = mapped_column(Integer, default=4)
+    credit_prefix: Mapped[str] = mapped_column(String(40), default="CN-")
+    credit_next_number: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class PensionPolicy(TimestampMixin, Base):
@@ -229,6 +231,9 @@ class Invoice(TimestampMixin, Base):
     )
     payments: Mapped[list[Payment]] = relationship(
         back_populates="invoice", order_by="Payment.paid_on", lazy="selectin"
+    )
+    credit_notes: Mapped[list[CreditNote]] = relationship(
+        "CreditNote", order_by="CreditNote.created_at", viewonly=True
     )
     archive_jobs: Mapped[list[ArchiveJob]] = relationship(
         back_populates="invoice", order_by="ArchiveJob.created_at", lazy="selectin"
@@ -586,3 +591,27 @@ class CalendarFeed(Base):
     token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     include_fees: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class CreditNote(Base):
+    """Credit against an issued invoice (whole lines). Immutable once created, like invoices:
+    own number series, frozen snapshot and PDF. Amounts are positive and reduce what is owed."""
+
+    __tablename__ = "credit_note"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    number: Mapped[str] = mapped_column(String(60), unique=True)
+    invoice_id: Mapped[str] = mapped_column(ForeignKey("invoice.id"), index=True)
+    credit_date: Mapped[date] = mapped_column(Date)
+    reason: Mapped[str] = mapped_column(Text)
+    line_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    fee_subtotal: Mapped[Decimal] = mapped_column(DecimalString)
+    pensionable_basic_total: Mapped[Decimal] = mapped_column(DecimalString)
+    pensionable_pay: Mapped[Decimal] = mapped_column(DecimalString)
+    employer_contribution: Mapped[Decimal] = mapped_column(DecimalString)
+    grand_total: Mapped[Decimal] = mapped_column(DecimalString)
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    local_pdf_path: Mapped[str] = mapped_column(String(300))
+    local_pdf_sha256: Mapped[str] = mapped_column(String(64))
+    idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

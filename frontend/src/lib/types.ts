@@ -56,7 +56,8 @@ export interface Line {
 }
 
 export interface PaymentState {
-  state: "unpaid" | "part_paid" | "paid" | "overdue" | "n/a";
+  state: "unpaid" | "part_paid" | "paid" | "overdue" | "credited" | "n/a";
+  credited?: string;
   paid: string | null;
   outstanding: string | null;
   days_overdue: number;
@@ -90,6 +91,7 @@ export interface InvoiceDetail extends InvoiceSummary {
   lines: Line[];
   payments: { id: string; paid_on: string; amount: string; method: string; reference: string | null }[];
   events: { timestamp: string; event_type: string; metadata: Record<string, unknown> }[];
+  credit_notes?: { id: string; number: string; credit_date: string; reason: string; grand_total: string; line_ids: string[] }[];
   correspondence?: (
     | { type: "sent"; at: string; to: string[]; subject: string | null }
     | { type: "document"; at: string; id: string; title: string; kind: DocKind; source: string }

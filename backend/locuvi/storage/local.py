@@ -41,14 +41,18 @@ def _fsync_dir(path: Path) -> None:
         os.close(fd)
 
 
-def write_issued_pdf(data_dir: Path, invoice_id: str, data: bytes) -> StoredFile:
-    """Write ``invoices/issued/{invoice_id}.pdf`` via temp file, fsync and rename.
+def write_issued_pdf(
+    data_dir: Path, invoice_id: str, data: bytes, folder: str = "issued"
+) -> StoredFile:
+    """Write ``invoices/{folder}/{invoice_id}.pdf`` via temp file, fsync and rename.
 
     Refuses to replace an existing file with *different* content: an issued
     artifact is never silently overwritten.
     """
     uuid.UUID(invoice_id)  # path-safety: only UUID basenames
-    rel = f"invoices/issued/{invoice_id}.pdf"
+    if folder not in {"issued", "credit"}:
+        raise ValueError("unknown PDF folder")
+    rel = f"invoices/{folder}/{invoice_id}.pdf"
     target = data_dir / rel
     target.parent.mkdir(parents=True, exist_ok=True)
     digest = sha256_bytes(data)

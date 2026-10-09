@@ -461,6 +461,17 @@ def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
                 )
             ],
             "correspondence": _correspondence(s, inv.id),
+            "credit_notes": [
+                {
+                    "id": c.id,
+                    "number": c.number,
+                    "credit_date": c.credit_date,
+                    "reason": c.reason,
+                    "grand_total": str(c.grand_total),
+                    "line_ids": c.line_ids,
+                }
+                for c in inv.credit_notes
+            ],
         }
     )
     if inv.status == "draft":
@@ -643,6 +654,41 @@ def duplicate(invoice_id: str, s: DB) -> dict[str, Any]:
 @api.post("/invoices/{invoice_id}/void")
 def void(invoice_id: str, body: S.VoidIn, s: DB) -> dict[str, Any]:
     return _detail(s, svc.void(s, svc.get_invoice(s, invoice_id), body.reason))
+
+
+@api.post("/invoices/{invoice_id}/credit-notes/preview")
+def credit_preview(invoice_id: str, body: S.CreditIn, s: DB) -> dict[str, str]:
+    from locuvi.services import credit_notes
+
+    return credit_notes.compute(s, svc.get_invoice(s, invoice_id), body.line_ids).as_strings()
+
+
+@api.post("/invoices/{invoice_id}/credit-notes", status_code=201)
+def credit_issue(
+    invoice_id: str,
+    body: S.CreditIn,
+    request: Request,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")] = "",
+) -> dict[str, Any]:
+    from locuvi.services import credit_notes
+
+    cn = credit_notes.issue(
+        state(request).settings, invoice_id, body.line_ids, body.reason, idempotency_key
+    )
+    return credit_notes.as_dict(cn)
+
+
+@api.get("/credit-notes/{credit_id}/pdf")
+def credit_pdf(credit_id: str, request: Request, s: DB) -> FileResponse:
+    from locuvi.models import CreditNote
+
+    cn = s.get(CreditNote, credit_id)
+    if cn is None:
+        raise NotFound("credit.not_found", "Credit note not found.")
+    path = resolve(state(request).settings.data_dir, cn.local_pdf_path)
+    if not path.is_file() or sha256_file(path) != cn.local_pdf_sha256:
+        raise Conflict("credit.pdf_problem", "The credit note file is missing or altered.")
+    return FileResponse(path, media_type="application/pdf", filename=f"{cn.number}.pdf")
 
 
 @api.post("/invoices/{invoice_id}/split-by-month")

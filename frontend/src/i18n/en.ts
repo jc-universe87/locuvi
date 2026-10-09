@@ -917,6 +917,21 @@ const en = {
   "corr.sent": "Invoice email",
   "corr.sent_to": "Sent to {to} · {when}",
   "corr.invoice": "Invoice",
+  "credit.open": "Issue credit note",
+  "credit.title": "Credit notes",
+  "credit.credited": "Credited",
+  "credit.sheet_title": "Credit note for {number}",
+  "credit.explain": "Use a credit note when a practice has already booked this invoice and some sessions need taking off. The invoice stays as issued; the credit note reduces what's owed and your pension figures.",
+  "credit.reason": "Reason",
+  "credit.reason_placeholder": "e.g. Session on 3 Oct cancelled by the practice",
+  "credit.issue": "Issue credit note",
+  "credit.issue_total": "Issue credit note of {total}",
+  "credit.immutable": "Credit notes get their own number (CN-…) and can't be edited once issued.",
+  "error.credit.reason_required": "Say why you are crediting this invoice.",
+  "error.credit.no_lines": "Choose at least one line to credit.",
+  "error.credit.already_credited": "Some of these lines are already credited.",
+  "error.credit.not_issued": "Only issued invoices can be credited.",
+  "error.invoice.void_has_credits": "This invoice has credit notes, so it can't be voided.",
 } as const;
 
 export type MessageKey = keyof typeof en;
