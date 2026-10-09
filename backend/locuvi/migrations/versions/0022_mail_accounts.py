@@ -36,7 +36,10 @@ def upgrade() -> None:
     # never-configured row is dropped so the list starts empty.
     op.execute(
         "DELETE FROM mailbox_config WHERE enabled = 0 AND COALESCE(host, '') = '' "
-        "AND password_ciphertext IS NULL AND ms_token_ciphertext IS NULL"
+        "AND COALESCE(username, '') = '' AND ms_client_id IS NULL "
+        "AND password_ciphertext IS NULL AND ms_token_ciphertext IS NULL "
+        "AND COALESCE(folders, '[]') = '[]' "
+        "AND NOT EXISTS (SELECT 1 FROM mail_folder_state)"
     )
     op.execute("UPDATE mailbox_config SET label = COALESCE(NULLIF(username, ''), host, '')")
     op.execute(

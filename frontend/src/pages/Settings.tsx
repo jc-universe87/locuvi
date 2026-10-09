@@ -839,7 +839,7 @@ function MailAccountEditor({ initial, onBack, onRemoved }: {
     setFolders((await api.post<{ folders: Folder[] }>(`/settings/mailboxes/${saved.id}/folders`)).folders);
   });
   const startSignIn = () => run(async () => {
-    const saved = cfg.id ? cfg : await persist({ enabled: false });
+    const saved = await persist({ enabled: false }); // keep edits made before signing in
     setCfg({ ...saved, ms_client_id: cfg.ms_client_id });
     setSignin(await api.post<SignIn>(`/settings/mailboxes/${saved.id}/microsoft/start`,
       { client_id: cfg.ms_client_id.trim(), tenant: cfg.ms_tenant }));

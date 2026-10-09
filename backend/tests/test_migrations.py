@@ -189,3 +189,32 @@ def test_0022_unused_mailbox_row_is_dropped(tmp_path):
     with eng.connect() as c:
         assert c.execute(text("SELECT COUNT(*) FROM mailbox_config")).scalar() == 0
     eng.dispose()
+
+
+def test_0022_keeps_a_signed_out_microsoft_mailbox(tmp_path):
+    eng = db.init_engine(tmp_path / "s.db")
+    upgrade(eng, "0021")
+    with eng.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO mailbox_config (id, enabled, provider, ms_client_id, ms_tenant, host,"
+                " port, security, username, folders, since_days, auto_scan, updated_at) VALUES"
+                " (1, 0, 'microsoft', '00000000-0000-0000-0000-000000000000', 'common', '', 993,"
+                " 'ssl', 'alex@example.invalid', '[\"f1\"]', 90, 1, '2026-10-01 00:00:00')"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO mail_folder_state (folder, uidvalidity, last_uid, cursor)"
+                " VALUES ('f1', -1, 0, 'https://graph.microsoft.com/v1.0/delta?x')"
+            )
+        )
+    upgrade(eng)
+    with eng.connect() as c:
+        assert c.execute(text("SELECT username FROM mailbox_config")).all() == [
+            ("alex@example.invalid",)
+        ]
+        assert c.execute(text("SELECT account_id, cursor FROM mail_folder_progress")).all() == [
+            (1, "https://graph.microsoft.com/v1.0/delta?x")
+        ]
+    eng.dispose()
