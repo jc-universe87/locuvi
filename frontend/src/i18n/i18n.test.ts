@@ -42,7 +42,7 @@ describe("i18n catalogues", () => {
     for (const k of ["uninvoiced_month", "uninvoiced_current", "draft_stale", "po_missing", "invoice_overdue",
       "invoice_due_soon", "invoice_awaiting", "session_duplicate", "session_overlap", "pension_due", "pension_overdue", "pension_deadline_not_invoiced", "pension_deadline_unpaid", "pension_deadline_form_a", "pension_deadline_form_b", "pension_deadline_passed",
       "pension_changed", "pension_tier_missing", "practice_no_address", "archive_failed", "archive_conflict",
-      "backup_never", "backup_stale", "proposals_pending", "inbox_waiting", "mailbox_failed", "bank_unmatched", "form_a_chase", "pcse_mismatch", "refund_due"]) expect(en).toHaveProperty(`finding.${k}`);
+      "backup_never", "backup_stale", "restore_drill_failed", "backup_offsite_failed", "backup_offsite_off", "proposals_pending", "inbox_waiting", "mailbox_failed", "bank_unmatched", "form_a_chase", "pcse_mismatch", "refund_due"]) expect(en).toHaveProperty(`finding.${k}`);
     for (const f of ["needs_practice", "needs_rate", "duplicate", "rate_differs", "clash", "not_in_diary", "invoiced", "cancel"])
       expect(en).toHaveProperty(`booking.flag_${f}`);
     for (const k of ["booking", "remittance", "statement", "pension", "other"]) expect(en).toHaveProperty(`inbox.kind_${k}`);

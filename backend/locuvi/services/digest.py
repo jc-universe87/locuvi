@@ -62,6 +62,12 @@ TEXT: dict[str, str] = {
     "archive_conflict": "Nextcloud already has a different file for {number}.",
     "backup_never": "No backup has been made yet.",
     "backup_stale": "The last backup was {days} days ago.",
+    "restore_drill_failed": "The latest backup ({file}) failed its restore check: {error}",
+    "backup_offsite_failed": "The encrypted backup copy did not reach Nextcloud ({error}).",
+    "backup_offsite_off": (
+        "Backups are only on this server. Set a backup passphrase to keep an encrypted copy "
+        "in Nextcloud."
+    ),
     "proposals_pending": "{n} suggested diary change(s) are waiting for you in the inbox.",
     "inbox_waiting": "{n} document(s) have been in your inbox for a few days.",
     "form_a_chase": (

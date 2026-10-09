@@ -1,12 +1,15 @@
 """Operator commands.
 
   python -m locuvi.cli backup  /backups/locuvi-YYYYmmdd.tar.gz
-  python -m locuvi.cli restore /backups/locuvi-YYYYmmdd.tar.gz [--force]
+  python -m locuvi.cli restore /backups/locuvi-YYYYmmdd.tar.gz[.enc] [--force]
+  python -m locuvi.cli drill   [/backups/file]     # verify a backup restores, touching nothing
+  python -m locuvi.cli decrypt in.tar.gz.enc out.tar.gz
   python -m locuvi.cli verify
   python -m locuvi.cli example-pdf out.pdf
 
-Backups contain banking details: encrypt them before they leave the machine
-(see README "Backups"). Uses DATA_DIR from the environment.
+Backups contain banking details. With BACKUP_PASSPHRASE_FILE set, the nightly backup is
+also encrypted and copied to Nextcloud (README "Backups"). Encrypted files are read with the
+same passphrase (or --passphrase-file). Uses DATA_DIR from the environment.
 """
 
 from __future__ import annotations
@@ -85,20 +88,77 @@ def backup(settings: Settings, dest: Path) -> dict:
     return manifest
 
 
-def restore(settings: Settings, src: Path, force: bool = False) -> dict:
+def _check_extracted(root: Path) -> dict:
+    """Everything a restore relies on, checked in an extracted backup before it is used."""
     from locuvi.storage.local import sha256_file
 
+    manifest = json.loads((root / MANIFEST).read_text())
+    for rel, sha in manifest["pdfs"].items():
+        f = root / rel
+        if not f.is_file() or sha256_file(f) != sha:
+            raise SystemExit(f"backup is damaged: {rel} missing or altered")
+    db_file = root / "locuvi.db"
+    if not db_file.is_file():
+        raise SystemExit("backup is damaged: database missing")
+    con = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True)
+    try:
+        if con.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise SystemExit("backup is damaged: database integrity check failed")
+        issued = con.execute("SELECT count(*) FROM invoice WHERE status != 'draft'").fetchone()[0]
+        if issued != manifest["issued_invoices"]:
+            raise SystemExit("backup is damaged: issued invoice count differs from manifest")
+        if not con.execute("SELECT version_num FROM alembic_version").fetchone():
+            raise SystemExit("backup is damaged: no schema version")
+    except sqlite3.DatabaseError as exc:
+        raise SystemExit(f"backup is damaged: {exc}") from None
+    finally:
+        con.close()
+    return manifest
+
+
+def _plain_archive(src: Path, tmp: Path, passphrase: str | None) -> Path:
+    """The tar.gz to read: src itself, or src decrypted into tmp."""
+    from locuvi import backup_crypto
+
+    with src.open("rb") as f:
+        encrypted = f.read(len(backup_crypto.MAGIC)) == backup_crypto.MAGIC
+    if not encrypted:
+        return src
+    if not passphrase:
+        raise SystemExit("backup is encrypted: set BACKUP_PASSPHRASE_FILE or --passphrase-file")
+    out = tmp / "backup.tar.gz"
+    try:
+        backup_crypto.decrypt_file(src, out, passphrase)
+    except backup_crypto.DecryptError as exc:
+        raise SystemExit(f"cannot decrypt backup: {exc}") from None
+    return out
+
+
+def check_backup(src: Path, passphrase: str | None = None) -> dict:
+    """Restore drill: decrypt (if needed), extract to a scratch folder and verify everything
+    a restore relies on, without touching the live data."""
+    with tempfile.TemporaryDirectory() as tmp:
+        plain = _plain_archive(src, Path(tmp), passphrase)
+        root = Path(tmp) / "x"
+        try:
+            with tarfile.open(plain, "r:gz") as tar:
+                tar.extractall(root, filter="data")
+        except (tarfile.TarError, OSError, EOFError) as exc:
+            raise SystemExit(f"backup is damaged: {exc}") from None
+        return _check_extracted(root)
+
+
+def restore(
+    settings: Settings, src: Path, force: bool = False, passphrase: str | None = None
+) -> dict:
     if settings.db_path.exists() and not force:
         raise SystemExit("DATA_DIR already has a database; stop the app and use --force")
     with tempfile.TemporaryDirectory() as tmp:
-        with tarfile.open(src, "r:gz") as tar:
-            tar.extractall(tmp, filter="data")
-        root = Path(tmp)
-        manifest = json.loads((root / MANIFEST).read_text())
-        for rel, sha in manifest["pdfs"].items():
-            f = root / rel
-            if not f.is_file() or sha256_file(f) != sha:
-                raise SystemExit(f"backup is damaged: {rel} missing or altered")
+        plain = _plain_archive(src, Path(tmp), passphrase or settings.backup_passphrase)
+        root = Path(tmp) / "x"
+        with tarfile.open(plain, "r:gz") as tar:
+            tar.extractall(root, filter="data")
+        manifest = _check_extracted(root)
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         for suffix in ("", "-wal", "-shm"):
             Path(str(settings.db_path) + suffix).unlink(missing_ok=True)
@@ -225,20 +285,46 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("restore")
     r.add_argument("src", type=Path)
     r.add_argument("--force", action="store_true")
+    r.add_argument("--passphrase-file", type=Path)
+    d = sub.add_parser("drill", help="check that a backup (default: the latest) restores")
+    d.add_argument("src", type=Path, nargs="?")
+    d.add_argument("--passphrase-file", type=Path)
+    x = sub.add_parser("decrypt", help="decrypt an off-server backup copy")
+    x.add_argument("src", type=Path)
+    x.add_argument("dest", type=Path)
+    x.add_argument("--passphrase-file", type=Path)
     sub.add_parser("verify")
     sub.add_parser("reset-password", help="forget the in-app password; use the secret file again")
     e = sub.add_parser("example-pdf")
     e.add_argument("out", type=Path)
     args = ap.parse_args(argv)
     settings = Settings.from_env()
+    pf = getattr(args, "passphrase_file", None)
+    passphrase = pf.read_text(encoding="utf-8").strip() if pf else settings.backup_passphrase
 
     if args.cmd == "backup":
         m = backup(settings, args.dest)
         print(f"backup written: {args.dest} ({m['issued_invoices']} issued PDFs)")
     elif args.cmd == "restore":
-        m = restore(settings, args.src, args.force)
+        m = restore(settings, args.src, args.force, passphrase)
         print(f"restored {m['issued_invoices']} issued PDFs and database from {args.src}")
         print("start the app and check /api/v1/health/ready")
+    elif args.cmd == "drill":
+        from locuvi.services import backups
+
+        result = backups.restore_drill(settings, args.src, passphrase)
+        print(json.dumps(result, indent=2))
+        return 0 if result["ok"] else 1
+    elif args.cmd == "decrypt":
+        from locuvi import backup_crypto
+
+        if not passphrase:
+            raise SystemExit("set BACKUP_PASSPHRASE_FILE or --passphrase-file")
+        try:
+            backup_crypto.decrypt_file(args.src, args.dest, passphrase)
+        except backup_crypto.DecryptError as exc:
+            raise SystemExit(f"cannot decrypt: {exc}") from None
+        print(f"decrypted to {args.dest}")
     elif args.cmd == "verify":
         result = verify(settings)
         print(json.dumps(result, indent=2))

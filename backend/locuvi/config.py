@@ -68,19 +68,24 @@ class Settings:
     key_dir: Path = Path("/keys")
     static_dir: Path | None = None
     auth_mode: str = "password"  # "password" | "gateway"
-    password: str | None = None
+    password: str | None = field(default=None, repr=False)
     cookie_secure: bool = True
     session_hours: int = 12
     webdav_allowlist: WebDavAllowlist = field(default_factory=WebDavAllowlist)
     webdav_allow_http_for_allowlisted: bool = False
     webdav_timeout_seconds: float = 20.0
-    webdav_password_override: str | None = None
+    webdav_password_override: str | None = field(default=None, repr=False)
     encryption_key_file: Path | None = None
     worker_enabled: bool = True
     worker_poll_seconds: float = 15.0
     backup_dir: Path | None = None  # automatic nightly backups go here (BACKUP_DIR)
     backup_keep_days: int = 30
-    ai_api_key_override: str | None = None  # ANTHROPIC_API_KEY_FILE (else the key saved in app)
+    # Off-server copy: encrypted with this passphrase (BACKUP_PASSPHRASE_FILE) and uploaded to
+    # the Nextcloud/WebDAV target under BACKUP_REMOTE_PATH. Never stored in the database.
+    backup_passphrase: str | None = field(default=None, repr=False)
+    backup_remote_path: str = "Locuvi/Backups"
+    # ANTHROPIC_API_KEY_FILE (else the key saved in the app)
+    ai_api_key_override: str | None = field(default=None, repr=False)
     ai_model: str = "claude-opus-5-5"
     log_level: str = "INFO"
 
@@ -126,6 +131,9 @@ class Settings:
             log_level=e.get("LOG_LEVEL", "INFO").upper(),
             backup_dir=Path(e["BACKUP_DIR"]) if e.get("BACKUP_DIR") else None,
             backup_keep_days=int(e.get("BACKUP_KEEP_DAYS", "30")),
+            backup_passphrase=_read_secret_file(e.get("BACKUP_PASSPHRASE_FILE")),
+            backup_remote_path=e.get("BACKUP_REMOTE_PATH", "Locuvi/Backups").strip("/ ")
+            or "Locuvi/Backups",
             ai_api_key_override=_read_secret_file(e.get("ANTHROPIC_API_KEY_FILE")),
             ai_model=e.get("LOCUVI_AI_MODEL", "claude-opus-5-5").strip() or "claude-opus-5-5",
         )

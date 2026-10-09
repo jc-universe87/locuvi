@@ -173,10 +173,8 @@ class WebDavClient:
             raise WebDavError("base_not_found", "parent folder does not exist")
         raise classify_status(resp, "MKCOL")
 
-    def put(self, encoded_rel: str, data: bytes) -> None:
-        resp = self._send(
-            "PUT", encoded_rel, content=data, headers={"Content-Type": "application/pdf"}
-        )
+    def put(self, encoded_rel: str, data: bytes, content_type: str = "application/pdf") -> None:
+        resp = self._send("PUT", encoded_rel, content=data, headers={"Content-Type": content_type})
         if resp.status_code in (200, 201, 204):
             return
         if resp.status_code == 409:

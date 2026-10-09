@@ -44,7 +44,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | --- | --- | --- |
 | Owner setup: sender/bank, numbering, pension rate check, practices, first test invoice | 🔜 | In the app; verify 14.38% / 90% against current NHSBSA guidance |
 | Nightly backup | ✅ | Automatic after 02:00 into `/backups` (30 days kept), "Back up now" on Today |
-| Off-server encrypted copy of `backups/` | 🔜 | README §5 |
+| Off-server encrypted copy of `backups/` | 🔜 | Built in: create `secrets/backup_passphrase.txt` and enable it in compose (README §5) |
 | Restore drill on the real server (once) | 🔜 | `locuvi.cli restore` into a scratch volume, then `verify` |
 | Merge working branch into `main`; deploy from `main` | 🔜 | Owner to approve PR |
 | HTTPS on the intranet (Caddy internal CA or Tailscale serve) | 🧭 | Plain http on LAN is readable by others on that network |
@@ -63,8 +63,8 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | Atomic multi-invoice bank matching (all payments + "matched" in one transaction; failure-injection tests) | ✅ |
 | Refund owed after a credit note on a paid invoice: "refund_due" state, finding, "Record refund" (negative payment with undo), netted in cash reports and Form B | ✅ |
 | AI attachments only with explicit per-document approval (audited; automatic email scans never send files); stronger redaction (patient lines dropped; emails, phones, postcodes, bank details, NHS and long numbers masked) | ✅ |
-| Credit notes archived to Nextcloud | ✅ | Own jobs at `<base>/YYYY/MM/CN-….pdf`, SHA-256 verified, never overwritten; status on the invoice page; included in "Archive all" |
-| Encrypted off-server backups + automatic restore drill | 🔜 |
+| Credit notes archived to Nextcloud: own jobs at `<base>/YYYY/MM/CN-….pdf`, SHA-256 verified, never overwritten; status on the invoice page; included in "Archive all" | ✅ |
+| Encrypted off-server backups (passphrase secret; scrypt + AES-256-GCM; uploaded to Nextcloud, SHA-256 verified, never overwritten) + automatic restore drill after every backup (`locuvi.cli drill` / `decrypt`; failures on Today) | ✅ |
 | CI on GitHub Actions; `main` as the stable branch | 🔜 |
 
 ## Part 3 — Product roadmap

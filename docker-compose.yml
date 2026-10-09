@@ -26,8 +26,14 @@ services:
       # Automatic nightly backup (after 02:00) into the /backups volume; 30 days kept.
       BACKUP_DIR: /backups
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      # Encrypted off-server copy of each backup, uploaded to your Nextcloud under
+      # BACKUP_REMOTE_PATH and checked by a restore drill. Uncomment the two
+      # backup_passphrase lines below after creating secrets/backup_passphrase.txt.
+      BACKUP_PASSPHRASE_FILE: /run/secrets/backup_passphrase
+      BACKUP_REMOTE_PATH: ${BACKUP_REMOTE_PATH:-Locuvi/Backups}
     secrets:
       - locuvi_password
+      # - backup_passphrase
     volumes:
       - locuvi-data:/data
       - locuvi-keys:/keys
@@ -50,6 +56,8 @@ services:
 secrets:
   locuvi_password:
     file: ./secrets/locuvi_password.txt
+  # backup_passphrase:
+  #   file: ./secrets/backup_passphrase.txt
 
 volumes:
   locuvi-data:

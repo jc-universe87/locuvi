@@ -212,10 +212,26 @@ keeping 30 days (`BACKUP_KEEP_DAYS`). If a backup is missing or old, Today shows
 **Back up now** button. Each archive is a consistent snapshot (SQLite online backup + every issued
 PDF + checksum manifest) and is refused if any issued PDF is missing or altered.
 
-Archives contain bank details. Copy them **off the server, encrypted**, e.g. nightly:
+Archives contain bank details. To keep an **encrypted copy off the server**, give Locuvi a
+backup passphrase (at least 12 characters, kept somewhere other than this server, e.g. your
+password manager — without it the off-server copies cannot be read):
 ```bash
-age -p -o offsite/locuvi-$(date +%F).tar.gz.age "$(ls -t backups/locuvi-*.tar.gz | head -1)"
-# or rclone/restic to another machine
+openssl rand -base64 24 > secrets/backup_passphrase.txt && chmod 600 secrets/backup_passphrase.txt
+# then uncomment the two `backup_passphrase` lines in docker-compose.yml and:
+docker compose up -d
+```
+Every backup is then encrypted (scrypt + AES-256-GCM, tamper-evident) and uploaded to your
+Nextcloud under `Locuvi/Backups/` (`BACKUP_REMOTE_PATH`) using the WebDAV settings — never
+overwriting a file and only counted once its SHA-256 matches. Locuvi does not delete old remote
+copies; tidy them in Nextcloud when you like. After each backup a **restore drill** decrypts the
+newest copy into a scratch folder and checks every PDF checksum, the database integrity and the
+invoice count, without touching live data. Today shows it if the drill or the upload fails, or
+if backups are still on this server only.
+
+Run a drill yourself, or decrypt an off-server copy by hand:
+```bash
+docker compose exec locuvi python -m locuvi.cli drill                 # latest backup
+python -m locuvi.cli decrypt locuvi-….tar.gz.enc out.tar.gz --passphrase-file pass.txt
 ```
 Also keep a copy of the keys volume (separately, encrypted) if you store the WebDAV or email
 password in the UI:
@@ -228,7 +244,9 @@ Restore (verified against the manifest checksums before anything is written):
 
 ```bash
 docker compose stop locuvi
-docker compose run --rm --no-deps locuvi python -m locuvi.cli restore /backups/locuvi-2026-10-31.tar.gz --force
+docker compose run --rm --no-deps locuvi python -m locuvi.cli restore /backups/locuvi-2026-10-31-020000.tar.gz --force
+# an encrypted .tar.gz.enc copy (e.g. downloaded from Nextcloud) restores the same way;
+# the passphrase comes from the secret, or add --passphrase-file
 docker compose up -d
 docker compose exec locuvi python -m locuvi.cli verify     # prints {"ok": true, ...}
 docker compose exec locuvi python -m locuvi.cli reset-password  # forgot the in-app password

@@ -31,7 +31,7 @@ from locuvi.models import (
 from locuvi.secrets_store import SecretBox, SecretUnavailable
 from locuvi.services import core
 from locuvi.storage.local import resolve, sha256_bytes
-from locuvi.webdav.client import PAUSING_ERRORS, WebDavClient, WebDavError
+from locuvi.webdav.client import MAX_DOWNLOAD, PAUSING_ERRORS, WebDavClient, WebDavError
 from locuvi.webdav.urlguard import (
     InvalidPath,
     UrlBlocked,
@@ -444,7 +444,14 @@ def _client(ctx: ArchiveContext, vurl: ValidatedUrl, user: str, pw: str) -> WebD
 # ------------------------------------------------------------------- processing
 
 
-def upload_verified(c: WebDavClient, rel: str, data: bytes, sha: str, tag: str) -> str | None:
+def upload_verified(
+    c: WebDavClient,
+    rel: str,
+    data: bytes,
+    sha: str,
+    tag: str,
+    content_type: str = "application/pdf",
+) -> str | None:
     """Upload idempotently without ever replacing different remote content.
 
     Returns the remote etag (if reported). Raises WebDavError('conflict') if a
@@ -458,10 +465,10 @@ def upload_verified(c: WebDavClient, rel: str, data: bytes, sha: str, tag: str) 
 
     existing = c.stat(rel)
     if existing.exists:
-        return _confirm_same(c, rel, sha, existing.etag)
+        return _confirm_same(c, rel, sha, existing.etag, max(len(data), MAX_DOWNLOAD))
 
     part = "/".join([*folder, f".{name}.locuvi-{tag}.part"])
-    c.put(part, data)
+    c.put(part, data, content_type)
     try:
         moved = c.move_no_overwrite(part, rel)
     except WebDavError:
@@ -469,15 +476,17 @@ def upload_verified(c: WebDavClient, rel: str, data: bytes, sha: str, tag: str) 
         raise
     if not moved:
         c.delete_quietly(part)
-        return _confirm_same(c, rel, sha, None)
-    remote_sha = c.get_sha256(rel)
+        return _confirm_same(c, rel, sha, None, max(len(data), MAX_DOWNLOAD))
+    remote_sha = c.get_sha256(rel, max_bytes=max(len(data), MAX_DOWNLOAD))
     if remote_sha != sha:
         raise WebDavError("verify_failed", "remote file does not match after upload")
     return c.stat(rel).etag
 
 
-def _confirm_same(c: WebDavClient, rel: str, sha: str, etag: str | None) -> str | None:
-    remote_sha = c.get_sha256(rel)
+def _confirm_same(
+    c: WebDavClient, rel: str, sha: str, etag: str | None, max_bytes: int = MAX_DOWNLOAD
+) -> str | None:
+    remote_sha = c.get_sha256(rel, max_bytes=max_bytes)
     if remote_sha is None:
         raise WebDavError("protocol_error", "remote file vanished during verification")
     if remote_sha != sha:

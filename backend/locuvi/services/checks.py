@@ -402,10 +402,27 @@ def _backup(s: Session, settings: Settings, today: date) -> list[Finding]:
     if last is None:
         return [Finding(key="backup_never", kind="backup_never", severity="warn", action=act)]
     days = (today - last.astimezone(core.LONDON).date()).days
+    out = []
     if days > 8:
-        return [Finding(key=f"backup_stale:{today.isoformat()}", kind="backup_stale",
-                        severity="warn", params={"days": days}, action=act)]  # fmt: skip
-    return []
+        out.append(Finding(key=f"backup_stale:{today.isoformat()}", kind="backup_stale",
+                           severity="warn", params={"days": days}, action=act))  # fmt: skip
+    from locuvi.services import backups
+
+    drill = backups.read_marker(settings, backups.DRILL_MARKER)
+    if drill and not drill.get("ok"):
+        out.append(Finding(key=f"restore_drill_failed:{drill.get('at')}",
+                           kind="restore_drill_failed", severity="urgent",
+                           params={"file": drill.get("file", ""), "error": drill.get("error", "")},
+                           action=act, dismissible=False))  # fmt: skip
+    offsite = backups.read_marker(settings, backups.OFFSITE_MARKER) or {}
+    if offsite.get("status") == "failed":
+        out.append(Finding(key=f"backup_offsite_failed:{offsite.get('at')}",
+                           kind="backup_offsite_failed", severity="warn",
+                           params={"error": offsite.get("error", "")}, action=act))  # fmt: skip
+    elif not settings.backup_passphrase or offsite.get("status") == "local_only":
+        out.append(Finding(key="backup_offsite_off", kind="backup_offsite_off",
+                           severity="info"))  # fmt: skip
+    return out
 
 
 # ------------------------------------------------------------------ helpers
