@@ -65,7 +65,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | AI attachments only with explicit per-document approval (audited; automatic email scans never send files); stronger redaction (patient lines dropped; emails, phones, postcodes, bank details, NHS and long numbers masked) | ✅ |
 | Credit notes archived to Nextcloud: own jobs at `<base>/YYYY/MM/CN-….pdf`, SHA-256 verified, never overwritten; status on the invoice page; included in "Archive all" | ✅ |
 | Encrypted off-server backups (passphrase secret; scrypt + AES-256-GCM; uploaded to Nextcloud, SHA-256 verified, never overwritten) + automatic restore drill after every backup (`locuvi.cli drill` / `decrypt`; failures on Today) | ✅ |
-| CI on GitHub Actions; `main` as the stable branch | 🔜 |
+| CI on GitHub Actions (`.github/workflows/ci.yml`: backend ruff + format + pytest, frontend test + typecheck + build, Docker image) on every PR and push to `main`; `main` as the stable branch (owner: set it as the default branch and protect it in GitHub settings) | ✅ |
 
 ## Part 3 — Product roadmap
 

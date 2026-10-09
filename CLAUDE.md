@@ -14,7 +14,8 @@ never submit pension forms or send email without an explicit owner tap.
   `services/pension.py`, `services/reports.py` (+ Today overview), `services/checks.py`
   (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,
   audit), `services/mailbox.py` (read-only IMAP, chosen folders only),
-  `services/bank.py` (CSV statement → credits only → deterministic matches), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
+  `services/bank.py` (CSV statement → credits only → deterministic matches), `services/backups.py`
+  + `backup_crypto.py` (nightly backup, encrypted off-server copy, restore drill), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
   read tools + draft-only tools, never send/issue/pay/submit), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas, `inbox.py`, `mcp.py` = Bevro MCP server with
@@ -30,6 +31,7 @@ never submit pension forms or send email without an explicit owner tap.
   file to the next `NNNN_` prefix and replace `locuvi.models.*` column types with `sa.*`.
 - Frontend: `cd frontend && npm test && npm run typecheck && npm run build`
 - Docker: `docker compose up -d --build` (needs `secrets/locuvi_password.txt`).
+- CI: `.github/workflows/ci.yml` runs the backend and frontend checks above on PRs and `main`.
 
 ## Rules that must not regress
 - Never use float for money; amounts cross the API as decimal strings.
