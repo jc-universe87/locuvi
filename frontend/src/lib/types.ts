@@ -246,6 +246,7 @@ export interface Finding {
     | { type: "open_settings"; section: string }
     | { type: "backup_now" }
     | { type: "open_inbox" }
+    | { type: "open_bank" }
     | null;
   dismissible: boolean;
 }
@@ -339,4 +340,19 @@ export interface MailboxConfig {
   last_scan_at: string | null;
   last_error: string | null;
   last_result: ScanResult | null;
+}
+
+export interface BankTx {
+  id: string;
+  booked_on: string;
+  amount: string;
+  description: string;
+  status: "suggested" | "unmatched" | "matched" | "ignored";
+  suggestion: {
+    kind: "number" | "amount" | "amount_practice" | "combined";
+    confidence: "high" | "medium";
+    invoices: { id: string; number: string; practice: string; amount: string }[];
+  } | null;
+  payment_ids: string[];
+  source_name: string;
 }

@@ -487,3 +487,24 @@ class Proposal(Base):
     result_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class BankTransaction(Base):
+    """A credit (money in) from an imported bank statement. Debits are never stored.
+
+    status: suggested (a deterministic match is proposed) | unmatched | matched | ignored.
+    """
+
+    __tablename__ = "bank_transaction"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True)
+    booked_on: Mapped[date] = mapped_column(Date, index=True)
+    amount: Mapped[Decimal] = mapped_column(DecimalString)
+    description: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(12), default="unmatched", index=True)
+    suggestion_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    payment_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    source_name: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

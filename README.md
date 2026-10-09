@@ -114,8 +114,9 @@ NHSBSA/PCSE guidance. When it changes, add a new dated rate in Settings → Pens
    Issuing allocates the next number and freezes the invoice and its PDF — it can't be
    edited afterwards, only voided or duplicated.
 3. **Send** it from the invoice page (after a one-time email setup) or download the PDF.
-4. When the money arrives, tap **Mark paid** (on Today or the invoice). Overdue invoices
-   rise to the top of Today.
+4. When the money arrives, tap **Mark paid** (on Today or the invoice) — or import your bank
+   statement (Invoices → **Payments in** → Import statement, CSV) and tap **Confirm N
+   matches**. Only money in is kept. Overdue invoices rise to the top of Today.
 5. **Pension** — after the month ends, open it to see the Form A figures per practice and the
    Form B summary, download the worksheet, copy the figures onto the official NHSBSA forms,
    then tap **Mark submitted**.

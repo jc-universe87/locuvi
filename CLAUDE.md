@@ -13,10 +13,11 @@ never submit pension forms or send email without an explicit owner tap.
   analyse, issue, void, split), `services/diary.py`, `services/payments.py`,
   `services/pension.py`, `services/reports.py` (+ Today overview), `services/checks.py`
   (findings), `services/documents.py` (inbox), `services/proposals.py` (suggest → accept/undo,
-  audit), `services/mailbox.py` (read-only IMAP, chosen folders only), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM), `mail.py` (SMTP),
+  audit), `services/mailbox.py` (read-only IMAP, chosen folders only),
+  `services/bank.py` (CSV statement → credits only → deterministic matches), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas), `migrations/` (Alembic), `cli.py`.
-- `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Invoices, InvoiceEditor,
+- `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Bank, Invoices, InvoiceEditor,
   InvoiceDetail, Pension, Reports, Settings, Welcome), `components/Booking.tsx` (paste + review), `components/ui.tsx` (sheets, toggles, segmented,
   toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.
 - `e2e/smoke.mjs` Playwright UI smoke; `docs/` decisions, report, example PDF.

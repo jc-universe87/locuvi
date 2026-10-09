@@ -353,3 +353,13 @@ class MailboxIn(Strict):
     ] = []
     since_days: Annotated[int, Field(ge=1, le=730)] = 90
     auto_scan: bool = True
+
+
+class BankAcceptIn(Strict):
+    invoice_ids: (
+        Annotated[
+            list[Annotated[str, StringConstraints(max_length=36)]],
+            Field(min_length=1, max_length=10),
+        ]
+        | None
+    ) = None

@@ -194,6 +194,22 @@ await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 await page.getByRole("button", { name: "Done" }).click();
 await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
 
+step("payments in: import a bank statement, mark a non-invoice credit");
+await page.getByRole("link", { name: "Invoices" }).first().click();
+await page.getByRole("link", { name: "Payments in" }).click();
+await page.getByRole("heading", { name: "Payments in" }).waitFor();
+const today = new Date().toLocaleDateString("en-GB", { timeZone: "Europe/London" });
+await page.locator("input[type=file]").setInputFiles({
+  name: "statement.csv", mimeType: "text/csv",
+  buffer: Buffer.from(`Date,Description,Amount\n${today},TAX REFUND,50.00\n${today},COFFEE,-3.20\n`),
+});
+await page.getByText("1 new payment in imported").waitFor();
+await page.getByText("TAX REFUND").waitFor();
+if (await page.getByText("COFFEE").count()) await fail("debit should not be stored");
+await shot("10e-bank");
+await page.getByRole("button", { name: "Not an invoice" }).click();
+await page.getByText("Nothing to match.").waitFor();
+
 step("settings hub and sections");
 await page.getByRole("link", { name: "Settings" }).click();
 await page.getByRole("link", { name: /Bank details/ }).click();
@@ -209,7 +225,7 @@ step("mobile layout");
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await mobile.addCookies(await ctx.cookies());
 const mp = await mobile.newPage();
-for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diary"], ["/invoices", "14-mobile-invoices"], ["/inbox", "15-mobile-inbox"]]) {
+for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diary"], ["/invoices", "14-mobile-invoices"], ["/inbox", "15-mobile-inbox"], ["/bank", "16-mobile-bank"], ["/settings/mailbox", "17-mobile-mailbox"]]) {
   await mp.goto(`${BASE}${path}`);
   await mp.locator(".tabbar").waitFor();
   await mp.waitForTimeout(300);

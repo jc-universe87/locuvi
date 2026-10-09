@@ -247,6 +247,8 @@ export function findingHref(f: Finding): string | null {
       return `/settings/${a.section}`;
     case "open_inbox":
       return "/inbox";
+    case "open_bank":
+      return "/bank";
     default:
       return null;
   }

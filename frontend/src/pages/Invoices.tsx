@@ -51,6 +51,9 @@ export default function InvoicesPage() {
   return (
     <>
       <PageHead title={t("invoices.title")}>
+        <Link className="btn secondary small" to="/bank">
+          <Icon name="money" size={16} /> {t("bank.title")}
+        </Link>
         <Link className="btn secondary small" to="/invoices/new">
           <Icon name="plus" size={16} /> {t("invoices.new")}
         </Link>

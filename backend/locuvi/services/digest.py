@@ -39,6 +39,7 @@ TEXT: dict[str, str] = {
     "backup_stale": "The last backup was {days} days ago.",
     "proposals_pending": "{n} suggested diary change(s) are waiting for you in the inbox.",
     "inbox_waiting": "{n} document(s) have been in your inbox for a few days.",
+    "bank_unmatched": "{n} payment(s) from your bank statement wait to be matched.",
     "mailbox_failed": "Checking your email folders failed — open Settings › Email folders.",
 }
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",

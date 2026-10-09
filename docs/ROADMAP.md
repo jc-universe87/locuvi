@@ -110,7 +110,7 @@ communicate from one place. Locuvi joins it as one connected agent/tool provider
 1. Polish from real use.
 2. Checks engine and weekly digest.
 3. Document inbox, then paste-a-booking as the first AI feature. ✅ (Oct 2026)
-4. Bank CSV import.
+4. Bank CSV import. ✅ (Oct 2026)
 5. Form A tracking and PCSE import.
 6. The full administrative agent.
 7. Bevro integration.
@@ -131,8 +131,13 @@ Each item is useful on its own and gives the AI something reliable to work with.
   SHA-256, text extracted once (pypdf / email parser), type and practice guessed, searchable,
   New/Done, delete with undo (purged after 30 days). Forwarding by email is still to do.
   (Spec A, 4 `read_authorised_document`)
-- 🧭 **Bank statement CSV import** with deterministic matching first: exact amount plus
-  invoice number in the reference. Unmatched lines go to a review list. (Spec D)
+- ✅ **Bank statement CSV import** (`services/bank.py`, Invoices › Payments in): reads the
+  common UK CSV exports (signed amount, separate paid in/out, £ signs, CR/DR, headerless),
+  keeps **only money in** (debits, balances and the file itself are never stored), de-duplicates
+  re-imports, and matches deterministically: invoice number in the reference → exact amount
+  with the practice named → exact amount → combined payment of 2–4 invoices of one practice.
+  Ambiguous amounts are never guessed. "Confirm N matches" records payments (dated as the
+  bank credit); manual pick, "Not an invoice", and undo for each. (Spec D)
 - 🧭 **Form A tracking**: per practice-month status (prepared → sent to practice → signed →
   submitted), with dates and owner-recorded evidence. **PCSE statement import** to compare
   expected and recorded contributions. (Spec C)

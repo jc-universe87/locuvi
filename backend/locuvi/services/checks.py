@@ -21,6 +21,7 @@ from locuvi.config import Settings
 from locuvi.models import (
     ArchiveJob,
     ArchiveStatus,
+    BankTransaction,
     Document,
     FindingDismissal,
     Invoice,
@@ -263,6 +264,16 @@ def _inbox(s: Session, today: date) -> list[Finding]:
             Document.status == "new", Document.deleted_at.is_(None), Document.created_at < cutoff
         )
     )
+    bank_waiting = s.scalar(
+        select(func.count(BankTransaction.id)).where(
+            BankTransaction.status.in_(["suggested", "unmatched"])
+        )
+    )
+    if bank_waiting:
+        out.append(Finding(
+            key="bank_unmatched", kind="bank_unmatched", severity="info",
+            params={"n": bank_waiting}, action={"type": "open_bank"}, dismissible=False,
+        ))  # fmt: skip
     mbox = s.get(MailboxConfig, 1)
     if mbox is not None and mbox.enabled and mbox.last_error:
         out.append(Finding(

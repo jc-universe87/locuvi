@@ -229,3 +229,60 @@ def mailbox_scan(request: Request, s: DB) -> dict[str, Any]:
         provider=_provider(request, s),
         factory=getattr(state(request), "imap_factory", None),
     )
+
+
+# ------------------------------------------------------------------------ bank
+
+
+@api.post("/bank/import", status_code=201)
+def bank_import(s: DB, file: Annotated[UploadFile, File()]) -> dict[str, Any]:
+    from locuvi.services import bank
+
+    data = file.file.read(bank.MAX_BYTES + 1)
+    return bank.import_statement(s, file.filename or "statement.csv", data)
+
+
+@api.get("/bank/transactions")
+def bank_transactions(s: DB, status: str | None = None) -> dict[str, Any]:
+    from locuvi.services import bank
+
+    if status not in (None, "suggested", "unmatched", "matched", "ignored"):
+        raise DomainError("bank.bad_status", "Unknown status.")
+    return {
+        "transactions": [bank.as_dict(t) for t in bank.listing(s, status)],
+        "counts": bank.summary(s),
+    }
+
+
+@api.post("/bank/transactions/accept-all")
+def bank_accept_all(s: DB) -> dict[str, Any]:
+    from locuvi.services import bank
+
+    return {"recorded": bank.accept_all(s), "counts": bank.summary(s)}
+
+
+@api.post("/bank/transactions/{tx_id}/accept")
+def bank_accept(tx_id: str, body: S.BankAcceptIn, s: DB) -> dict[str, Any]:
+    from locuvi.services import bank
+
+    tx = bank.get(s, tx_id)
+    bank.accept(s, tx, body.invoice_ids)
+    return bank.as_dict(tx)
+
+
+@api.post("/bank/transactions/{tx_id}/ignore")
+def bank_ignore(tx_id: str, s: DB) -> dict[str, Any]:
+    from locuvi.services import bank
+
+    tx = bank.get(s, tx_id)
+    bank.ignore(s, tx)
+    return bank.as_dict(tx)
+
+
+@api.post("/bank/transactions/{tx_id}/undo")
+def bank_undo(tx_id: str, s: DB) -> dict[str, Any]:
+    from locuvi.services import bank
+
+    tx = bank.get(s, tx_id)
+    bank.undo(s, tx)
+    return bank.as_dict(tx)

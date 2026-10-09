@@ -5,6 +5,7 @@ import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
 import DiaryPage from "./pages/Diary";
+import BankPage from "./pages/Bank";
 import InboxPage from "./pages/Inbox";
 import InvoiceDetailPage from "./pages/InvoiceDetail";
 import InvoiceEditor from "./pages/InvoiceEditor";
@@ -99,6 +100,7 @@ export default function App() {
             <Route path="/invoices/:id/edit" element={<InvoiceEditor />} />
             <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
             <Route path="/inbox" element={<InboxPage />} />
+            <Route path="/bank" element={<BankPage />} />
             <Route path="/pension" element={<PensionPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage onSignOut={session.auth_mode === "password" ? signOut : undefined} />} />
