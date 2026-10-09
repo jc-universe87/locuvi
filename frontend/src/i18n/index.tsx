@@ -65,6 +65,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = locale === "en" ? "en-GB" : locale;
   }, [locale]);
   const setLocale = useCallback((l: Locale) => {
+    document.documentElement.lang = l === "en" ? "en-GB" : l;
     setLocaleState(l);
     try {
       localStorage.setItem("locuvi.locale", l);

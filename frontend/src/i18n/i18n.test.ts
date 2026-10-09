@@ -66,7 +66,8 @@ describe("i18n catalogues", () => {
       "nav", "auth", "common", "status", "archive", "archive_error",
       "invoices", "editor", "unit", "totals", "issue", "detail",
       "practices", "settings", "today", "welcome", "diary",
-      "pay", "pension", "reports",
+      "pay", "pension", "reports", "email", "bank", "password",
+      "calendar", "repeat", "corr", "credit", "refund",
     ]);
     const critical = Object.keys(en).filter((key) => sections.has(key.split(".")[0]));
     for (const [locale, catalogue] of Object.entries(catalogues)) {
@@ -78,6 +79,6 @@ describe("i18n catalogues", () => {
 
   it("falls back to English and interpolates", () => {
     expect(translate("de", "nav.invoices")).toBe("Rechnungen");
-    expect(translate("de", "issue.confirm_total", { total: "£1.00" })).toBe("Total: £1.00");
+    expect(translate("de", "issue.confirm_total", { total: "£1.00" })).toBe("Gesamtbetrag: £1.00");
   });
 });
