@@ -50,6 +50,7 @@ never submit pension forms or send email without an explicit owner tap.
 - Secrets (owner password, app password, bank account) never in logs, API responses (masked)
   or git. Test only against disposable WebDAV servers, never the owner's live Nextcloud.
 - All UI text through i18n keys in `frontend/src/i18n/en.ts` (tests enforce this).
+- English UI copy must follow `docs/PLAIN_ENGLISH_UX.md`: short, natural en-GB, action-led labels; keep official NHS and accounting terms accurate and explained. Update smoke assertions if labels change.
 - Fictional data only in fixtures (`example.invalid`, `00-00-00`, `00000000`).
 - Tests never call a real AI API (fake provider / fake SDK client). AI output is re-validated
   server-side and only becomes data through `proposals.accept`.
