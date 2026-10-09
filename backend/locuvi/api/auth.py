@@ -148,13 +148,14 @@ class SessionManager:
         from locuvi import profiles
 
         now = time.monotonic()
-        with self._lock:
+        with self._lock:  # reserve this attempt before the (slow) check: bursts can't bypass
             while self._failures and now - self._failures[0] > 300:
                 self._failures.popleft()
             if len(self._failures) >= 5:
                 raise TooManyAttempts(
                     "auth.too_many_attempts", "Too many attempts. Wait a few minutes."
                 )
+            self._failures.append(now)
         if name and name.strip():
             profile = profiles.by_name(self._settings, name)
         else:  # one profile (or an old sign-in screen): the admin
@@ -162,11 +163,14 @@ class SessionManager:
             profile = active[0] if len(active) == 1 else None
         stored = profile.password_hash if profile else None
         ok = bool(stored and verify_password(attempt, stored))
-        if not ok:
-            with self._lock:
-                self._failures.append(now)
-            return None
-        return profile
+        if ok:
+            with self._lock:  # a correct password doesn't count against the limit
+                try:
+                    self._failures.remove(now)
+                except ValueError:
+                    pass
+            return profile
+        return None
 
     def profile_for(self, request: Request) -> Any:
         """The signed-in profile of a request (gateway mode with one profile: the admin)."""

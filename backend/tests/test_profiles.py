@@ -195,3 +195,81 @@ def test_profile_list_is_backed_up(st, tmp_path):
 
     names = [r[0] for r in sqlite3.connect(dest).execute("SELECT name FROM profile ORDER BY id")]
     assert names == ["Owner", "Sam"]
+
+
+def test_login_burst_cannot_bypass_the_limit(st):
+    """Attempts are reserved before the slow password check, so parallel guesses count."""
+    import threading
+
+    app = create_app(st)
+    with TestClient(app):
+        sm = app.state.sessions
+        results: list[object] = []
+
+        def guess():
+            try:
+                results.append(sm.check_password(None, "wrong-password"))
+            except Exception as exc:  # noqa: BLE001
+                results.append(type(exc).__name__)
+
+        threads = [threading.Thread(target=guess) for _ in range(12)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert results.count(None) == 5 and results.count("TooManyAttempts") == 7
+
+
+def test_upgrade_keeps_the_old_session_epoch(st):
+    """Sessions a past password change ended must not come back when profiles arrive."""
+    from locuvi import db
+    from locuvi.api.auth import hash_password
+    from locuvi.migrate import upgrade
+    from locuvi.models import AuthConfig
+
+    eng = db.init_engine(st.db_path)
+    upgrade(eng)
+    with db.new_session() as s:
+        s.add(AuthConfig(id=1, password_hash=hash_password("changed-password-1"), session_epoch=3))
+        s.commit()
+    eng.dispose()
+    with TestClient(create_app(st)):
+        admin = profiles.get(st, 1)
+        assert admin is not None and admin.session_epoch == 3
+
+
+def test_offsite_backups_are_kept_apart(st):
+    other = profiles.settings_for(st, 7)
+    assert other.backup_remote_path == f"{st.backup_remote_path}/profile-7"
+    assert profiles.settings_for(st, 1).backup_remote_path == st.backup_remote_path
+
+
+def test_purge_retries_and_never_removes_a_restored_profile(st, monkeypatch):
+    from locuvi.api.auth import hash_password
+
+    profiles.ensure_first(st, "Owner", hash_password("owner-password-1"))
+    p = profiles.create(st, "Sam", hash_password("sam-password-1"))
+    profiles.remove(st, p.id)
+    later = datetime.now(UTC) + timedelta(days=31)
+
+    # files can't be deleted: the entry stays, so a later run tries again
+    import shutil
+
+    real = shutil.rmtree
+
+    def broken(*a, **k):
+        raise PermissionError("busy")
+
+    monkeypatch.setattr(shutil, "rmtree", broken)
+    assert profiles.purge_removed(st, now=later) == []
+    assert profiles.get(st, p.id) is not None and profiles.data_dir(st, p.id).exists()
+    monkeypatch.setattr(shutil, "rmtree", real)
+
+    # restored just before the purge runs: nothing is deleted
+    profiles.restore(st, p.id)
+    assert profiles.purge_removed(st, now=later) == []
+    assert profiles.active(st, p.id) is not None and profiles.data_dir(st, p.id).exists()
+
+    profiles.remove(st, p.id)
+    assert profiles.purge_removed(st, now=later) == [p.id]
+    assert not profiles.data_dir(st, p.id).exists()

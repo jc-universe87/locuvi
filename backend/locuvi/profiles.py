@@ -13,6 +13,7 @@ was (``DATA_DIR`` itself), so upgrading moves no files; later profiles live in
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import sqlite3
@@ -31,7 +32,8 @@ PURGE_AFTER = timedelta(days=30)
 NAME_RE = re.compile(r"[^\x00-\x1f]{1,40}")
 MIN_PASSWORD = 10
 
-_lock = threading.Lock()
+log = logging.getLogger(__name__)
+_lock = threading.RLock()  # restore/purge hold it across their check-and-change
 _cache: dict[Path, list[Profile]] = {}  # this process is the only writer
 
 
@@ -141,10 +143,18 @@ def settings_for(settings: Settings, profile_id: int) -> Settings:
     if profile_id == 1:
         return settings
     backup = settings.backup_dir / f"profile-{profile_id}" if settings.backup_dir else None
-    return replace(settings, data_dir=data_dir(settings, profile_id), backup_dir=backup)
+    remote = f"{settings.backup_remote_path}/profile-{profile_id}".strip("/")
+    return replace(
+        settings,
+        data_dir=data_dir(settings, profile_id),
+        backup_dir=backup,
+        backup_remote_path=remote,  # off-site copies never collide between profiles
+    )
 
 
-def ensure_first(settings: Settings, name: str, password_hash: str | None) -> Profile:
+def ensure_first(
+    settings: Settings, name: str, password_hash: str | None, session_epoch: int = 0
+) -> Profile:
     """Create profile 1 (the admin) from the existing installation, once."""
     with _lock, _connect(settings) as conn:
         _cache.pop(registry_path(settings), None)
@@ -152,8 +162,13 @@ def ensure_first(settings: Settings, name: str, password_hash: str | None) -> Pr
         if r is None:
             conn.execute(
                 "INSERT INTO profile (id, name, password_hash, is_admin, session_epoch,"
-                " created_at) VALUES (1, ?, ?, 1, 0, ?)",
-                (_clean_name(name) if name.strip() else "Owner", password_hash, _now()),
+                " created_at) VALUES (1, ?, ?, 1, ?, ?)",
+                (
+                    _clean_name(name) if name.strip() else "Owner",
+                    password_hash,
+                    int(session_epoch or 0),
+                    _now(),
+                ),  # fmt: skip
             )
             r = conn.execute(f"SELECT {_COLS} FROM profile WHERE id = 1").fetchone()
     return _row(r)
@@ -246,32 +261,46 @@ def remove(settings: Settings, profile_id: int) -> Profile:
 
 
 def restore(settings: Settings, profile_id: int) -> Profile:
-    p = get(settings, profile_id)
-    if p is None or p.deleted_at is None:
-        raise DomainError("profile.not_found", "That profile can't be restored.")
-    if by_name(settings, p.name) is not None:
-        raise DomainError("profile.name_taken", "There is already a profile with that name.")
-    with _lock, _connect(settings) as conn:
+    with _lock:  # serialised with purge_removed: a profile is either restored or purged
         _cache.pop(registry_path(settings), None)
-        conn.execute("UPDATE profile SET deleted_at = NULL WHERE id = ?", (profile_id,))
-    p2 = get(settings, profile_id)
+        p = get(settings, profile_id)
+        if p is None or p.deleted_at is None:
+            raise DomainError("profile.not_found", "That profile can't be restored.")
+        if by_name(settings, p.name) is not None:
+            raise DomainError("profile.name_taken", "There is already a profile with that name.")
+        with _connect(settings) as conn:
+            conn.execute("UPDATE profile SET deleted_at = NULL WHERE id = ?", (profile_id,))
+        _cache.pop(registry_path(settings), None)
+        p2 = get(settings, profile_id)
     assert p2 is not None
     return p2
 
 
 def purge_removed(settings: Settings, now: datetime | None = None) -> list[int]:
-    """Delete the data of profiles removed more than PURGE_AFTER ago."""
+    """Delete the data of profiles removed more than PURGE_AFTER ago. A profile whose files
+    can't be deleted keeps its entry, so the next run tries again."""
     cutoff = ((now or datetime.now(UTC)) - PURGE_AFTER).strftime("%Y-%m-%dT%H:%M:%SZ")
-    gone = [p for p in all_profiles(settings, deleted=True) if (p.deleted_at or "") < cutoff]
-    for p in gone:
-        if p.id != 1:
-            shutil.rmtree(data_dir(settings, p.id), ignore_errors=True)
-            if settings.backup_dir:
-                shutil.rmtree(settings.backup_dir / f"profile-{p.id}", ignore_errors=True)
-        with _lock, _connect(settings) as conn:
+    purged: list[int] = []
+    for candidate in all_profiles(settings, deleted=True):
+        with _lock:
             _cache.pop(registry_path(settings), None)
-            conn.execute("DELETE FROM profile WHERE id = ?", (p.id,))
-    return [p.id for p in gone]
+            p = get(settings, candidate.id)  # re-check: it may have been restored meanwhile
+            if p is None or p.deleted_at is None or p.deleted_at >= cutoff or p.id == 1:
+                continue
+            try:
+                for folder in (data_dir(settings, p.id),
+                               settings.backup_dir / f"profile-{p.id}" if settings.backup_dir
+                               else None):  # fmt: skip
+                    if folder is not None and folder.exists():
+                        shutil.rmtree(folder)
+            except OSError:
+                log.exception("removed profile %s not purged yet; will retry", p.id)
+                continue
+            with _connect(settings) as conn:
+                conn.execute("DELETE FROM profile WHERE id = ?", (p.id,))
+            _cache.pop(registry_path(settings), None)
+            purged.append(p.id)
+    return purged
 
 
 def find(settings: Settings, match: Any) -> int | None:

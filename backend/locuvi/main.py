@@ -99,12 +99,13 @@ def _ensure_admin(settings: Settings) -> None:
         cfg = s.get(AuthConfig, 1)
         owner = s.get(OwnerProfile, 1)
         stored = cfg.password_hash if cfg else None
+        epoch = cfg.session_epoch if cfg else 0  # sessions a past password change ended stay ended
         legal = owner.legal_name if owner else ""
     words = [w for w in (legal or "").replace(".", " ").split() if w.lower() not in _TITLES]
     name = words[0] if words else "Owner"
     if not stored and settings.password:
         stored = hash_password(settings.password)
-    profiles.ensure_first(settings, name, stored)
+    profiles.ensure_first(settings, name, stored, epoch or 0)
 
 
 def create_app(

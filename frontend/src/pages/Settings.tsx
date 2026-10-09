@@ -20,7 +20,8 @@ const ICON: Record<Section, string> = {
 export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?: () => void; profile?: HouseholdProfile | null }) {
   const { t, locale, setLocale } = useT();
   const { section } = useParams();
-  const visible = (s: Section) => (s !== "password" || !!onSignOut) && (s !== "profiles" || !!profile?.is_admin);
+  // Password: always for a signed-in profile (a gateway admin sets one before adding profiles).
+  const visible = (s: Section) => (s !== "password" || !!onSignOut || !!profile) && (s !== "profiles" || !!profile?.is_admin);
   if (section && (SECTIONS as readonly string[]).includes(section) && visible(section as Section)) {
     return (
       <>
