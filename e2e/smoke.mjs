@@ -294,7 +294,7 @@ await page.getByRole("link", { name: "Today" }).first().click();
 await page.waitForURL(`${BASE}/`);
 
 step("settings hub and sections");
-await page.getByRole("link", { name: "Settings" }).click();
+await page.getByRole("link", { name: "Settings" }).first().click();
 await page.getByRole("link", { name: /Bank account/ }).click();
 await page.getByLabel("Account number").waitFor();
 if ((await page.getByLabel("Account number").getAttribute("placeholder")) !== "••••0000") await fail("masked account");
