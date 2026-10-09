@@ -107,6 +107,13 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
   the database so backups cover it), accent colour from print-safe presets, one-line footer on
   every invoice page, email sign-off for drafted emails, sample-invoice preview. Frozen into each
   issued snapshot (`presentation`), so issued documents never change (migration 0018).
+- ✅ Rates (owner request): each practice is paid per **session** or per **hour** (hourly
+  rate + usual hours; the Diary opens on the practice's pay type), and the NHS employer
+  pension is either **added on top** or **included in the rate**. Included rates are really
+  calculated now: basic fee = agreed rate ÷ (1 + 90% × employer rate), rounded to the penny,
+  then the normal rules; the agreed rate is kept on the session, invoice line, snapshot and
+  PDF note, and any penny rounding against the agreed total is shown before issuing
+  (migration 0019). A session rate is never used as an hourly rate.
 - 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
 - ✅ Password change without editing the secret file (Settings › Password): scrypt hash in the
   database overrides the secret file; changing it signs out every other device (session epoch);

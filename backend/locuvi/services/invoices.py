@@ -30,7 +30,9 @@ from locuvi.money import (
     ROUNDING_DESCRIPTION,
     LineInput,
     Totals,
+    basic_from_inclusive,
     calculate_totals,
+    line_amount,
     pensionable_months,
 )
 from locuvi.pdf.render import render_invoice_pdf
@@ -51,6 +53,7 @@ class LineData:
     quantity: Decimal
     unit_price: Decimal
     pensionable: bool
+    agreed_rate: Decimal | None = None  # rate agreed including the employer contribution
 
 
 @dataclass
@@ -72,6 +75,7 @@ class Analysis:
     work_start: date | None
     work_end: date | None
     months: list[tuple[int, int]]
+    unit_prices: tuple[Decimal, ...] = ()  # effective prices (inclusive rates converted)
 
 
 # --------------------------------------------------------------------------- lines
@@ -96,18 +100,43 @@ def validate_line(ln: LineData, index: int) -> None:
         )
     if ln.quantity > Decimal("10000") or ln.unit_price > Decimal("1000000"):
         raise DomainError("line.too_large", f"Line {index + 1}: value too large", line=index)
+    a = ln.agreed_rate
+    if a is not None and (a < 0 or a > Decimal("1000000") or a.as_tuple().exponent < -2):  # type: ignore[operator]
+        raise DomainError(
+            "line.bad_agreed_rate", f"Line {index + 1}: check the agreed rate", line=index
+        )
 
 
-def _line_inputs(lines: Sequence[LineData | InvoiceLine]) -> list[LineInput]:
+def _line_inputs(
+    lines: Sequence[LineData | InvoiceLine], prices: Sequence[Decimal] | None = None
+) -> list[LineInput]:
     return [
         LineInput(
             service_date=ln.service_date,
             quantity=ln.quantity,
-            unit_price=ln.unit_price,
+            unit_price=prices[i] if prices is not None else ln.unit_price,
             pensionable=ln.pensionable,
         )
-        for ln in lines
+        for i, ln in enumerate(lines)
     ]
+
+
+def effective_prices(
+    lines: Sequence[LineData | InvoiceLine], pension_enabled: bool, policy: PensionPolicy | None
+) -> tuple[Decimal, ...]:
+    """Unit prices to invoice: an inclusive agreed rate becomes the basic fee when pension
+    applies to the line, and is charged as agreed when it does not."""
+    values = core.policy_values(policy) if policy is not None else None
+    out = []
+    for ln in lines:
+        agreed = getattr(ln, "agreed_rate", None)
+        if agreed is None:
+            out.append(ln.unit_price)
+        elif pension_enabled and ln.pensionable and values is not None:
+            out.append(basic_from_inclusive(agreed, values))
+        else:
+            out.append(agreed)
+    return tuple(out)
 
 
 # ------------------------------------------------------------------------ analysis
@@ -124,13 +153,13 @@ def analyse(
 ) -> Analysis:
     blocking: list[Issue] = []
     warnings: list[Issue] = []
-    inputs = _line_inputs(lines)
-    dates = sorted(ln.service_date for ln in inputs)
+    raw = _line_inputs(lines)
+    dates = sorted(ln.service_date for ln in raw)
     work_start = dates[0] if dates else None
     work_end = dates[-1] if dates else None
 
-    months = pensionable_months(inputs) if pension_enabled else []
-    pension_dates = sorted(ln.service_date for ln in inputs if ln.pensionable)
+    months = pensionable_months(raw) if pension_enabled else []
+    pension_dates = sorted(ln.service_date for ln in raw if ln.pensionable)
     policy = None
     if pension_enabled and pension_dates:
         policy = core.policy_for_date(s, pension_dates[0])
@@ -154,11 +183,34 @@ def analyse(
                     )
                 )
 
+    prices = effective_prices(lines, pension_enabled, policy)
+    inputs = _line_inputs(lines, prices)
     totals = calculate_totals(
         inputs,
         pension_enabled=pension_enabled,
         policy=core.policy_values(policy) if policy else None,
     )
+    agreed_lines = [ln for ln in lines if getattr(ln, "agreed_rate", None) is not None]
+    if agreed_lines and totals.employer_contribution > 0:
+        agreed_total = sum(
+            (
+                line_amount(ln.quantity, ln.agreed_rate)  # type: ignore[arg-type]
+                if getattr(ln, "agreed_rate", None) is not None
+                else line_amount(ln.quantity, p)
+                for ln, p in zip(lines, prices, strict=True)
+            ),
+            Decimal("0"),
+        )
+        if agreed_total != totals.grand_total:
+            warnings.append(
+                Issue(
+                    "invoice.inclusive_rounding",
+                    "The agreed all-in rates add up to a slightly different total because "
+                    "each fee is rounded to the penny.",
+                    {"agreed": str(agreed_total), "total": str(totals.grand_total),
+                     "difference": str(totals.grand_total - agreed_total)},
+                )
+            )  # fmt: skip
 
     if len(months) > 1:
         blocking.append(
@@ -182,6 +234,7 @@ def analyse(
         practice is not None
         and practice.rate_includes_pension
         and totals.pensionable_basic_total > 0
+        and any(ln.pensionable and getattr(ln, "agreed_rate", None) is None for ln in lines)
     ):
         warnings.append(
             Issue(
@@ -216,7 +269,7 @@ def analyse(
 
     if for_issue:
         blocking.extend(_issue_preflight(s, lines, practice, totals))
-    return Analysis(totals, policy, blocking, warnings, work_start, work_end, months)
+    return Analysis(totals, policy, blocking, warnings, work_start, work_end, months, tuple(prices))
 
 
 def _issue_preflight(
@@ -302,6 +355,7 @@ def _set_lines(inv: Invoice, lines: Sequence[LineData]) -> None:
                 unit_price=ln.unit_price,
                 amount=Decimal("0"),
                 pensionable=ln.pensionable,
+                agreed_rate=ln.agreed_rate,
                 sort_order=i,
             )
         )
@@ -315,8 +369,8 @@ def _refresh_draft_cache(s: Session, inv: Invoice) -> Analysis:
         practice=inv.practice,
         reference=inv.reference,
     )
-    for ln, amount in zip(inv.lines, a.totals.line_amounts, strict=True):
-        ln.amount = amount
+    for ln, price, amount in zip(inv.lines, a.unit_prices, a.totals.line_amounts, strict=True):
+        ln.unit_price, ln.amount = price, amount
     inv.fee_subtotal = a.totals.fee_subtotal
     inv.pensionable_basic_total = a.totals.pensionable_basic_total
     inv.pensionable_pay = a.totals.pensionable_pay
@@ -398,8 +452,14 @@ def delete_draft(s: Session, inv: Invoice) -> None:
 def duplicate(s: Session, source: Invoice) -> Invoice:
     lines = [
         LineData(
-            ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price, ln.pensionable
-        )
+            ln.service_date,
+            ln.description,
+            ln.unit,
+            ln.quantity,
+            ln.unit_price,
+            ln.pensionable,
+            ln.agreed_rate,
+        )  # fmt: skip
         for ln in source.lines
     ]
     practice_id = source.practice_id
@@ -467,6 +527,7 @@ def split_by_month(s: Session, inv: Invoice) -> list[Invoice]:
                     ln.quantity,
                     ln.unit_price,
                     ln.pensionable,
+                    ln.agreed_rate,
                 )
                 for ln in groups[key]
             ],
@@ -481,8 +542,14 @@ def split_by_month(s: Session, inv: Invoice) -> list[Invoice]:
         result.append(new)
     keep = [
         LineData(
-            ln.service_date, ln.description, ln.unit, ln.quantity, ln.unit_price, ln.pensionable
-        )
+            ln.service_date,
+            ln.description,
+            ln.unit,
+            ln.quantity,
+            ln.unit_price,
+            ln.pensionable,
+            ln.agreed_rate,
+        )  # fmt: skip
         for ln in groups[keys[0]]
     ]
     _set_lines(inv, keep)
@@ -567,6 +634,7 @@ def build_snapshot(
                 "unit_price": str(ln.unit_price),
                 "amount": str(amount),
                 "pensionable": ln.pensionable,
+                **({"agreed_rate": str(ln.agreed_rate)} if ln.agreed_rate is not None else {}),
             }
             for ln, amount in zip(inv.lines, a.totals.line_amounts, strict=True)
         ],
@@ -669,6 +737,8 @@ def issue(
         )
         if a.blocking:
             raise ValidationFailed([p.as_dict() for p in a.blocking])
+        for ln, price in zip(inv.lines, a.unit_prices, strict=True):
+            ln.unit_price = price  # inclusive rates converted with the rate in force
 
         profile = core.get_profile(s)
         seq = core.get_sequence(s)

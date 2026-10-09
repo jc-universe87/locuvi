@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { RateFields, rateBody, rateFieldsValid } from "../components/RateFields";
 import { ErrorAlert, Logo } from "../components/ui";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
@@ -16,7 +17,10 @@ export default function WelcomePage() {
   const [me, setMe] = useState({ legal_name: "", address_lines: "", postcode: "", email: "" });
   const [bank, setBank] = useState({ bank_account_holder: "", bank_sort_code: "", bank_account_number: "" });
   const [hasAccount, setHasAccount] = useState(false);
-  const [practice, setPractice] = useState({ name: "", billing_address: "", default_rate: "" });
+  const [practice, setPractice] = useState({
+    name: "", billing_address: "", default_rate: "", default_unit: "am", hourly_rate: "", default_hours: "",
+    rate_includes_pension: false,
+  });
   const [hasPractice, setHasPractice] = useState(false);
 
   useEffect(() => {
@@ -61,7 +65,7 @@ export default function WelcomePage() {
         setStep(2);
       } else {
         if (practice.name.trim()) {
-          await api.post("/practices", { ...practice, default_rate: practice.default_rate || null });
+          await api.post("/practices", { name: practice.name, billing_address: practice.billing_address, ...rateBody(practice) });
         }
         await finish();
       }
@@ -85,7 +89,7 @@ export default function WelcomePage() {
       : step === 1
         ? bank.bank_account_holder.trim() && bank.bank_sort_code.replace(/\D/g, "").length === 6 &&
           (hasAccount || bank.bank_account_number.replace(/\D/g, "").length === 8)
-        : true;
+        : rateFieldsValid(practice);
 
   return (
     <div className="wizard">
@@ -146,10 +150,9 @@ export default function WelcomePage() {
                 <textarea id="w-paddr" rows={2} value={practice.billing_address}
                   onChange={(e) => setPractice({ ...practice, billing_address: e.target.value })} />
               </Row>
-              <Row id="w-prate" label={t("welcome.session_rate")}>
-                <input id="w-prate" type="text" inputMode="decimal" placeholder="£"
-                  value={practice.default_rate} onChange={(e) => setPractice({ ...practice, default_rate: e.target.value })} />
-              </Row>
+              <div className="welcome-rates">
+                <RateFields idPrefix="w" value={practice} onChange={(v) => setPractice({ ...practice, ...v })} />
+              </div>
             </>
           )}
           {step === 2 && hasPractice && <p style={{ padding: "1rem 1.15rem", margin: 0 }}>{t("welcome.practice_exists")}</p>}

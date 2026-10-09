@@ -6,6 +6,11 @@ Rules (specs/INVOICES_AND_PENSIONS.md):
   pensionable pay        = eligible basic fee × pensionable fraction (0.90), HALF_UP 2dp
   employer contribution  = pensionable pay × employer rate (e.g. 0.1438), HALF_UP 2dp
   grand total            = fee subtotal + employer contribution (no VAT in v0.1)
+
+Rates agreed *including* the employer contribution (some practices quote one all-in figure):
+  basic unit price       = agreed rate ÷ (1 + pensionable fraction × employer rate), HALF_UP 2dp
+then the normal rules above apply, so the invoice total matches the agreed figure to within
+a few pence of rounding (shown to the owner before issuing).
 """
 
 from __future__ import annotations
@@ -97,6 +102,11 @@ class Totals:
 
 def line_amount(quantity: Decimal, unit_price: Decimal) -> Decimal:
     return round_money(quantity * unit_price)
+
+
+def basic_from_inclusive(agreed: Decimal, policy: PensionPolicyValues) -> Decimal:
+    """Basic fee for a rate agreed inclusive of the employer pension contribution."""
+    return round_money(agreed / (1 + policy.pensionable_fraction * policy.employer_rate))
 
 
 def calculate_totals(

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BookingSheet } from "../components/Booking";
+import { RateFields, rateBody, rateFieldsValid } from "../components/RateFields";
 import { Dialog, ErrorAlert, Field, Icon, PageHead, Segmented, Toggle, useToast } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
@@ -64,6 +65,7 @@ export default function DiaryPage() {
   const [rate, setRate] = useState("");
   const [hours, setHours] = useState("4");
   const [editingRate, setEditingRate] = useState(false);
+  const [inclusive, setInclusive] = useState(false);
   const [sessions, setSessions] = useState<WorkSession[]>([]);
   const [ready, setReady] = useState<ReadyGroup[]>([]);
   const [open, setOpen] = useState<WorkSession | null>(null);
@@ -103,12 +105,22 @@ export default function DiaryPage() {
     remember("locuvi.diary.practice", practiceId);
     remember("locuvi.diary.unit", unit);
     api
-      .get<{ rate: string | null }>(`/sessions/suggest-rate?practice_id=${practiceId}&unit=${unit}`)
+      .get<{ rate: string | null; includes_pension: boolean; hours: string | null }>(`/sessions/suggest-rate?practice_id=${practiceId}&unit=${unit}`)
       .then((r) => {
         setRate(r.rate ?? "");
         setEditingRate(!r.rate);
+        setInclusive(r.includes_pension);
+        if (r.hours) setHours(r.hours);
       }, () => undefined);
   }, [practiceId, unit]);
+
+  // An hourly practice opens on "hours"; a sessional one never stays on it by accident.
+  const choosePractice = (id: string) => {
+    setPracticeId(id);
+    const p = practices?.find((x) => x.id === id);
+    if (p?.default_unit === "hours") setUnit("hours");
+    else if (p && unit === "hours") setUnit("am");
+  };
 
   const practice = practices?.find((p) => p.id === practiceId) ?? null;
   const byDay = useMemo(() => {
@@ -193,6 +205,7 @@ export default function DiaryPage() {
           <PracticeSheet onClose={() => setNewPractice(false)} onSaved={(p) => {
             setPractices([p]);
             setPracticeId(p.id);
+            setUnit(p.default_unit === "hours" ? "hours" : "am");
             setNewPractice(false);
           }} />
         )}
@@ -212,7 +225,7 @@ export default function DiaryPage() {
       <div className="card" style={{ paddingBottom: "0.85rem" }}>
         <div className="chips" role="group" aria-label={t("diary.practice")}>
           {practices?.map((p) => (
-            <button key={p.id} type="button" className="chip" aria-pressed={p.id === practiceId} onClick={() => setPracticeId(p.id)}>
+            <button key={p.id} type="button" className="chip" aria-pressed={p.id === practiceId} onClick={() => choosePractice(p.id)}>
               <span className="dot" style={{ background: p.id === practiceId ? "#fff" : colourFor(practices, p.id) }} />
               {p.name}
             </button>
@@ -241,7 +254,7 @@ export default function DiaryPage() {
             </label>
           ) : (
             <button type="button" className="btn ghost small" onClick={() => setEditingRate(true)} title={t("diary.change_rate")}>
-              {gbp(rate)}{unit === "hours" ? ` ${t("diary.per_hour")}` : ""} ✎
+              {gbp(rate)}{unit === "hours" ? ` ${t("diary.per_hour")}` : ""}{inclusive ? ` ${t("rates.incl")}` : ""} ✎
             </button>
           )}
         </div>
@@ -328,6 +341,7 @@ export default function DiaryPage() {
         <PracticeSheet onClose={() => setNewPractice(false)} onSaved={(p) => {
           setPractices((ps) => [...(ps ?? []), p]);
           setPracticeId(p.id);
+          setUnit(p.default_unit === "hours" ? "hours" : "am");
           setNewPractice(false);
         }} />
       )}
@@ -416,6 +430,9 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
     billing_email: practice?.billing_email ?? "",
     contact_name: practice?.contact_name ?? "",
     default_rate: practice?.default_rate ?? "",
+    default_unit: (practice?.default_unit ?? "am") as string,
+    hourly_rate: practice?.hourly_rate ?? "",
+    default_hours: practice?.default_hours ?? "",
     default_pensionable: practice?.default_pensionable ?? true,
     rate_includes_pension: practice?.rate_includes_pension ?? false,
     default_payment_terms_days: practice?.default_payment_terms_days?.toString() ?? "",
@@ -430,7 +447,7 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
   const save = async () => {
     const body = {
       ...p,
-      default_rate: p.default_rate.trim() || null,
+      ...rateBody(p),
       default_payment_terms_days: p.default_payment_terms_days.trim() ? Number(p.default_payment_terms_days) : null,
     };
     try {
@@ -443,7 +460,7 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
   };
   return (
     <Dialog open title={practice ? practice.name : t("practices.add")} onClose={onClose}
-      footer={<button className="btn" onClick={save} disabled={!p.name.trim()}>{t("common.save")}</button>}>
+      footer={<button className="btn" onClick={save} disabled={!p.name.trim() || !rateFieldsValid(p)}>{t("common.save")}</button>}>
       <ErrorAlert error={error} />
       <div className="grid">
         <Field id="ps-name" label={t("practices.name")}>
@@ -452,18 +469,14 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
         <Field id="ps-addr" label={t("practices.billing_address")}>
           <textarea id="ps-addr" rows={3} value={p.billing_address} onChange={(e) => setP({ ...p, billing_address: e.target.value })} />
         </Field>
-        <div className="grid grid-2">
-          <Field id="ps-rate" label={t("welcome.session_rate")}>
-            <input id="ps-rate" type="text" inputMode="decimal" placeholder="£" value={p.default_rate} onChange={(e) => setP({ ...p, default_rate: e.target.value })} />
-          </Field>
-          <Field id="ps-email" label={t("practices.billing_email")} optional>
-            <input id="ps-email" type="email" value={p.billing_email} onChange={(e) => setP({ ...p, billing_email: e.target.value })} />
-          </Field>
-        </div>
+        <Field id="ps-email" label={t("practices.billing_email")} optional>
+          <input id="ps-email" type="email" value={p.billing_email} onChange={(e) => setP({ ...p, billing_email: e.target.value })} />
+        </Field>
         <div className="toggle-row">
           <span className="text">{t("practices.default_pensionable")}</span>
           <Toggle checked={p.default_pensionable} onChange={(v) => setP({ ...p, default_pensionable: v })} label={t("practices.default_pensionable")} />
         </div>
+        <RateFields idPrefix="ps" value={p} pensionable={p.default_pensionable} onChange={(v) => setP({ ...p, ...v })} />
         {!more ? (
           <button type="button" className="btn ghost small" style={{ justifySelf: "start" }} onClick={() => setMore(true)}>{t("common.more_options")}</button>
         ) : (
@@ -489,10 +502,6 @@ export function PracticeSheet({ practice, onClose, onSaved }: { practice?: Pract
             <Field id="ps-signatory" label={t("practices.form_a_signatory")} optional>
               <input id="ps-signatory" type="text" value={p.form_a_signatory} onChange={(e) => setP({ ...p, form_a_signatory: e.target.value })} />
             </Field>
-            <div className="toggle-row">
-              <span className="text">{t("practices.rate_includes_pension")}<br /><span className="hint">{t("practices.rate_includes_pension_help")}</span></span>
-              <Toggle checked={p.rate_includes_pension} onChange={(v) => setP({ ...p, rate_includes_pension: v })} label={t("practices.rate_includes_pension")} />
-            </div>
             {practice && (
               <div className="toggle-row">
                 <span className="text">{t("practices.archived")}</span>

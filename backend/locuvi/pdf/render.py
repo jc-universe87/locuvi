@@ -515,11 +515,35 @@ def render_invoice_pdf(snapshot: dict[str, Any], *, draft: bool = False) -> byte
         if pension_on and basic > 0
         else None
     )
+    inclusive_note = None
+    agreed = sorted(
+        {
+            (ln["agreed_rate"], ln.get("unit") == "hours")
+            for ln in snapshot.get("lines", [])
+            if ln.get("agreed_rate") and ln.get("pensionable")
+            and ln.get("agreed_rate") != ln.get("unit_price")
+        }
+    )  # fmt: skip
+    if agreed and pension_on and basic > 0 and not credit:
+        fraction = Decimal(str(pension.get("pensionable_fraction") or "0"))
+        rate = Decimal(str(pension.get("employer_rate") or "0"))
+        rates = ", ".join(
+            label("pdf.per_hour" if hourly else "pdf.per_session", amount=fmt_gbp(Decimal(a)))
+            for a, hourly in agreed
+        )
+        divisor = f"{(1 + fraction * rate).normalize():f}"
+        text = label("pdf.inclusive_note", rates=rates, divisor=divisor,
+                     fraction=_pct(str(fraction)), rate=_pct(str(rate)))  # fmt: skip
+        inclusive_note = Paragraph(_esc(text), st["small"])
     closing: list[Any] = [
         totals_table,
         Spacer(1, 2 * mm),
         Table(
-            [[vat_note], *([[pension_note]] if pension_note else [])],
+            [
+                [vat_note],
+                *([[inclusive_note]] if inclusive_note else []),
+                *([[pension_note]] if pension_note else []),
+            ],  # fmt: skip
             colWidths=[tot_w],
             hAlign="RIGHT",
             style=TableStyle(

@@ -34,6 +34,12 @@ EN_GB: dict[str, str] = {
     "pdf.employer_addition": "Employer NHS pension contribution ({rate} of pensionable pay)",
     "pdf.total_due": "Total due (GBP)",
     "pdf.vat_not_registered": "No VAT charged: supplier is not VAT registered.",
+    "pdf.inclusive_note": (
+        "Agreed {rates}, including the employer NHS pension contribution. The basic fee is the "
+        "agreed rate ÷ {divisor} (1 + {fraction} × {rate}), rounded to the penny."
+    ),
+    "pdf.per_hour": "{amount} per hour",
+    "pdf.per_session": "{amount} per session",
     "pdf.payment_details": "Payment details",
     "pdf.bank_holder": "Account name",
     "pdf.sort_code": "Sort code",

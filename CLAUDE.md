@@ -37,7 +37,9 @@ never submit pension forms or send email without an explicit owner tap.
   The server updates with `./update.sh`; startup backs up before migrating (`backups.before_upgrade`).
 
 ## Rules that must not regress
-- Never use float for money; amounts cross the API as decimal strings.
+- Never use float for money; amounts cross the API as decimal strings. Rates agreed incl.
+  employer pension live in `agreed_rate`; the fee is `money.basic_from_inclusive` (analyse
+  derives `unit_prices`), never typed twice.
 - Issued invoices are immutable: number, snapshot, PDF. No edit/delete; void keeps them.
   Corrections after booking are credit notes (`services/credit_notes.py`, own series, same
   issue guarantees, PDFs in `invoices/credit/` — keep integrity + backup covering them).

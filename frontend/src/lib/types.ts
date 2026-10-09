@@ -23,6 +23,7 @@ export interface Totals {
 
 export interface Analysis {
   totals: Totals;
+  unit_prices?: string[];
   blocking: Issue[];
   warnings: Issue[];
   work_start_date: string | null;
@@ -53,6 +54,8 @@ export interface Line {
   unit_price: string;
   amount?: string;
   pensionable: boolean;
+  /** rate agreed including the employer pension; unit_price (the fee) is derived from it */
+  agreed_rate?: string | null;
 }
 
 export interface PaymentState {
@@ -117,6 +120,8 @@ export interface Practice {
   reference: string | null;
   default_rate: string | null;
   default_unit: Unit;
+  hourly_rate: string | null;
+  default_hours: string | null;
   default_pensionable: boolean;
   rate_includes_pension: boolean;
   default_payment_terms_days: number | null;
@@ -194,6 +199,7 @@ export interface WorkSession {
   unit: Unit;
   quantity: string;
   rate: string;
+  rate_includes_pension: boolean;
   pensionable: boolean;
   description: string;
   status: "active" | "cancelled";

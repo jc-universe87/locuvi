@@ -91,7 +91,7 @@ await page.getByRole("button", { name: "Continue" }).click();
 await page.getByRole("heading", { name: "Your first practice" }).waitFor();
 await page.getByLabel("Practice name").fill("Example Medical Practice");
 await page.getByLabel("Billing address").fill("2 Test Road\nSampleford\nSF1 2BB");
-await page.getByLabel("Usual session rate (£)").fill("600.00");
+await page.getByLabel("Session rate (£)").fill("600.00");
 await shot("02-welcome-practice");
 await page.getByRole("button", { name: "Start using Locuvi" }).click();
 

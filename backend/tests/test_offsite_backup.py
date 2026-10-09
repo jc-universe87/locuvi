@@ -181,11 +181,13 @@ def test_backup_before_upgrade(settings, session, ready, tmp_path):
     cfg = migrate.alembic_config()
     with engine.begin() as conn:
         cfg.attributes["connection"] = conn
-        command.downgrade(cfg, "0017")  # pretend the server still runs the previous release
+        command.stamp(cfg, "0017")  # pretend the server still runs an older release
     current, head = migrate.pending(engine)
     assert current == "0017" and head != current
     dest = backups.before_upgrade(st, engine)
     assert dest is not None and dest.name.endswith(f"-before-{head}.tar.gz")
     assert cli.check_backup(dest)["issued_invoices"] == 1  # a restorable copy of the old data
-    migrate.upgrade(engine)
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.stamp(cfg, "head")
     assert backups.before_upgrade(replace(st, backup_dir=None), engine) is None

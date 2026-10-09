@@ -376,6 +376,8 @@ def _practice_out(p: Practice) -> dict[str, Any]:
         reference=p.reference,
         default_rate=str(p.default_rate) if p.default_rate is not None else None,
         default_unit=p.default_unit,
+        hourly_rate=_s(p.hourly_rate),
+        default_hours=_s(p.default_hours),
         default_pensionable=p.default_pensionable,
         rate_includes_pension=p.rate_includes_pension,
         default_payment_terms_days=p.default_payment_terms_days,
@@ -391,8 +393,10 @@ def _apply_practice(p: Practice, data: dict[str, Any]) -> None:
     if "name" in data and not (data["name"] or "").strip():
         raise DomainError("practice.name_required", "Enter the practice name.")
     for k, v in data.items():
-        if k == "default_rate":
+        if k in {"default_rate", "hourly_rate", "default_hours"}:
             v = Decimal(v) if v not in (None, "") else None
+            if k == "default_hours" and v is not None and not (0 < v <= 24):
+                raise DomainError("practice.bad_hours", "Usual hours must be between 0 and 24.")
         elif isinstance(v, str):
             v = v.strip()
             if k in {
@@ -457,7 +461,10 @@ def _lines(body_lines: list[S.LineIn]) -> list[svc.LineData]:
     out = []
     for ln in body_lines:
         q, price = ln.as_decimals()
-        out.append(svc.LineData(ln.service_date, ln.description, ln.unit, q, price, ln.pensionable))
+        agreed = Decimal(ln.agreed_rate) if ln.agreed_rate not in (None, "") else None
+        out.append(
+            svc.LineData(ln.service_date, ln.description, ln.unit, q, price, ln.pensionable, agreed)
+        )
     return out
 
 
@@ -492,6 +499,7 @@ def _summary(s: Session, inv: Invoice) -> dict[str, Any]:
 def _analysis_out(a: svc.Analysis) -> dict[str, Any]:
     return {
         "totals": a.totals.as_strings(),
+        "unit_prices": [str(p) for p in a.unit_prices],
         "blocking": [i.as_dict() for i in a.blocking],
         "warnings": [i.as_dict() for i in a.warnings],
         "work_start_date": a.work_start,
@@ -550,6 +558,7 @@ def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
                     "unit_price": str(ln.unit_price),
                     "amount": str(ln.amount),
                     "pensionable": ln.pensionable,
+                    "agreed_rate": _s(ln.agreed_rate),
                 }
                 for ln in inv.lines
             ],
@@ -963,6 +972,7 @@ def _session_out(s: Session, w: Any) -> dict[str, Any]:
         "unit": w.unit,
         "quantity": str(w.quantity),
         "rate": str(w.rate),
+        "rate_includes_pension": w.rate_includes_pension,
         "pensionable": w.pensionable,
         "description": w.description,
         "status": w.status,
@@ -1041,7 +1051,12 @@ def suggest_rate(s: DB, practice_id: str, unit: str = "am") -> dict[str, Any]:
     if p is None:
         raise NotFound("practice.not_found", "Practice not found.")
     r = diary.remembered_rate(s, p, unit)
-    return {"rate": str(r) if r is not None else None, "pensionable": p.default_pensionable}
+    return {
+        "rate": str(r) if r is not None else None,
+        "pensionable": p.default_pensionable,
+        "includes_pension": p.rate_includes_pension,
+        "hours": _s(p.default_hours) if unit == "hours" else None,
+    }
 
 
 @api.get("/sessions/ready")
