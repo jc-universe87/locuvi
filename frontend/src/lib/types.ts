@@ -134,6 +134,7 @@ export interface Practice {
 
 export interface Branding {
   has_logo: boolean;
+  logo_format: "svg" | "png" | null;
   logo_sha256: string | null;
   accent: string;
   accents: Record<string, string>;

@@ -247,14 +247,14 @@ function LookSection() {
       <div className="form-list">
         <div className="form-row stacked">
           {b.has_logo ? (
-            <img className="logo-preview" src={`/api/v1/settings/branding/logo.png?v=${b.logo_sha256 ?? ""}`} alt={t("look.logo_alt")} />
+            <img className="logo-preview" src={`/api/v1/settings/branding/logo?v=${b.logo_sha256 ?? ""}`} alt={t("look.logo_alt")} />
           ) : (
             <span className="hint">{t("look.no_logo")}</span>
           )}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <label className="btn secondary small" aria-disabled={busy}>
               <Icon name="upload" size={16} /> {b.has_logo ? t("look.replace_logo") : t("look.add_logo")}
-              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden disabled={busy} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
             {b.has_logo && <button type="button" className="btn ghost small" onClick={remove}>{t("look.remove_logo")}</button>}
           </div>

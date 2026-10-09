@@ -135,6 +135,7 @@ class OwnerProfile(TimestampMixin, Base):
     accounting_basis: Mapped[str] = mapped_column(String(10), default="cash")
     # Personalisation (services/branding.py); frozen into each issued snapshot.
     logo_png: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    logo_svg: Mapped[str | None] = mapped_column(Text, nullable=True)  # cleaned vector logo
     brand_accent: Mapped[str] = mapped_column(String(20), default="steel")
     invoice_footer: Mapped[str | None] = mapped_column(String(300), nullable=True)
     email_signoff: Mapped[str | None] = mapped_column(String(500), nullable=True)

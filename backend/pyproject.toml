@@ -16,6 +16,7 @@ dependencies = [
     "anthropic>=1.12.1",
     "python-multipart>=0.0.32",
     "pypdf>=6.19.0",
+    "svglib>=1.5",
 ]
 
 [dependency-groups]
