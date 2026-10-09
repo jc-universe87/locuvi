@@ -144,46 +144,52 @@ def fake():
     })  # fmt: skip
 
 
-def sign_in(session, box, fake):
-    start = mailbox.ms_start(CLIENT_ID, "organizations", fake.transport())
+def ms_account(session, box, tenant="organizations"):
+    return mailbox.create_account(session, box, {"provider": "microsoft", "ms_tenant": tenant})
+
+
+def sign_in(session, box, fake, acc=None, tenant="organizations"):
+    acc = acc or ms_account(session, box, tenant)
+    start = mailbox.ms_start(session, acc.id, CLIENT_ID, tenant, fake.transport())
     assert start["user_code"] == "ABCD-1234" and "device_code" not in str(start)
-    assert mailbox.ms_poll(session, box, fake.transport())["status"] == "pending"
-    return mailbox.ms_poll(session, box, fake.transport())
+    assert mailbox.ms_poll(session, box, acc.id, fake.transport())["status"] == "pending"
+    return acc, mailbox.ms_poll(session, box, acc.id, fake.transport())
 
 
 def test_sign_in_keeps_only_an_encrypted_token(session, box, fake):
-    done = sign_in(session, box, fake)
+    acc, done = sign_in(session, box, fake)
     assert done == {"status": "done", "username": "alex@example.invalid"}
-    cfg = mailbox.get_config(session)
-    pub = mailbox.config_public(cfg)
+    pub = mailbox.account_public(acc)
     assert (
         pub["provider"] == "microsoft"
         and pub["ms_signed_in"]
         and pub["ms_tenant"] == "organizations"
     )
-    assert "refresh-token" not in str(pub) and "refresh-token" not in cfg.ms_token_ciphertext
+    assert "refresh-token" not in str(pub) and "refresh-token" not in acc.ms_token_ciphertext
     with pytest.raises(DomainError) as e:  # the code is single-use
-        mailbox.ms_poll(session, box, fake.transport())
+        mailbox.ms_poll(session, box, acc.id, fake.transport())
     assert e.value.code == "mailbox.ms_expired"
 
 
 def test_slow_down_lengthens_the_wait(session, box):
     fake = FakeMicrosoft({}, approve_after=2, slow_down=True)
-    start = mailbox.ms_start(CLIENT_ID, "common", fake.transport())
-    first = mailbox.ms_poll(session, box, fake.transport())
-    second = mailbox.ms_poll(session, box, fake.transport())
+    acc = ms_account(session, box, "common")
+    start = mailbox.ms_start(session, acc.id, CLIENT_ID, "common", fake.transport())
+    first = mailbox.ms_poll(session, box, acc.id, fake.transport())
+    second = mailbox.ms_poll(session, box, acc.id, fake.transport())
     assert (first["interval"], second["interval"]) == (
         start["interval"] + 5,
         start["interval"] + 10,
     )
-    assert mailbox.ms_poll(session, box, fake.transport())["status"] == "done"
+    assert mailbox.ms_poll(session, box, acc.id, fake.transport())["status"] == "done"
 
 
 def test_stale_poll_neither_saves_nor_ends_the_new_sign_in(session, box, monkeypatch):
     fake = FakeMicrosoft({}, approve_after=0)
-    mailbox.ms_start(CLIENT_ID, "common", fake.transport())
+    acc = ms_account(session, box, "common")
+    mailbox.ms_start(session, acc.id, CLIENT_ID, "common", fake.transport())
     stale = dict(mail_microsoft._pending)
-    mailbox.ms_start(CLIENT_ID, "common", fake.transport())  # owner cancelled and restarted
+    mailbox.ms_start(session, acc.id, CLIENT_ID, "common", fake.transport())  # restarted
     newer = dict(mail_microsoft._pending)
     newer["device_code"] = "newer-code"
     mail_microsoft._pending.update(newer)
@@ -207,35 +213,43 @@ def test_stale_poll_neither_saves_nor_ends_the_new_sign_in(session, box, monkeyp
 
     monkeypatch.setattr(mail_microsoft, "_pending_lock", Swap())
     with pytest.raises(DomainError) as e:
-        mailbox.ms_poll(session, box, fake.transport())
+        mailbox.ms_poll(session, box, acc.id, fake.transport())
     assert e.value.code == "mailbox.ms_expired"
-    assert not mailbox.get_config(session).ms_token_ciphertext
+    assert not mailbox.get_account(session, acc.id).ms_token_ciphertext
     assert mail_microsoft._pending["device_code"] == "newer-code"
 
 
-def test_bad_app_id_and_missing_approval(session, box):
+def test_bad_app_id_missing_approval_and_wrong_account(session, box):
+    acc = ms_account(session, box)
     with pytest.raises(DomainError) as e:
-        mailbox.ms_start("not-a-guid", "common")
+        mailbox.ms_start(session, acc.id, "not-a-guid", "common")
     assert e.value.code == "mailbox.ms_client_id"
     fake = FakeMicrosoft({}, consent=False, approve_after=0)
-    mailbox.ms_start(CLIENT_ID, "organizations", fake.transport())
+    mailbox.ms_start(session, acc.id, CLIENT_ID, "organizations", fake.transport())
+    other = ms_account(session, box)
+    with pytest.raises(DomainError) as e:  # a sign-in belongs to the account that began it
+        mailbox.ms_poll(session, box, other.id, fake.transport())
+    assert e.value.code == "mailbox.ms_expired"
     with pytest.raises(DomainError) as e:
-        mailbox.ms_poll(session, box, fake.transport())
+        mailbox.ms_poll(session, box, acc.id, fake.transport())
     assert e.value.code == "mailbox.ms_admin_consent"
-    assert not mailbox.get_config(session).ms_token_ciphertext
+    assert not mailbox.get_account(session, acc.id).ms_token_ciphertext
+    imap = mailbox.create_account(session, box, {"host": "imap.example.invalid"})
+    with pytest.raises(DomainError) as e:
+        mailbox.ms_start(session, imap.id, CLIENT_ID, "common", fake.transport())
+    assert e.value.code == "mailbox.type_fixed"
 
 
 def test_folders_scan_and_resume_read_only(settings, session, box, fake, ready):
-    sign_in(session, box, fake)
-    folders = mailbox.list_folders(session, settings, box, factory=fake.transport())
+    acc, _ = sign_in(session, box, fake)
+    folders = mailbox.list_folders(session, settings, box, acc.id, factory=fake.transport())
     assert folders[0]["label"] == "Inbox"
     assert {"name": "child-id", "label": "Inbox / Locum"} in folders
-    mailbox.save_config(session, box, {"enabled": True, "folders": ["child-id"]})
-    assert mailbox.config_public(mailbox.get_config(session))["folder_labels"] == {
-        "child-id": "Inbox / Locum"
-    }
+    # folders Microsoft never listed are not kept
+    mailbox.save_account(session, box, acc, {"enabled": True, "folders": ["INBOX", "child-id"]})
+    assert mailbox.account_public(acc)["folder_labels"] == {"child-id": "Inbox / Locum"}
 
-    res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+    res = mailbox.scan(session, settings, box, transport=fake.transport(), today=TODAY)
     assert res["checked"] == 1 and res["bookings"] == 1 and res["to_review"] == 1
     doc = session.query(Document).one()
     assert doc.source == "email" and doc.mail_folder == "child-id"
@@ -246,58 +260,59 @@ def test_folders_scan_and_resume_read_only(settings, session, box, fake, ready):
     fake.folders["child-id"][1].append(
         booking("m2", "2026-09-20T10:00:00Z", "Remittance advice BACS paid")
     )
-    res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+    res = mailbox.scan(session, settings, box, transport=fake.transport(), today=TODAY)
     assert res["checked"] == 1 and res["remittances"] == 1
-    assert "deltatoken=2" in session.get(MailFolderState, "child-id").cursor
-    res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+    assert "deltatoken=2" in session.get(MailFolderState, (acc.id, "child-id")).cursor
+    res = mailbox.scan(session, settings, box, transport=fake.transport(), today=TODAY)
     assert res["checked"] == 0
 
     # Microsoft forgot the position: read again from the start, nothing imported twice
     fake.forget_delta = True
-    res = mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+    res = mailbox.scan(session, settings, box, transport=fake.transport(), today=TODAY)
     assert res["checked"] == 2 and res["already_seen"] == 2
     assert session.query(Document).count() == 2
     assert all(r.method == "GET" for r in fake.requests if r.url.host == "graph.microsoft.com")
-    assert fake.refresh.endswith("-7")  # sign-in, folders, 2 scans: each kept the new one
+    assert fake.refresh.endswith("-7")  # sign-in, folders, 4 scans: each kept the new one
 
 
 def test_expired_sign_in_is_reported(settings, session, box, fake):
-    sign_in(session, box, fake)
-    mailbox.list_folders(session, settings, box, factory=fake.transport())
-    mailbox.save_config(session, box, {"enabled": True, "folders": ["child-id"]})
+    acc, _ = sign_in(session, box, fake)
+    mailbox.list_folders(session, settings, box, acc.id, factory=fake.transport())
+    mailbox.save_account(session, box, acc, {"enabled": True, "folders": ["child-id"]})
     fake.refresh = "revoked-0"
     with pytest.raises(DomainError) as e:
-        mailbox.scan(session, settings, box, factory=fake.transport(), today=TODAY)
+        mailbox.scan(session, settings, box, transport=fake.transport(), today=TODAY)
     assert e.value.code == "mailbox.ms_signed_out"
-    assert mailbox.get_config(session).last_error == "mailbox.ms_signed_out"
+    assert mailbox.get_account(session, acc.id).last_error == "mailbox.ms_signed_out"
 
 
-def test_switching_account_type_forgets_folders(settings, session, box, fake):
-    mailbox.save_config(session, box, {
-        "enabled": True, "host": "imap.gmail.com", "username": "alex@example.invalid",
-        "password": "app-password-0000", "folders": ["INBOX"],
-    })  # fmt: skip
-    session.add(MailFolderState(folder="INBOX", uidvalidity=7, last_uid=40))
+def test_type_is_fixed_and_another_mailbox_starts_afresh(settings, session, box, fake):
+    acc, _ = sign_in(session, box, fake)
+    mailbox.list_folders(session, settings, box, acc.id, factory=fake.transport())
+    mailbox.save_account(session, box, acc, {"enabled": True, "folders": ["child-id"]})
+    session.add(MailFolderState(account_id=acc.id, folder="child-id", uidvalidity=-1,
+                                last_uid=0, cursor="x"))  # fmt: skip
     session.commit()
-    sign_in(session, box, fake)
-    cfg = mailbox.get_config(session)
-    assert cfg.provider == "microsoft" and cfg.folders == [] and not cfg.enabled
+    with pytest.raises(DomainError) as e:
+        mailbox.save_account(session, box, acc, {"provider": "imap", "host": "imap.gmail.com"})
+    assert e.value.code == "mailbox.type_fixed"
+    # signing this account in to a different mailbox forgets the old folders and progress
+    fake.polls_left = 1
+    original = fake.handle
+
+    def other_user(req):
+        if req.url.path == "/v1.0/me":
+            return httpx.Response(200, json={"mail": "sam@example.invalid"})
+        return original(req)
+
+    fake.handle = other_user
+    sign_in(session, box, fake, acc=acc)
+    acc = mailbox.get_account(session, acc.id)
+    assert acc.username == "sam@example.invalid" and acc.folders == [] and not acc.enabled
     assert session.query(MailFolderState).count() == 0
-    # folders Microsoft never listed (e.g. the old IMAP names) are not kept
-    mailbox.list_folders(session, settings, box, factory=fake.transport())
-    cfg = mailbox.save_config(session, box, {"folders": ["INBOX", "child-id"]})
-    assert cfg.folders == ["child-id"]
-    # switching back to IMAP drops the Microsoft folder ids sent along by the page
-    cfg = mailbox.save_config(session, box, {
-        "provider": "imap", "host": "imap.gmail.com", "username": "alex@example.invalid",
-        "folders": ["child-id"],
-    })  # fmt: skip
-    assert cfg.provider == "imap" and cfg.folders == []
-    cfg.provider = "microsoft"
-    session.commit()
+    mailbox.ms_sign_out(session, acc.id)
     with pytest.raises(DomainError):  # must sign in again after signing out
-        mailbox.ms_sign_out(session)
-        mailbox.save_config(session, box, {"enabled": True, "folders": ["child-id"]})
+        mailbox.save_account(session, box, acc, {"enabled": True, "folders": ["child-id"]})
 
 
 def test_api_microsoft_flow(settings, fake):
@@ -309,27 +324,29 @@ def test_api_microsoft_flow(settings, fake):
     app.state.ms_transport = fake.transport()
     with TestClient(app) as c:
         h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
-        r = c.post("/api/v1/settings/mailbox/microsoft/start", headers=h,
+        r = c.post("/api/v1/settings/mailboxes", headers=h,
+                   json={"provider": "microsoft", "ms_tenant": "common"})  # fmt: skip
+        assert r.status_code == 201
+        base = f"/api/v1/settings/mailboxes/{r.json()['id']}"
+        r = c.post(f"{base}/microsoft/start", headers=h,
                    json={"client_id": CLIENT_ID, "tenant": "consumers"})  # fmt: skip
         assert r.status_code == 200 and r.json()["user_code"] == "ABCD-1234"
         assert "secret-device-code" not in r.text
-        assert (
-            c.post("/api/v1/settings/mailbox/microsoft/poll", headers=h).json()["status"]
-            == "pending"
-        )
-        r = c.post("/api/v1/settings/mailbox/microsoft/poll", headers=h).json()
-        assert r["status"] == "done" and r["config"]["username"] == "alex@example.invalid"
-        names = [
-            f["name"]
-            for f in c.post("/api/v1/settings/mailbox/folders", headers=h).json()["folders"]
-        ]
+        assert c.post(f"{base}/microsoft/poll", headers=h).json()["status"] == "pending"
+        r = c.post(f"{base}/microsoft/poll", headers=h).json()
+        assert r["status"] == "done" and r["account"]["username"] == "alex@example.invalid"
+        names = [f["name"] for f in c.post(f"{base}/folders", headers=h).json()["folders"]]
         assert "child-id" in names
         body = {"enabled": True, "provider": "microsoft", "folders": ["child-id"]}
-        r = c.put("/api/v1/settings/mailbox", headers=h, json=body)
+        r = c.put(base, headers=h, json=body)
         assert r.status_code == 200 and "refresh-token" not in r.text
         assert c.post("/api/v1/mailbox/scan", headers=h).json()["bookings"] == 1
-        r = c.delete("/api/v1/settings/mailbox/microsoft", headers=h).json()
+        r = c.delete(f"{base}/microsoft", headers=h).json()
         assert not r["ms_signed_in"] and not r["enabled"]
+        assert c.delete(base, headers=h).status_code == 200
+        assert c.get("/api/v1/settings/mailboxes").json()["accounts"] == []
+        assert c.post(f"{base}/restore", headers=h).json()["id"]
+        assert len(c.get("/api/v1/settings/mailboxes").json()["accounts"]) == 1
 
 
 def test_graph_ids_are_escaped():

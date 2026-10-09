@@ -460,12 +460,15 @@ class Document(TimestampMixin, Base):
 
 
 class MailboxConfig(Base):
-    """Singleton (id 1): read-only access to folders the owner chose, by IMAP (password
-    encrypted) or Microsoft sign-in (Graph, Mail.Read only; refresh token encrypted)."""
+    """One email account the owner connected (several allowed): read-only access to the
+    folders they chose, by IMAP (password encrypted) or Microsoft sign-in (Graph, Mail.Read
+    only; refresh token encrypted). The account type is fixed when it is added."""
 
     __tablename__ = "mailbox_config"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(String(100), default="")
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     provider: Mapped[str] = mapped_column(String(12), default="imap")  # imap | microsoft
     ms_client_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -487,10 +490,14 @@ class MailboxConfig(Base):
 
 
 class MailFolderState(Base):
-    """How far each chosen folder has been read (IMAP UIDVALIDITY + last UID seen)."""
+    """How far each chosen folder of an account has been read (IMAP UIDVALIDITY + last UID
+    seen, or the Microsoft delta link)."""
 
-    __tablename__ = "mail_folder_state"
+    __tablename__ = "mail_folder_progress"
 
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("mailbox_config.id", ondelete="CASCADE"), primary_key=True
+    )
     folder: Mapped[str] = mapped_column(String(300), primary_key=True)
     uidvalidity: Mapped[int] = mapped_column(Integer, default=0)
     last_uid: Mapped[int] = mapped_column(Integer, default=0)

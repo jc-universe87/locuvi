@@ -361,6 +361,8 @@ class ProposalAcceptIn(Strict):
 class MailboxIn(Strict):
     enabled: bool = False
     provider: Literal["imap", "microsoft"] | None = None
+    label: Annotated[str, StringConstraints(max_length=100)] = ""
+    ms_tenant: Annotated[str, StringConstraints(max_length=64)] | None = None
     host: Annotated[str, StringConstraints(max_length=200)] = ""
     port: Annotated[int, Field(ge=1, le=65535)] = 993
     security: Literal["ssl", "starttls"] = "ssl"

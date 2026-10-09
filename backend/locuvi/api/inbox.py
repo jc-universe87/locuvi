@@ -201,59 +201,86 @@ def put_assistant(body: S.AssistantIn, request: Request, s: DB) -> dict[str, Any
 # ------------------------------------------------------------------ mail folders
 
 
-@api.get("/settings/mailbox")
-def get_mailbox(s: DB) -> dict[str, Any]:
+@api.get("/settings/mailboxes")
+def list_mailboxes(s: DB) -> dict[str, Any]:
     from locuvi.services import mailbox
 
-    return mailbox.config_public(mailbox.get_config(s))
+    return {"accounts": [mailbox.account_public(a) for a in mailbox.list_accounts(s)]}
 
 
-@api.put("/settings/mailbox")
-def put_mailbox(body: S.MailboxIn, request: Request, s: DB) -> dict[str, Any]:
+@api.post("/settings/mailboxes", status_code=201)
+def add_mailbox(body: S.MailboxIn, request: Request, s: DB) -> dict[str, Any]:
     from locuvi.services import mailbox
 
-    cfg = mailbox.save_config(s, state(request).secrets, body.model_dump())
-    return mailbox.config_public(cfg)
+    acc = mailbox.create_account(s, state(request).secrets, body.model_dump())
+    return mailbox.account_public(acc)
 
 
-@api.post("/settings/mailbox/folders")
-def mailbox_folders(request: Request, s: DB) -> dict[str, Any]:
+@api.put("/settings/mailboxes/{account_id}")
+def put_mailbox(account_id: int, body: S.MailboxIn, request: Request, s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    acc = mailbox.get_account(s, account_id)
+    acc = mailbox.save_account(s, state(request).secrets, acc, body.model_dump())
+    return mailbox.account_public(acc)
+
+
+@api.delete("/settings/mailboxes/{account_id}")
+def remove_mailbox(account_id: int, s: DB) -> dict[str, Any]:
+    """Remove an account (undo with /restore until it is purged a day later)."""
+    from locuvi.services import mailbox
+
+    return mailbox.account_public(mailbox.remove_account(s, account_id))
+
+
+@api.post("/settings/mailboxes/{account_id}/restore")
+def restore_mailbox(account_id: int, s: DB) -> dict[str, Any]:
+    from locuvi.services import mailbox
+
+    return mailbox.account_public(mailbox.restore_account(s, account_id))
+
+
+@api.post("/settings/mailboxes/{account_id}/folders")
+def mailbox_folders(account_id: int, request: Request, s: DB) -> dict[str, Any]:
     """Connect with the saved details and list folders, so the owner can tick which to read."""
     from locuvi.services import mailbox
 
+    acc = mailbox.get_account(s, account_id)
+    factory = _ms(request) if acc.provider == "microsoft" else _imap(request)
     folders = mailbox.list_folders(
-        s, state(request).settings, state(request).secrets, factory=_mail_factory(request, s),
-    )  # fmt: skip
+        s, state(request).settings, state(request).secrets, account_id, factory=factory
+    )
     return {"folders": folders}
 
 
-@api.post("/settings/mailbox/microsoft/start")
-def mailbox_ms_start(body: S.MicrosoftSignInIn, request: Request) -> dict[str, Any]:
+@api.post("/settings/mailboxes/{account_id}/microsoft/start")
+def mailbox_ms_start(
+    account_id: int, body: S.MicrosoftSignInIn, request: Request, s: DB
+) -> dict[str, Any]:
     """Begin a Microsoft sign-in: returns a short code to enter at microsoft.com/devicelogin."""
     from locuvi.services import mailbox
 
-    return mailbox.ms_start(
-        body.client_id, body.tenant, getattr(state(request), "ms_transport", None)
-    )
+    return mailbox.ms_start(s, account_id, body.client_id, body.tenant, _ms(request))
 
 
-@api.post("/settings/mailbox/microsoft/poll")
-def mailbox_ms_poll(request: Request, s: DB) -> dict[str, Any]:
+@api.post("/settings/mailboxes/{account_id}/microsoft/poll")
+def mailbox_ms_poll(account_id: int, request: Request, s: DB) -> dict[str, Any]:
     from locuvi.services import mailbox
 
-    r = mailbox.ms_poll(s, state(request).secrets, getattr(state(request), "ms_transport", None))
-    return {**r, "config": mailbox.config_public(mailbox.get_config(s))}
+    r = mailbox.ms_poll(s, state(request).secrets, account_id, _ms(request))
+    return {**r, "account": mailbox.account_public(mailbox.get_account(s, account_id))}
 
 
-@api.delete("/settings/mailbox/microsoft")
-def mailbox_ms_sign_out(s: DB) -> dict[str, Any]:
+@api.delete("/settings/mailboxes/{account_id}/microsoft")
+def mailbox_ms_sign_out(account_id: int, s: DB) -> dict[str, Any]:
     from locuvi.services import mailbox
 
-    return mailbox.config_public(mailbox.ms_sign_out(s))
+    return mailbox.account_public(mailbox.ms_sign_out(s, account_id))
 
 
 @api.post("/mailbox/scan")
 def mailbox_scan(request: Request, s: DB) -> dict[str, Any]:
+    """Check every switched-on email account now."""
     from locuvi.services import mailbox
 
     return mailbox.scan(
@@ -261,17 +288,19 @@ def mailbox_scan(request: Request, s: DB) -> dict[str, Any]:
         state(request).settings,
         state(request).secrets,
         provider=_provider(request, s),
-        factory=_mail_factory(request, s),
+        factory=_imap(request),
+        transport=_ms(request),
     )
 
 
-def _mail_factory(request: Request, s: Any) -> Any:
-    """Test hook: a fake IMAP server, or a fake Microsoft transport for Microsoft accounts."""
-    from locuvi.services import mailbox
-
-    if mailbox.get_config(s).provider == "microsoft":
-        return getattr(state(request), "ms_transport", None)
+def _imap(request: Request) -> Any:
+    """Test hook: a fake IMAP server factory."""
     return getattr(state(request), "imap_factory", None)
+
+
+def _ms(request: Request) -> Any:
+    """Test hook: a fake Microsoft transport."""
+    return getattr(state(request), "ms_transport", None)
 
 
 # ------------------------------------------------------------------------ bank

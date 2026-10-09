@@ -88,8 +88,8 @@ def box(settings):
     return SecretBox(settings)
 
 
-def configure(session, box, folders=("Locum bookings",)):
-    return mailbox.save_config(
+def configure(session, box, folders=("Locum bookings",), username="alex@example.invalid"):
+    return mailbox.create_account(
         session,
         box,
         {
@@ -97,7 +97,7 @@ def configure(session, box, folders=("Locum bookings",)):
             "host": "imap.example.invalid",
             "port": 993,
             "security": "ssl",
-            "username": "alex@example.invalid",
+            "username": username,
             "password": "app-password-0000",
             "folders": list(folders),
             "since_days": 90,
@@ -107,9 +107,9 @@ def configure(session, box, folders=("Locum bookings",)):
 
 def test_config_validation_and_secret(session, box):
     with pytest.raises(DomainError):
-        mailbox.save_config(session, box, {"enabled": True, "host": "imap.example.invalid"})
+        mailbox.create_account(session, box, {"enabled": True, "host": "imap.example.invalid"})
     with pytest.raises(DomainError) as e:
-        mailbox.save_config(
+        mailbox.create_account(
             session,
             box,
             {
@@ -122,15 +122,15 @@ def test_config_validation_and_secret(session, box):
         )
     assert e.value.code == "mailbox.no_folders"
     cfg = configure(session, box)
-    pub = mailbox.config_public(cfg)
+    pub = mailbox.account_public(cfg)
     assert pub["password_set"] and "app-password" not in str(pub)
     assert "app-password" not in (cfg.password_ciphertext or "")
 
 
 def test_list_folders_only_selectable_and_decoded(settings, session, box):
-    configure(session, box)
+    acc = configure(session, box)
     fake = FakeIMAP({"INBOX": {}, "Locum bookings": {}})
-    folders = mailbox.list_folders(session, settings, box, factory=lambda cfg: fake)
+    folders = mailbox.list_folders(session, settings, box, acc.id, factory=lambda cfg: fake)
     labels = [f["label"] for f in folders]
     assert labels[0] == "INBOX" and "[Gmail]" not in labels
     assert "Équipe" in labels and {"name": "&AMk-quipe", "label": "Équipe"} in folders
@@ -239,6 +239,55 @@ def test_login_failure_is_recorded_as_finding(settings, session, box, ready):
     assert "mailbox_failed" in {f.kind for f in checks.run_checks(session, today=TODAY)}
 
 
+def test_several_accounts_each_with_own_folders_and_errors(settings, session, box, ready):
+    """Two mailboxes with the same folder name keep separate progress; one failing account
+    doesn't stop the other, and only the failing one is reported."""
+    work = configure(session, box, username="work@example.invalid")
+    home = configure(session, box, username="home@example.invalid")
+    servers = {
+        "work@example.invalid": FakeIMAP({"Locum bookings": {
+            7: mail("Booking", "Locum session 23 October AM £600", "<w1@example.invalid>"),
+        }}),
+        "home@example.invalid": FakeIMAP({"Locum bookings": {
+            7: mail("Booking", "Locum session 24 October AM £600", "<h1@example.invalid>"),
+        }}),
+    }  # fmt: skip
+    res = mailbox.scan(
+        session, settings, box, factory=lambda acc: servers[acc.username], today=TODAY
+    )
+    assert res["checked"] == 2 and res["bookings"] == 2 and res["errors"] == []
+    from locuvi.models import MailFolderState
+
+    assert {(st.account_id, st.last_uid) for st in session.query(MailFolderState)} == {
+        (work.id, 7), (home.id, 7)
+    }  # fmt: skip
+
+    servers["home@example.invalid"].password = "changed"
+    res = mailbox.scan(
+        session, settings, box, factory=lambda acc: servers[acc.username], today=TODAY
+    )
+    assert res["errors"] == [
+        {"account_id": home.id, "label": "home@example.invalid", "error": "mailbox.auth_failed"}
+    ]
+    found = [f for f in checks.run_checks(session, today=TODAY) if f.kind == "mailbox_failed"]
+    assert [f.params["account"] for f in found] == ["home@example.invalid"]
+
+    # removing an account stops it (undo restores it); after a day it is purged
+    mailbox.remove_account(session, home.id)
+    assert [a.id for a in mailbox.list_accounts(session)] == [work.id]
+    mailbox.restore_account(session, home.id)
+    mailbox.remove_account(session, home.id)
+    from datetime import timedelta
+
+    from locuvi.models import utcnow
+
+    assert mailbox.purge_removed(session) == 0
+    assert mailbox.purge_removed(session, now=utcnow() + timedelta(days=2)) == 1
+    assert {st.account_id for st in session.query(MailFolderState)} == {work.id}
+    with pytest.raises(DomainError):
+        mailbox.restore_account(session, home.id)
+
+
 def test_api_mailbox_flow(settings):
     from fastapi.testclient import TestClient
 
@@ -268,20 +317,25 @@ def test_api_mailbox_flow(settings):
             "username": "alex@example.invalid",
             "password": "app-password-0000",
         }
-        assert c.put("/api/v1/settings/mailbox", json=body, headers=h).status_code == 200
+        r = c.post("/api/v1/settings/mailboxes", json=body, headers=h)
+        assert r.status_code == 201
+        acc = r.json()["id"]
         names = [
             f["name"]
-            for f in c.post("/api/v1/settings/mailbox/folders", headers=h).json()["folders"]
+            for f in c.post(f"/api/v1/settings/mailboxes/{acc}/folders", headers=h).json()[
+                "folders"
+            ]
         ]
         assert "Locum bookings" in names
         r = c.put(
-            "/api/v1/settings/mailbox",
+            f"/api/v1/settings/mailboxes/{acc}",
             headers=h,
             json={**body, "password": None, "enabled": True, "folders": ["Locum bookings"]},
         )
         assert r.json()["password_set"] and "app-password" not in r.text
         r = c.post("/api/v1/mailbox/scan", headers=h)
         assert r.status_code == 200 and r.json()["to_review"] == 1
-        assert c.get("/api/v1/settings/mailbox").json()["last_result"]["bookings"] == 1
+        accounts = c.get("/api/v1/settings/mailboxes").json()["accounts"]
+        assert accounts[0]["last_result"]["bookings"] == 1
         prop = c.get("/api/v1/proposals").json()[0]
         assert prop["items"][0]["rate"] == "600.00" and Decimal(prop["items"][0]["rate"]) == 600
