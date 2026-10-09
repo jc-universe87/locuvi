@@ -88,7 +88,9 @@ Design principle for everything below (owner, 8 Oct 2026): **Apple-style intuiti
   calendar): private secret link (encrypted at rest, regenerate/turn off), no fees unless
   chosen, cancelled sessions marked cancelled, RFC 5545 folding/escaping.
 - 🧭 Native review of DE/KO/FR/ES/PT translations (currently navigation only).
-- 🧭 Password change without editing the secret file.
+- ✅ Password change without editing the secret file (Settings › Password): scrypt hash in the
+  database overrides the secret file; changing it signs out every other device (session epoch);
+  `python -m locuvi.cli reset-password` falls back to the secret file if forgotten.
 - 🧭 Each April: add the new employer rate and check your employee tier (Settings → Pension).
 
 ### Later ideas — 💭

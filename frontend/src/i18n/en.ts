@@ -932,6 +932,19 @@ const en = {
   "error.credit.already_credited": "Some of these lines are already credited.",
   "error.credit.not_issued": "Only issued invoices can be credited.",
   "error.invoice.void_has_credits": "This invoice has credit notes, so it can't be voided.",
+  "settings.s_password": "Password",
+  "settings.s_password_sub": "Change your sign-in password",
+  "password.intro": "Changing your password signs out every other device.",
+  "password.current": "Current password",
+  "password.new": "New password",
+  "password.new_hint": "At least 10 characters. A few random words work well.",
+  "password.again": "New password again",
+  "password.mismatch": "The new passwords don't match.",
+  "password.save": "Change password",
+  "password.changed": "Password changed. Other devices have been signed out.",
+  "password.forgot": "Forgot it? On the server run: docker compose exec locuvi python -m locuvi.cli reset-password, restart, and sign in with the password from secrets/locuvi_password.txt.",
+  "error.auth.same_password": "Choose a different password.",
+  "error.auth.gateway_mode": "Sign-in is handled by your gateway.",
 } as const;
 
 export type MessageKey = keyof typeof en;

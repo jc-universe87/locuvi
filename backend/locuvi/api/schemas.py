@@ -417,3 +417,8 @@ class CreditIn(Strict):
         list[Annotated[str, StringConstraints(max_length=36)]], Field(min_length=1, max_length=200)
     ]
     reason: Annotated[str, StringConstraints(max_length=1000)] = ""
+
+
+class PasswordChangeIn(Strict):
+    current: Annotated[str, StringConstraints(max_length=500)]
+    new: Annotated[str, StringConstraints(min_length=10, max_length=500)]

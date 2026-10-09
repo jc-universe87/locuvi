@@ -351,3 +351,59 @@ def test_search_finds_frozen_practice_name_after_rename(api):
     api.patch(f"/api/v1/practices/{pid}", {"name": "Renamed Surgery"})
     assert api.get("/api/v1/invoices?q=Example%20Medical").json()["total"] == 1
     assert api.get("/api/v1/invoices?q=Renamed").json()["total"] == 1
+
+
+def test_password_change_signs_out_other_sessions(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from locuvi import cli
+    from locuvi.config import Settings
+    from locuvi.main import create_app
+
+    st = Settings(
+        app_env="test",
+        data_dir=tmp_path / "d",
+        key_dir=tmp_path / "k",
+        auth_mode="password",
+        password="file-password-1",
+        cookie_secure=False,
+        worker_enabled=False,
+    )
+    app = create_app(st)
+    with TestClient(app) as a:
+        b = TestClient(app)
+        for c in (a, b):
+            r = c.post("/api/v1/auth/login", json={"password": "file-password-1"})
+            assert r.status_code == 200
+        csrf = r.json()["csrf_token"]
+        a_csrf = a.get("/api/v1/auth/session").json()["csrf_token"]
+        bad = a.post(
+            "/api/v1/auth/password",
+            headers={"X-CSRF-Token": a_csrf},
+            json={"current": "wrong-password", "new": "new-password-22"},
+        )
+        assert bad.status_code == 401
+        short = a.post(
+            "/api/v1/auth/password",
+            headers={"X-CSRF-Token": a_csrf},
+            json={"current": "file-password-1", "new": "short"},
+        )
+        assert short.status_code == 422
+        ok = a.post(
+            "/api/v1/auth/password",
+            headers={"X-CSRF-Token": a_csrf},
+            json={"current": "file-password-1", "new": "new-password-22"},
+        )
+        assert ok.status_code == 200
+        assert a.get("/api/v1/auth/session").json()["authenticated"] is True  # this device
+        assert b.get("/api/v1/auth/session").json()["authenticated"] is False  # others out
+        assert csrf
+        c = TestClient(app)
+        assert c.post("/api/v1/auth/login", json={"password": "file-password-1"}).status_code == 401
+        assert c.post("/api/v1/auth/login", json={"password": "new-password-22"}).status_code == 200
+    # restart: the hash is loaded from the database
+    with TestClient(create_app(st)) as d:
+        assert d.post("/api/v1/auth/login", json={"password": "new-password-22"}).status_code == 200
+    cli.reset_password(st)
+    with TestClient(create_app(st)) as e:
+        assert e.post("/api/v1/auth/login", json={"password": "file-password-1"}).status_code == 200

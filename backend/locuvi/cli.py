@@ -110,6 +110,20 @@ def restore(settings: Settings, src: Path, force: bool = False) -> dict:
     return manifest
 
 
+def reset_password(settings: Settings) -> None:
+    """Lost the in-app password: fall back to the secret file and sign out all sessions."""
+    from locuvi import db
+    from locuvi.models import AuthConfig
+
+    db.init_engine(settings.db_path)
+    with db.new_session() as s:
+        cfg = s.get(AuthConfig, 1)
+        if cfg is not None:
+            cfg.password_hash = None
+            cfg.session_epoch = (cfg.session_epoch or 0) + 1
+            s.commit()
+
+
 def verify(settings: Settings) -> dict:
     from locuvi import db, integrity
 
@@ -212,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("src", type=Path)
     r.add_argument("--force", action="store_true")
     sub.add_parser("verify")
+    sub.add_parser("reset-password", help="forget the in-app password; use the secret file again")
     e = sub.add_parser("example-pdf")
     e.add_argument("out", type=Path)
     args = ap.parse_args(argv)
@@ -228,6 +243,10 @@ def main(argv: list[str] | None = None) -> int:
         result = verify(settings)
         print(json.dumps(result, indent=2))
         return 0 if result["ok"] else 1
+    elif args.cmd == "reset-password":
+        reset_password(settings)
+        print("in-app password removed: sign in with the password from the secret file")
+        print("restart the app for the change to take effect")
     elif args.cmd == "example-pdf":
         from locuvi.pdf.render import render_invoice_pdf
 

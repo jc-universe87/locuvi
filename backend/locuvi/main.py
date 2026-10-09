@@ -61,6 +61,11 @@ def create_app(
         with db.new_session() as s:
             core.ensure_singletons(s)
             app.state.integrity = integrity.check(s, settings)
+            from locuvi.models import AuthConfig
+
+            auth_cfg = s.get(AuthConfig, 1)
+            pw_hash = auth_cfg.password_hash if auth_cfg else None
+            epoch = auth_cfg.session_epoch if auth_cfg else 0
         secrets = SecretBox(settings)
         app.state.secrets = secrets
         app.state.archive_ctx = archive_ctx or ArchiveContext(settings, secrets)
@@ -69,6 +74,8 @@ def create_app(
             mode=settings.auth_mode,
             password=settings.password,
             hours=settings.session_hours,
+            password_hash=pw_hash,
+            epoch=epoch,
         )
         app.state.worker = None
         app.state.digest = None

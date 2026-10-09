@@ -615,3 +615,15 @@ class CreditNote(Base):
     local_pdf_sha256: Mapped[str] = mapped_column(String(64))
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AuthConfig(Base):
+    """Singleton (id 1): owner password set in the app (scrypt hash; overrides the secret file)
+    and the session epoch — bumping it signs out every existing session."""
+
+    __tablename__ = "auth_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    session_epoch: Mapped[int] = mapped_column(Integer, default=0)
+    changed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

@@ -230,6 +230,7 @@ docker compose stop locuvi
 docker compose run --rm --no-deps locuvi python -m locuvi.cli restore /backups/locuvi-2026-10-31.tar.gz --force
 docker compose up -d
 docker compose exec locuvi python -m locuvi.cli verify     # prints {"ok": true, ...}
+docker compose exec locuvi python -m locuvi.cli reset-password  # forgot the in-app password
 ```
 
 If the keys volume is lost, invoices are unaffected; re-enter the WebDAV app password and sign in again.

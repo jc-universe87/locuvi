@@ -75,6 +75,36 @@ def login(body: S.LoginIn, request: Request, response: Response) -> dict[str, An
     return {"authenticated": True, "csrf_token": sm.csrf_for(token)}
 
 
+@api.post("/auth/password")
+def change_password(
+    body: S.PasswordChangeIn, request: Request, response: Response, s: DB
+) -> dict[str, Any]:
+    """Change the owner password in the app. Every other session is signed out."""
+    from locuvi.api.auth import hash_password
+    from locuvi.models import AuthConfig, utcnow
+
+    sm: SessionManager = request.app.state.sessions
+    if sm.mode != "password":
+        raise DomainError("auth.gateway_mode", "Sign-in is handled by your gateway.")
+    if not sm.check_password(body.current):
+        raise Unauthorized("auth.invalid_password", "That password is not correct.")
+    if body.new == body.current:
+        raise DomainError("auth.same_password", "Choose a different password.")
+    cfg = s.get(AuthConfig, 1) or AuthConfig(id=1, session_epoch=0)
+    s.add(cfg)
+    cfg.password_hash = hash_password(body.new)
+    cfg.session_epoch = (cfg.session_epoch or 0) + 1
+    cfg.changed_at = utcnow()
+    core.audit(s, "auth.password_changed")
+    s.commit()
+    sm.set_password_hash(cfg.password_hash, cfg.session_epoch)
+    token = sm.issue_token()  # keep this device signed in
+    st = request.app.state.settings
+    response.set_cookie(COOKIE, token, httponly=True, secure=st.cookie_secure,
+                        samesite="strict", max_age=st.session_hours * 3600, path="/")  # fmt: skip
+    return {"ok": True, "csrf_token": sm.csrf_for(token)}
+
+
 @public.post("/auth/logout")
 def logout(response: Response) -> dict[str, bool]:
     response.delete_cookie(COOKIE, path="/")

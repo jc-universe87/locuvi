@@ -3,17 +3,17 @@ import { Link, useParams } from "react-router-dom";
 import { ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave } from "../components/ui";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
-import { api } from "../lib/api";
+import { api, setCsrf } from "../lib/api";
 import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
 import type { AssistantConfig, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents"] as const;
+const SECTIONS = ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "password"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send",
+  you: "today", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", password: "settings",
 };
 
 export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) {
@@ -37,6 +37,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
         {section === "agents" && <AgentsSection />}
+        {section === "password" && <PasswordSection />}
       </>
     );
   }
@@ -44,7 +45,7 @@ export default function SettingsPage({ onSignOut }: { onSignOut?: () => void }) 
     <>
       <h1>{t("nav.settings")}</h1>
       <div className="form-list">
-        {SECTIONS.map((s) => (
+        {SECTIONS.filter((s) => s !== "password" || onSignOut).map((s) => (
           <Link key={s} to={`/settings/${s}`} className="list-row">
             <span className="task-icon" style={{ width: "2rem", height: "2rem", borderRadius: 9 }}><Icon name={ICON[s]} size={18} /></span>
             <span className="list-main">
@@ -807,6 +808,51 @@ function CalendarSection() {
           <p className="form-foot">{t("calendar.private")}</p>
         </>
       )}
+    </>
+  );
+}
+
+function PasswordSection() {
+  const { t } = useT();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [done, setDone] = useState(false);
+  const mismatch = again.length > 0 && next !== again;
+  const save = async () => {
+    setError(null);
+    try {
+      const r = await api.post<{ csrf_token: string }>("/auth/password", { current, new: next });
+      setCsrf(r.csrf_token);
+      setDone(true);
+      setCurrent(""); setNext(""); setAgain("");
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("password.intro")}</p>
+      <ErrorAlert error={error} />
+      {done && <div className="alert ok" role="status">✓ {t("password.changed")}</div>}
+      <div className="form-list">
+        <Row id="pw-cur" label={t("password.current")}>
+          <input id="pw-cur" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </Row>
+        <Row id="pw-new" label={t("password.new")} hint={t("password.new_hint")}>
+          <input id="pw-new" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+        </Row>
+        <Row id="pw-again" label={t("password.again")}>
+          <input id="pw-again" type="password" autoComplete="new-password" value={again} aria-invalid={mismatch}
+            onChange={(e) => setAgain(e.target.value)} />
+        </Row>
+      </div>
+      {mismatch && <p className="hint" style={{ color: "var(--err)" }}>{t("password.mismatch")}</p>}
+      <div className="actions" style={{ marginTop: "0.5rem" }}>
+        <button className="btn" disabled={!current || next.length < 10 || next !== again} onClick={save}>{t("password.save")}</button>
+      </div>
+      <p className="form-foot">{t("password.forgot")}</p>
     </>
   );
 }

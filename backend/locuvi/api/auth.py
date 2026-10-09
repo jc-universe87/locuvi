@@ -44,31 +44,77 @@ def _b64(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
 
+SCRYPT = {"n": 2**14, "r": 8, "p": 1}
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    dk = hashlib.scrypt(password.encode("utf-8"), salt=salt, dklen=32, **SCRYPT)
+    return f"scrypt${SCRYPT['n']}${SCRYPT['r']}${SCRYPT['p']}${_b64(salt)}${_b64(dk)}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, n, r, p, salt_b64, dk_b64 = stored.split("$")
+        if algo != "scrypt":
+            return False
+        pad = lambda s: s + "=" * (-len(s) % 4)  # noqa: E731
+        salt = base64.urlsafe_b64decode(pad(salt_b64))
+        want = base64.urlsafe_b64decode(pad(dk_b64))
+        got = hashlib.scrypt(password.encode("utf-8"), salt=salt, dklen=len(want),
+                             n=int(n), r=int(r), p=int(p))  # fmt: skip
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(got, want)
+
+
 class SessionManager:
-    def __init__(self, key: bytes, *, mode: str, password: str | None, hours: int) -> None:
+    def __init__(
+        self,
+        key: bytes,
+        *,
+        mode: str,
+        password: str | None,
+        hours: int,
+        password_hash: str | None = None,
+        epoch: int = 0,
+    ) -> None:
         self._key = key
         self.mode = mode
         self._password = password
+        self._hash = password_hash
+        self._epoch = epoch
         self._ttl = hours * 3600
         self._failures: deque[float] = deque()
         self._lock = threading.Lock()
+
+    def set_password_hash(self, password_hash: str | None, epoch: int) -> None:
+        """Called after an in-app password change (or reset): old sessions stop working."""
+        with self._lock:
+            self._hash, self._epoch = password_hash, epoch
 
     def _sign(self, payload: str) -> str:
         return _b64(hmac.new(self._key, payload.encode(), hashlib.sha256).digest())
 
     def issue_token(self) -> str:
-        payload = f"v1.{int(time.time()) + self._ttl}.{_b64(secrets.token_bytes(16))}"
+        expiry = int(time.time()) + self._ttl
+        payload = f"v2.{expiry}.{self._epoch}.{_b64(secrets.token_bytes(16))}"
         return f"{payload}.{self._sign(payload)}"
 
     def valid_token(self, token: str | None) -> bool:
-        if not token or token.count(".") != 3:
+        if not token or token.count(".") not in (3, 4):
             return False
         payload, sig = token.rsplit(".", 1)
         if not hmac.compare_digest(sig, self._sign(payload)):
             return False
+        parts = payload.split(".")
         try:
-            expiry = int(payload.split(".")[1])
+            expiry = int(parts[1])
+            # v1 tokens (before epochs existed) count as epoch 0
+            epoch = int(parts[2]) if parts[0] == "v2" and len(parts) == 4 else 0
         except ValueError:
+            return False
+        if parts[0] not in ("v1", "v2") or epoch != self._epoch:
             return False
         return expiry > time.time()
 
@@ -85,9 +131,12 @@ class SessionManager:
                 raise TooManyAttempts(
                     "auth.too_many_attempts", "Too many attempts. Wait a few minutes."
                 )
-            ok = self._password is not None and hmac.compare_digest(
-                attempt.encode("utf-8"), self._password.encode("utf-8")
-            )
+            if self._hash:
+                ok = verify_password(attempt, self._hash)
+            else:
+                ok = self._password is not None and hmac.compare_digest(
+                    attempt.encode("utf-8"), self._password.encode("utf-8")
+                )
             if not ok:
                 self._failures.append(now)
             return ok
