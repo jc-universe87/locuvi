@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { BookingSheet, ProposalReview, useAssistant, usePractices } from "../components/Booking";
 import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useToast } from "../components/ui";
 import { useT } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob } from "../lib/api";
 import { ukDate } from "../lib/format";
-import type { Doc, DocKind, MailboxConfig, Proposal, ScanResult } from "../lib/types";
+import type { Doc, DocKind, InvoiceSummary, MailboxConfig, Proposal, ScanResult } from "../lib/types";
 
 const KINDS: DocKind[] = ["booking", "remittance", "statement", "pension", "other"];
 const KIND_ICON: Record<DocKind, string> = {
@@ -42,6 +43,13 @@ export default function InboxPage() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get("doc");
+    if (!id) return;
+    api.get<Doc>(`/documents/${id}`).then(setOpen, setError);
+    setParams({}, { replace: true });
+  }, [params, setParams]);
   const [mailboxOn, setMailboxOn] = useState(false);
   const [scanning, setScanning] = useState(false);
   useEffect(() => {
@@ -202,6 +210,10 @@ function DocSheet({
   const toast = useToast();
   const assistant = useAssistant();
   const [d, setD] = useState<Doc | null>(doc);
+  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
+  useEffect(() => {
+    if (doc) api.get<{ items: InvoiceSummary[] }>("/invoices?status=issued&page_size=100").then((r) => setInvoices(r.items), () => undefined);
+  }, [doc]);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -210,7 +222,7 @@ function DocSheet({
   }, [doc]);
   if (!d) return <Dialog open={false} onClose={onClose} title="">{null}</Dialog>;
 
-  const patch = async (body: Partial<Pick<Doc, "kind" | "status" | "practice_id">>) => {
+  const patch = async (body: Partial<Pick<Doc, "kind" | "status" | "practice_id" | "invoice_id">>) => {
     try {
       const next = await api.patch<Doc>(`/documents/${d.id}`, body);
       setD({ ...d, ...next });
@@ -281,6 +293,13 @@ function DocSheet({
           <select id="doc-practice" value={d.practice_id ?? ""} onChange={(e) => void patch({ practice_id: e.target.value || null })}>
             <option value="">—</option>
             {practices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="form-row">
+          <label htmlFor="doc-invoice">{t("corr.invoice")}</label>
+          <select id="doc-invoice" value={d.invoice_id ?? ""} onChange={(e) => void patch({ invoice_id: e.target.value || null })}>
+            <option value="">—</option>
+            {invoices.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.practice_name}</option>)}
           </select>
         </div>
         <div className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>

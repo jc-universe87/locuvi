@@ -913,6 +913,10 @@ const en = {
   "calendar.copy": "Copy link",
   "calendar.new_link": "New link",
   "calendar.private": "Anyone with this link can see your sessions. Your phone must be able to reach Locuvi (home network or Tailscale). If the link was shared by mistake, tap New link — the old one stops working.",
+  "corr.title": "Correspondence",
+  "corr.sent": "Invoice email",
+  "corr.sent_to": "Sent to {to} · {when}",
+  "corr.invoice": "Invoice",
 } as const;
 
 export type MessageKey = keyof typeof en;

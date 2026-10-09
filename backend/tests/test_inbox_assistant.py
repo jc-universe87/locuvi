@@ -441,3 +441,32 @@ def test_upload_size_limit(settings, session, monkeypatch):
         documents.add_upload(session, settings, "a.txt", "text/plain", b"x" * 11)
     assert e.value.code == "document.too_large"
     assert session.query(Document).count() == 0 and session.query(Proposal).count() == 0
+
+
+def test_correspondence_links_documents_to_invoices(settings, session, ready):
+    import uuid
+
+    from locuvi.models import InvoiceEvent
+    from locuvi.services import invoices as svc
+
+    diary.add_sessions(session, [diary.SessionInput(ready.id, date(2026, 8, 3))])
+    d = diary.invoice_month(session, ready.id, "2026-08")
+    inv = svc.issue(settings, d.id, uuid.uuid4().hex).invoice
+    session.expire_all()
+    number = inv.invoice_number
+    remit = documents.add_paste(session, f"Remittance advice: BACS for {number.lower()} paid")
+    assert remit.invoice_id == inv.id  # number found, case/punctuation-insensitive
+    other = documents.add_paste(session, "Remittance for several invoices")
+    assert other.invoice_id is None
+    documents.update(session, other, invoice_id=inv.id)
+    session.add(
+        InvoiceEvent(
+            invoice_id=inv.id,
+            event_type="emailed",
+            metadata_json={"to": ["a@example.invalid"], "subject": "Invoice"},
+        )
+    )
+    session.commit()
+    log = documents.correspondence(session, inv.id)
+    assert sorted(x["type"] for x in log) == ["document", "document", "sent"]
+    assert {x.get("id") for x in log if x["type"] == "document"} == {remit.id, other.id}

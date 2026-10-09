@@ -316,6 +316,7 @@ class PasteIn(Strict):
 
 
 class DocumentPatch(Strict):
+    invoice_id: Annotated[str, StringConstraints(max_length=36)] | None = None
     kind: DocKind | None = None
     title: Annotated[str, StringConstraints(min_length=1, max_length=200)] | None = None
     status: Literal["new", "done"] | None = None

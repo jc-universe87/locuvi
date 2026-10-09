@@ -149,8 +149,10 @@ Each item is useful on its own and gives the AI something reliable to work with.
 - ✅ **PCSE comparison**: type in, or import as CSV (month + pensionable pay and/or
   contributions; rows per practice are summed), what PCSE/NHS Pensions shows; Locuvi compares
   with the expected figures from issued invoices and flags mismatches. (Spec C)
-- 🧭 **Correspondence log**: emails sent and received about an invoice or session, linked to
-  it, so drafts can use context the owner has authorised. (Spec F)
+- ✅ **Correspondence log**: each invoice shows the emails sent from Locuvi (recipient,
+  subject, time) and the inbox documents/emails linked to it — linked automatically when the
+  invoice number appears in the text (remittances, replies), or by hand in the inbox. The
+  agent sees it through `get_invoice`. (Spec F)
 - ✅ **Audit log for proposals** (`Proposal` table, `services/proposals.py`): what was proposed,
   by which engine (`rules` or `ai:<model>`), what the owner accepted, changed or rejected, and
   what was created — with undo. Used by the rules reader and the AI alike.
@@ -204,7 +206,7 @@ Each item is useful on its own and gives the AI something reliable to work with.
   tracking and PCSE comparison (Spec C, D); it never claims a submission was accepted.
 - ✅ Questions in plain language over your records ("Which practices still owe me money?").
   Figures come from the services, never from AI estimates. (G)
-- 🧭 Correspondence log (emails sent/received per invoice) as further context. (F)
+- ✅ Correspondence log (emails sent/received per invoice) as further context. (F)
 
 ### Phase 4 — Extended integration — 🔜 partly done (v3)
 - ✅ **Bevro integration** (`api/mcp.py`, Settings › Connected agents): Locuvi is an **MCP

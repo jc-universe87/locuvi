@@ -225,6 +225,30 @@ export default function InvoiceDetailPage() {
         </section>
       )}
 
+      {inv.correspondence && inv.correspondence.length > 0 && (
+        <section className="card flush" aria-labelledby="h-corr">
+          <h2 id="h-corr" className="card-pad-title">{t("corr.title")}</h2>
+          {inv.correspondence.map((c, i) => c.type === "sent" ? (
+            <div key={i} className="list-row">
+              <span className="task-icon ok"><Icon name="send" size={18} /></span>
+              <span className="list-main">
+                <span className="list-title">{c.subject ?? t("corr.sent")}</span>
+                <span className="list-sub">{t("corr.sent_to", { to: c.to.join(", "), when: dateTime(c.at) })}</span>
+              </span>
+            </div>
+          ) : (
+            <Link key={i} to={`/inbox?doc=${c.id}`} className="list-row">
+              <span className="task-icon"><Icon name="inbox" size={18} /></span>
+              <span className="list-main">
+                <span className="list-title">{c.title}</span>
+                <span className="list-sub">{t(`inbox.kind_${c.kind}` as MessageKey)} · {dateTime(c.at)}</span>
+              </span>
+              <span className="chev"><Icon name="chevron" size={18} /></span>
+            </Link>
+          ))}
+        </section>
+      )}
+
       <details className="more card">
         <summary>{t("detail.history")}</summary>
         <ul className="timeline" style={{ marginTop: "0.5rem" }}>

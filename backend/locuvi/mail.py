@@ -150,7 +150,11 @@ def send_invoice(
         InvoiceEvent(
             invoice_id=inv.id,
             event_type="emailed",
-            metadata_json={"to": recipients, "message_id": msg["Message-ID"]},
+            metadata_json={
+                "to": recipients,
+                "subject": str(msg["Subject"]),
+                "message_id": msg["Message-ID"],
+            },
         )
     )
     s.commit()

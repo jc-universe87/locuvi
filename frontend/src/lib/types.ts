@@ -90,6 +90,10 @@ export interface InvoiceDetail extends InvoiceSummary {
   lines: Line[];
   payments: { id: string; paid_on: string; amount: string; method: string; reference: string | null }[];
   events: { timestamp: string; event_type: string; metadata: Record<string, unknown> }[];
+  correspondence?: (
+    | { type: "sent"; at: string; to: string[]; subject: string | null }
+    | { type: "document"; at: string; id: string; title: string; kind: DocKind; source: string }
+  )[];
   analysis?: Analysis;
   snapshot?: {
     seller: { legal_name: string };
@@ -265,6 +269,7 @@ export interface Doc {
   size: number;
   status: "new" | "done";
   practice_id: string | null;
+  invoice_id: string | null;
   has_file: boolean;
   has_text: boolean;
   excerpt: string;

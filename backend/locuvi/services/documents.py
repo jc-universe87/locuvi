@@ -147,6 +147,22 @@ def guess_practice(s: Session, text: str) -> str | None:
     return best.id if best else None
 
 
+def guess_invoice(s: Session, text: str) -> str | None:
+    """The issued invoice whose number appears in the text (only when exactly one does)."""
+    from locuvi.models import Invoice
+
+    hay = re.sub(r"[^a-z0-9]", "", text[:50000].lower())
+    if not hay:
+        return None
+    hits = [
+        i.id
+        for i in s.scalars(select(Invoice).where(Invoice.invoice_number.is_not(None)))
+        if len(re.sub(r"[^a-z0-9]", "", (i.invoice_number or "").lower())) >= 4
+        and re.sub(r"[^a-z0-9]", "", (i.invoice_number or "").lower()) in hay
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
 def _title_from(text: str, fallback: str) -> str:
     m = re.search(r"^Subject:\s*(.+)$", text, re.M)
     if m:
@@ -191,6 +207,7 @@ def add_upload(
         stored_name=stored,
         text_content=text,
         practice_id=guess_practice(s, text),
+        invoice_id=guess_invoice(s, text),
     )
     s.add(doc)
     core.audit(s, "document.added", source="upload", content_type=ctype, size=len(data))
@@ -212,6 +229,7 @@ def add_paste(s: Session, text: str, kind: str | None = None) -> Document:
         sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
         text_content=text,
         practice_id=guess_practice(s, text),
+        invoice_id=guess_invoice(s, text),
     )
     s.add(doc)
     core.audit(s, "document.added", source="paste", size=doc.size)
@@ -249,8 +267,13 @@ def update(s: Session, doc: Document, **changes: object) -> Document:
     if changes.get("practice_id"):
         if s.get(Practice, str(changes["practice_id"])) is None:
             raise NotFound("practice.not_found", "Practice not found.")
+    if changes.get("invoice_id"):
+        from locuvi.models import Invoice
+
+        if s.get(Invoice, str(changes["invoice_id"])) is None:
+            raise NotFound("invoice.not_found", "Invoice not found.")
     for k, v in changes.items():
-        setattr(doc, k, (v or None) if k == "practice_id" else v)
+        setattr(doc, k, (v or None) if k in {"practice_id", "invoice_id"} else v)
     s.commit()
     return doc
 
@@ -297,3 +320,32 @@ def new_count(s: Session) -> int:
             )
         )
     )
+
+
+def for_invoice(s: Session, invoice_id: str) -> list[Document]:
+    return list(
+        s.scalars(
+            select(Document)
+            .where(Document.invoice_id == invoice_id, Document.deleted_at.is_(None))
+            .order_by(Document.created_at)
+        )
+    )
+
+
+def correspondence(s: Session, invoice_id: str) -> list[dict[str, object]]:
+    """Emails sent from Locuvi about the invoice, and inbox documents linked to it, by date."""
+    from locuvi.models import InvoiceEvent
+
+    out: list[dict[str, object]] = []
+    for e in s.scalars(
+        select(InvoiceEvent).where(
+            InvoiceEvent.invoice_id == invoice_id, InvoiceEvent.event_type == "emailed"
+        )
+    ):
+        md = e.metadata_json or {}
+        out.append({"type": "sent", "at": e.timestamp.isoformat(), "to": md.get("to", []),
+                    "subject": md.get("subject")})  # fmt: skip
+    for d in for_invoice(s, invoice_id):
+        out.append({"type": "document", "id": d.id, "at": d.created_at.isoformat(),
+                    "title": d.title, "kind": d.kind, "source": d.source})  # fmt: skip
+    return sorted(out, key=lambda x: str(x["at"]))

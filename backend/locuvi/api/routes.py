@@ -409,6 +409,12 @@ def _analysis_out(a: svc.Analysis) -> dict[str, Any]:
     }
 
 
+def _correspondence(s: Session, invoice_id: str) -> list[dict[str, Any]]:
+    from locuvi.services import documents
+
+    return documents.correspondence(s, invoice_id)  # type: ignore[return-value]
+
+
 def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
     out = _summary(s, inv)
     out.update(
@@ -454,6 +460,7 @@ def _detail(s: Session, inv: Invoice) -> dict[str, Any]:
                     .order_by(InvoiceEvent.timestamp)
                 )
             ],
+            "correspondence": _correspondence(s, inv.id),
         }
     )
     if inv.status == "draft":

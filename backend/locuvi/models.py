@@ -422,6 +422,9 @@ class Document(TimestampMixin, Base):
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     message_id: Mapped[str | None] = mapped_column(String(300), nullable=True, index=True)
     mail_folder: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    invoice_id: Mapped[str | None] = mapped_column(
+        ForeignKey("invoice.id"), nullable=True, index=True
+    )
 
 
 class MailboxConfig(Base):

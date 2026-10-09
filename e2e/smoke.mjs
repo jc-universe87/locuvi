@@ -118,6 +118,7 @@ const [download] = await Promise.all([
   dialog.getByRole("button", { name: "Issue invoice" }).click(),
 ]);
 if (!/^LOC-\d{4}-0001\.pdf$/.test(download.suggestedFilename())) await fail(`bad filename ${download.suggestedFilename()}`);
+const invoiceNumber = download.suggestedFilename().replace(/\.pdf$/, "");
 await page.locator(".inv-hero .amount", { hasText: "£2,032.96" }).waitFor();
 await page.locator(".pill", { hasText: /^Due / }).waitFor();
 await shot("07-detail");
@@ -196,7 +197,7 @@ step("inbox: pasted booking is filed as done; upload a file");
 await page.getByRole("link", { name: /^Inbox/ }).click();
 await page.getByRole("heading", { name: "Inbox" }).waitFor();
 await page.locator("input[type=file]").setInputFiles({
-  name: "remittance.txt", mimeType: "text/plain", buffer: Buffer.from("Remittance advice: BACS payment £2,032.96"),
+  name: "remittance.txt", mimeType: "text/plain", buffer: Buffer.from(`Remittance advice: BACS payment £2,032.96 for ${invoiceNumber}`),
 });
 await page.getByText("Added 1 document").waitFor();
 await page.getByRole("button", { name: /remittance\.txt/ }).click();
@@ -206,6 +207,14 @@ await page.getByRole("dialog").getByRole("button", { name: "Mark done" }).click(
 await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 await page.getByRole("button", { name: "Done" }).click();
 await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
+
+step("invoice shows its correspondence (remittance linked by number)");
+await page.getByRole("link", { name: "Invoices" }).first().click();
+await page.getByRole("link", { name: new RegExp(invoiceNumber) }).first().click();
+await page.getByRole("heading", { name: "Correspondence" }).waitFor();
+await page.getByRole("link", { name: /remittance\.txt/ }).click();
+await page.getByRole("dialog").getByText("BACS payment").waitFor();
+await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
 step("payments in: import a bank statement, mark a non-invoice credit");
 await page.getByRole("link", { name: "Invoices" }).first().click();

@@ -28,6 +28,7 @@ def _doc_out(d: Document, *, full: bool = False) -> dict[str, Any]:
         "size": d.size,
         "status": d.status,
         "practice_id": d.practice_id,
+        "invoice_id": d.invoice_id,
         "has_file": bool(d.stored_name),
         "has_text": bool(d.text_content.strip()),
         "excerpt": " ".join(d.text_content.split())[:160],

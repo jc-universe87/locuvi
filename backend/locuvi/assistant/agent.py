@@ -97,8 +97,9 @@ TOOLS: list[dict[str, Any]] = [
     ),
     _tool(
         "get_invoice",
-        "One invoice by its number (e.g. LOC-2026-0001): lines, totals, "
-        "payments and payment state.",
+        "One invoice by its number (e.g. LOC-2026-0001): lines, totals, payments, payment "
+        "state and correspondence (emails sent; linked inbox documents, readable with "
+        "read_document).",
         {"number": {"type": "string"}},
     ),
     _tool(
@@ -292,6 +293,7 @@ class Tools:
             ],
             "employer_contribution": _money(inv.employer_contribution),
             "last_emailed": inv.last_emailed_at.isoformat() if inv.last_emailed_at else None,
+            "correspondence": documents.correspondence(self.s, inv.id),
         }
 
     def t_financial_summary(self, tax_year: int | None) -> Any:
