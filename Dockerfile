@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Locuvi v1.0 — single container: FastAPI API + built React frontend + archive worker.
 #
 # Behind a TLS-intercepting proxy, pass its CA as an optional build secret:
