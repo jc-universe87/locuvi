@@ -512,6 +512,7 @@ class AssistantConfig(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     provider: Mapped[str] = mapped_column(String(20), default="anthropic")
+    model: Mapped[str | None] = mapped_column(String(120), nullable=True)  # None = default
     api_key_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
     weekly_brief: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)

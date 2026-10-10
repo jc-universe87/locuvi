@@ -194,8 +194,16 @@ def put_assistant(body: S.AssistantIn, request: Request, s: DB) -> dict[str, Any
         api_key=body.api_key,
         clear_key=body.clear_key,
         weekly_brief=body.weekly_brief,
+        provider=body.provider,
+        model=body.model,
     )
     return providers.config_public(cfg, state(request).settings)
+
+
+@api.post("/settings/assistant/check")
+def check_assistant(request: Request, s: DB) -> dict[str, Any]:
+    factory = getattr(state(request), "ai_model_lister", None)  # tests: fake provider
+    return providers.check_key(s, state(request).settings, state(request).secrets, factory)
 
 
 # ------------------------------------------------------------------ mail folders

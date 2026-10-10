@@ -22,10 +22,17 @@ if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() =>
 step("turn on the assistant");
 await page.goto(`${BASE}/settings/assistant`);
 await page.getByRole("switch").click();
-await page.getByLabel("Anthropic AI access key").fill("sk-ant-e2e-fake-key-0000000000000000000000");
+// the company can be changed; a key is never carried over to another company
+await page.getByLabel("AI company").selectOption("deepseek");
+await page.getByText("Get a key from DeepSeek").waitFor();
+await page.getByLabel("AI company").selectOption("anthropic");
+await page.getByLabel("Your API key").fill("sk-ant-e2e-fake-key-0000000000000000000000");
 await page.getByRole("button", { name: "Save" }).click();
 await page.getByText("AI assistant is enabled").waitFor();
 if (await page.getByText("sk-ant-e2e").count()) throw new Error("key echoed");
+await page.getByRole("button", { name: "Check key" }).click();
+await page.getByText("Your key works. 2 models are available.").waitFor();
+if (SHOTS) await page.screenshot({ path: `${SHOTS}/19-ai-provider.png`, fullPage: true });
 
 step("paste a booking -> AI suggestion, clearly labelled");
 await page.goto(`${BASE}/diary`);

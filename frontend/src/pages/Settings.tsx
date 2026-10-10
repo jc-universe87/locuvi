@@ -606,27 +606,58 @@ function StorageSection() {
 }
 
 function AssistantSection() {
-  const { t } = useT();
+  const { t, tn } = useT();
   const [cfg, setCfg] = useState<AssistantConfig | null>(null);
   const [key, setKey] = useState("");
+  const [model, setModel] = useState("");
+  const [models, setModels] = useState<string[]>([]);
+  const [checked, setChecked] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    api.get<AssistantConfig>("/settings/assistant").then(setCfg, setError);
+    api.get<AssistantConfig>("/settings/assistant").then((c) => { setCfg(c); setModel(c.model); }, setError);
   }, []);
   if (!cfg) return <ErrorAlert error={error} />;
-  const save = async (enabled: boolean, clear = false) => {
+  const put = async (body: Record<string, unknown>) => {
     setError(null);
     setSaved(false);
     try {
-      setCfg(await api.put<AssistantConfig>("/settings/assistant", { enabled, api_key: key || null, clear_key: clear }));
+      const next = await api.put<AssistantConfig>("/settings/assistant", body);
+      setCfg(next);
+      setModel(next.model);
+      return next;
+    } catch (e) {
+      setError(e);
+      return null;
+    }
+  };
+  const save = async (enabled: boolean, clear = false) => {
+    const custom = model.trim() && model.trim() !== info?.default_model ? model.trim() : "";
+    if (await put({ enabled, api_key: key || null, clear_key: clear, model: custom })) {
       setKey("");
       setSaved(true);
+    }
+  };
+  const choose = async (provider: string) => {
+    setModels([]);
+    setChecked(false);
+    setKey("");
+    await put({ enabled: cfg.enabled, provider });
+  };
+  const check = async () => {
+    setError(null);
+    setChecked(false);
+    try {
+      const r = await api.post<{ ok: boolean; models: string[] }>("/settings/assistant/check", {});
+      setModels(r.models);
+      setChecked(true);
     } catch (e) {
       setError(e);
     }
   };
+  const info = cfg.providers.find((p) => p.id === cfg.provider);
   const hasKey = cfg.key_saved || cfg.key_from_server;
+  const placeholder = cfg.provider === "anthropic" ? "sk-ant-…" : cfg.provider === "gemini" ? "AIza…" : "sk-…";
   return (
     <>
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("assistant.intro")}</p>
@@ -636,33 +667,47 @@ function AssistantSection() {
         <SwitchRow label={t("assistant.toggle")} hint={t("assistant.toggle_hint")} checked={cfg.enabled}
           onChange={(v) => { if (!v || hasKey || key) void save(v); else setCfg({ ...cfg, enabled: true }); }} />
         {cfg.enabled && (
-          <Row id="ai-key" label={t("assistant.key")} hint={cfg.key_from_server ? t("assistant.key_server") : t("assistant.key_hint")}>
-            <input id="ai-key" type="password" autoComplete="off" spellCheck={false} disabled={cfg.key_from_server}
-              placeholder={cfg.key_saved ? "••••••••" : "sk-ant-…"} value={key} onChange={(e) => setKey(e.target.value.trim())} />
-          </Row>
+          <>
+            <Row id="ai-provider" label={t("assistant.provider")} hint={t("assistant.provider_hint")}>
+              <select id="ai-provider" value={cfg.provider} onChange={(e) => void choose(e.target.value)}>
+                {cfg.providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </Row>
+            <Row id="ai-key" label={t("assistant.key")} hint={cfg.key_from_server ? t("assistant.key_server") : t("assistant.key_hint")}>
+              <input id="ai-key" type="password" autoComplete="off" spellCheck={false} disabled={cfg.key_from_server}
+                placeholder={cfg.key_saved ? "••••••••" : placeholder} value={key} onChange={(e) => setKey(e.target.value.trim())} />
+            </Row>
+            <Row id="ai-model" label={t("assistant.model_label")} hint={t("assistant.model_hint", { model: info?.default_model ?? "" })}>
+              <input id="ai-model" type="text" list="ai-models" autoComplete="off" spellCheck={false} value={model}
+                onChange={(e) => setModel(e.target.value.trim())} />
+              <datalist id="ai-models">{models.map((m) => <option key={m} value={m} />)}</datalist>
+            </Row>
+          </>
         )}
       </div>
+      {cfg.enabled && info && !cfg.key_from_server && (
+        <p className="form-foot">
+          <a href={info.key_url} target="_blank" rel="noreferrer noopener">{t("assistant.get_key", { provider: info.label })}</a>
+          {!info.reads_photos && <> · {t("assistant.no_photos")}</>}
+        </p>
+      )}
+      {checked && <div className="alert ok" role="status">✓ {tn("assistant.key_works", models.length)}</div>}
       {cfg.ready && (
         <div className="form-list" style={{ marginTop: "0.75rem" }}>
           <SwitchRow label={t("assistant.weekly_brief")} hint={t("assistant.weekly_brief_hint")} checked={cfg.weekly_brief}
-            onChange={async (v) => {
-              try {
-                setCfg(await api.put<AssistantConfig>("/settings/assistant", { enabled: true, weekly_brief: v }));
-              } catch (e) {
-                setError(e);
-              }
-            }} />
+            onChange={(v) => void put({ enabled: true, weekly_brief: v })} />
         </div>
       )}
-      {cfg.enabled && !cfg.key_from_server && (
+      {cfg.enabled && (
         <div className="actions" style={{ marginTop: "0.5rem" }}>
-          <button className="btn" disabled={!key && !cfg.key_saved} onClick={() => void save(true)}>{t("common.save")}</button>
+          <button className="btn" disabled={!key && !hasKey} onClick={() => void save(true)}>{t("common.save")}</button>
+          {hasKey && <button className="btn ghost" onClick={() => void check()}>{t("assistant.check_key")}</button>}
           {cfg.key_saved && <button className="btn ghost" onClick={() => void save(false, true)}>{t("assistant.forget_key")}</button>}
         </div>
       )}
       <h3>{t("assistant.privacy_title")}</h3>
       <ul className="muted bullets">
-        <li>{t("assistant.privacy_1")}</li>
+        <li>{t("assistant.privacy_1", { provider: info?.label ?? "" })}</li>
         <li>{t("assistant.privacy_2")}</li>
         <li>{t("assistant.privacy_3")}</li>
         <li>{t("assistant.privacy_4")}</li>
