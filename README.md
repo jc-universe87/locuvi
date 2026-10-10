@@ -9,7 +9,7 @@
 **A calm, private home for a UK GP locum's admin:** diary, invoices, payments, NHS pension
 forms and tax-year reports, on your own server.
 
-[![CI](https://github.com/jc-universe87/GP-Locum-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/jc-universe87/GP-Locum-Manager/actions/workflows/ci.yml)
+[![CI](https://github.com/jc-universe87/locuvi/actions/workflows/ci.yml/badge.svg)](https://github.com/jc-universe87/locuvi/actions/workflows/ci.yml)
 ![Self-hosted](https://img.shields.io/badge/self--hosted-your%20server-294d63)
 ![Made for](https://img.shields.io/badge/made%20for-UK%20GP%20locums-294d63)
 
