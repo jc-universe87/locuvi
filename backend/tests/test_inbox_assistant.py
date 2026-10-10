@@ -291,7 +291,7 @@ def test_assistant_config_off_by_default_and_key_encrypted(settings, session):
     cfg = providers.get_config(session)
     assert "x" * 40 not in (cfg.api_key_ciphertext or "")
     pub = providers.config_public(cfg, settings)
-    assert pub["ready"] is True and "api_key" not in json.dumps(pub).replace("key_", "")
+    assert pub["ready"] is True and "x" * 40 not in json.dumps(pub) and "api_key" not in pub
     assert isinstance(providers.provider_for(session, settings, box), providers.AnthropicProvider)
     providers.save_config(session, box, enabled=False, api_key=None)
     assert providers.provider_for(session, settings, box) is None

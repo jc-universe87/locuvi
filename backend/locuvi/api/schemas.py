@@ -354,6 +354,8 @@ class AssistantIn(Strict):
     api_key: Annotated[str, StringConstraints(max_length=500)] | None = None
     clear_key: bool = False
     weekly_brief: bool | None = None
+    provider: Annotated[str, StringConstraints(max_length=20)] | None = None
+    model: Annotated[str, StringConstraints(max_length=120)] | None = None
 
 
 class ProposalChoice(Strict):

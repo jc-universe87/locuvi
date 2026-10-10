@@ -36,7 +36,7 @@ describe("i18n catalogues", () => {
       expect(en).toHaveProperty(`settings.s_${s}_sub`);
     }
     for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]) expect(en).toHaveProperty(`diary.wd_${d}`);
-    for (const m of ["bank_transfer", "cheque", "cash", "other"]) expect(en).toHaveProperty(`pay.method_${m}`);
+    for (const m of ["bank_transfer", "cheque", "cash", "other", "refund"]) expect(en).toHaveProperty(`pay.method_${m}`);
     for (const g of ["morning", "afternoon", "evening"]) expect(en).toHaveProperty(`today.${g}`);
     // Every finding kind the backend checks engine can emit (backend/locuvi/services/checks.py)
     for (const k of ["uninvoiced_month", "uninvoiced_current", "draft_stale", "po_missing", "invoice_overdue",

@@ -332,7 +332,7 @@ export default function DiaryPage() {
                 <span className="list-sub">{inv.status === "draft" ? t("diary.draft_ready") : t("diary.invoiced")}</span>
               </span>
               <Link className="btn small secondary" to={inv.status === "draft" ? `/invoices/${inv.id}/edit` : `/invoices/${inv.id}`}>
-                {t("today.review")}
+                {inv.status === "draft" ? t("today.review") : t("diary.view_invoice")}
               </Link>
             </li>
           ))}

@@ -98,7 +98,8 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          # fixed name: servers pull this image, whatever the repository is called
+          images: ghcr.io/jc-universe87/gp-locum-manager
           tags: |
             type=raw,value=latest
             type=sha,format=short

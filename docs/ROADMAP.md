@@ -44,7 +44,7 @@ Acceptance criteria from `implementation/ACCEPTANCE.md`: all met — evidence in
 | --- | --- | --- |
 | Owner setup: sender/bank, numbering, pension rate check, practices, first test invoice | 🔜 | In the app; verify 14.38% / 90% against current NHSBSA guidance |
 | Nightly backup | ✅ | Automatic after 02:00 into `/backups` (30 days kept), "Back up now" on Today |
-| Off-server encrypted copy of `backups/` | 🔜 | Built in: create `secrets/backup_passphrase.txt` and enable it in compose (README §5) |
+| Off-server encrypted copy of `backups/` | 🔜 | Built in: create `secrets/backup_passphrase.txt` and enable it in compose (docs/SETUP.md, Backups) |
 | Restore drill on the real server (once) | 🔜 | `locuvi.cli restore` into a scratch volume, then `verify` |
 | Merge working branch into `main`; deploy from `main` | ✅ | PR #1 merged 9 Oct 2026 |
 | One-command updates: image published to GHCR on every green push to `main`; `./update.sh` (or `docker compose pull && docker compose up -d`); automatic backup before any database upgrade | ✅ | README "Updates"; one-time `docker login ghcr.io` (repo is private) |
@@ -303,3 +303,14 @@ before enabling a cloud model.
   removes profiles (removal is restorable for 30 days). Sign-in asks for a name once there is
   more than one profile.
 
+
+## Choice of AI company and plain-English manuals (owner request, 10 Oct 2026) ✅
+
+- Settings › Assistant: choose Anthropic (Claude), OpenAI, Google Gemini, DeepSeek, Mistral,
+  xAI (Grok) or OpenRouter, with the owner's own API key and an optional model; **Check key**
+  lists the models the key can use. Non-Anthropic companies use one OpenAI-compatible adapter
+  (`assistant/providers.py`); switching company forgets the saved key. Migration 0024.
+- Documentation rewritten for non-technical readers with current screenshots:
+  `README.md`, `docs/USER_GUIDE.md`, `docs/SETUP.md`, `docs/EMAIL_SETUP.md`,
+  `docs/AI_SETUP.md`, `docs/DEVELOPERS.md`; pictures come from `e2e/docs-shots.mjs`.
+- Repository checked for personal data before going public: fictional fixtures only.

@@ -18,7 +18,7 @@ never submit pension forms or send email without an explicit owner tap.
   audit), `services/mailbox.py` (read-only IMAP, chosen folders only),
   `services/bank.py` (CSV statement → credits only → deterministic matches), `services/backups.py`
   + `backup_crypto.py` (nightly backup, encrypted off-server copy, restore drill),
-  `services/branding.py` (logo/accent/footer/sign-off, frozen into snapshot `presentation`), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM, `agent.py` tool loop:
+  `services/branding.py` (logo/accent/footer/sign-off, frozen into snapshot `presentation`), `assistant/` (`rules.py` booking reader, `providers.py` optional LLM: Anthropic SDK or OpenAI-compatible adapter for the other companies, `agent.py` tool loop:
   read tools + draft-only tools, never send/issue/pay/submit), `mail.py` (SMTP),
   `pdf/render.py` + `pdf/pension.py` (ReportLab A4), `webdav/` (urlguard, client, archive
   queue/worker), `api/` (routes, auth, schemas, `inbox.py`, `mcp.py` = Bevro MCP server with
@@ -26,7 +26,12 @@ never submit pension forms or send email without an explicit owner tap.
 - `frontend/src/` React + TS: `pages/` (Today, Diary, Inbox, Bank, Invoices, InvoiceEditor,
   InvoiceDetail, Pension, Reports, Settings, Welcome), `components/Booking.tsx` (paste + review), `components/ui.tsx` (sheets, toggles, segmented,
   toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.
-- `e2e/smoke.mjs` Playwright UI smoke; `e2e/assistant.mjs` + `e2e/fake_anthropic.py` AI paths; `docs/` decisions, report, example PDF.
+- `e2e/smoke.mjs` Playwright UI smoke; `e2e/assistant.mjs` + `e2e/fake_anthropic.py` AI paths;
+  `e2e/docs-shots.mjs` screenshots for `docs/images/`; `docs/` decisions, report, example PDF.
+- User-facing docs (plain English, non-technical readers): `README.md`, `docs/USER_GUIDE.md`,
+  `docs/SETUP.md`, `docs/EMAIL_SETUP.md`, `docs/AI_SETUP.md`; technical: `docs/DEVELOPERS.md`.
+  Update them (and the screenshots) when a visible feature changes. The repo is public: no
+  personal data anywhere.
 
 ## Commands
 - Backend: `cd backend && uv run pytest && uv run ruff check . && uv run ruff format .`

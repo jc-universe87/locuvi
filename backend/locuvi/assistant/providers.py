@@ -11,9 +11,12 @@ import base64
 import json
 import logging
 import re
+from dataclasses import dataclass
 from datetime import date
+from types import SimpleNamespace
 from typing import Any, Protocol
 
+import httpx
 from sqlalchemy.orm import Session
 
 from locuvi.config import Settings
@@ -192,12 +195,27 @@ class AnthropicProvider:
             log.warning("assistant request failed: status %s", exc.status_code)
             raise DomainError("assistant.failed", "The AI service could not read this.") from None
 
+    def list_models(self) -> list[str]:
+        import anthropic
+
+        try:
+            return chat_models(sorted({m.id for m in self._client.models.list(limit=100)}))
+        except anthropic.AuthenticationError:
+            raise DomainError(
+                "assistant.auth_failed", "The AI provider rejected the API key."
+            ) from None
+        except anthropic.APIError:
+            raise DomainError("assistant.unreachable", "Could not reach the AI service.") from None
+
     def run_turn(
         self, *, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
     ) -> Any:
         """One step of the agent loop (tool use, adaptive thinking, explicit effort)."""
         resp = self._create(
-            output_config={"effort": "medium"}, system=system, messages=messages, tools=tools
+            output_config={"effort": "medium"},
+            system=system,
+            messages=for_anthropic(messages),
+            tools=tools,
         )
         served = getattr(resp, "model", None)
         if served and served != self.model:
@@ -239,6 +257,360 @@ class AnthropicProvider:
         return data
 
 
+# ------------------------------------------------------------ other providers
+
+
+@dataclass(frozen=True)
+class ProviderInfo:
+    label: str
+    default_model: str
+    base_url: str | None  # OpenAI-compatible endpoint; None for Anthropic (own SDK)
+    key_url: str  # where the owner creates a key
+    vision: bool = True  # can read photos of bookings
+    strict_schema: bool = False  # supports response_format json_schema (else json_object)
+    tokens_field: str = "max_tokens"
+
+
+# Defaults are only a starting point: model names change often, so the owner can pick another
+# from the provider's own list (Settings › AI assistant › Check key).
+PROVIDERS: dict[str, ProviderInfo] = {
+    "anthropic": ProviderInfo(
+        "Anthropic (Claude)", "claude-opus-5-5", None,
+        "https://console.anthropic.com/settings/keys",
+    ),
+    "openai": ProviderInfo(
+        "OpenAI (ChatGPT)", "gpt-5.5", "https://api.openai.com/v1",
+        "https://platform.openai.com/api-keys", strict_schema=True,
+        tokens_field="max_completion_tokens",
+    ),
+    "gemini": ProviderInfo(
+        "Google Gemini", "gemini-flash-latest",
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        "https://aistudio.google.com/apikey",
+    ),
+    "deepseek": ProviderInfo(
+        "DeepSeek", "deepseek-v4-flash", "https://api.deepseek.com",
+        "https://platform.deepseek.com/api_keys", vision=False,
+    ),
+    "mistral": ProviderInfo(
+        "Mistral", "mistral-large-latest", "https://api.mistral.ai/v1",
+        "https://console.mistral.ai/api-keys",
+    ),
+    "xai": ProviderInfo(
+        "xAI (Grok)", "grok-4", "https://api.x.ai/v1", "https://console.x.ai",
+    ),
+    "openrouter": ProviderInfo(
+        "OpenRouter (many models, one key)", "openrouter/auto", "https://openrouter.ai/api/v1",
+        "https://openrouter.ai/keys",
+    ),
+}  # fmt: skip
+
+_JSON_ONLY = (
+    "\n\nReply with one JSON object only (no other text) that follows this JSON schema:\n"
+    + json.dumps(BOOKING_SCHEMA)
+)
+_FAILED = ("assistant.failed", "The AI service could not read this.")
+
+
+def _http_error(exc: Exception) -> DomainError:
+    """Provider HTTP problems as the same friendly errors the Anthropic path uses."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        if code in (401, 403):
+            return DomainError("assistant.auth_failed", "The AI provider rejected the API key.")
+        if code == 429:
+            return DomainError("assistant.busy", "The AI service is busy. Try again shortly.")
+        log.warning("assistant request failed: status %s", code)
+        return DomainError(*_FAILED)
+    return DomainError("assistant.unreachable", "Could not reach the AI service.")
+
+
+def pdf_text(data: bytes) -> str:
+    """Text layer of a PDF (for providers that cannot take PDF files directly)."""
+    import io
+
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join((pg.extract_text() or "") for pg in reader.pages[:20]).strip()
+    except Exception:  # noqa: BLE001 - unreadable PDF: treated as "no text"
+        return ""
+
+
+def _tool_schema(schema: dict[str, Any], provider: str) -> dict[str, Any]:
+    if provider != "gemini":
+        return schema
+    # Gemini's OpenAI layer accepts a smaller JSON-schema subset
+    drop = {"additionalProperties", "pattern"}
+    if isinstance(schema, dict):
+        return {k: _tool_schema(v, provider) for k, v in schema.items() if k not in drop}
+    if isinstance(schema, list):
+        return [_tool_schema(v, provider) for v in schema]
+    return schema
+
+
+def to_chat_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The stored (Anthropic-style) conversation as OpenAI chat messages.
+
+    Thinking and fallback blocks are Claude-internal and are left out.
+    """
+    out: list[dict[str, Any]] = [{"role": "system", "content": system}]
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, str):
+            out.append({"role": m["role"], "content": content})
+            continue
+        blocks = [b for b in content or [] if isinstance(b, dict)]
+        if m["role"] == "assistant":
+            text = "\n\n".join(b["text"] for b in blocks if b.get("type") == "text")
+            calls = []
+            for b in blocks:
+                if b.get("type") != "tool_use":
+                    continue
+                call = {
+                    "id": b["id"],
+                    "type": "function",
+                    "function": {"name": b["name"], "arguments": json.dumps(b.get("input") or {})},
+                }
+                if b.get("extra_content"):  # e.g. Gemini's thought signature, returned unchanged
+                    call["extra_content"] = b["extra_content"]
+                calls.append(call)
+            msg: dict[str, Any] = {"role": "assistant", "content": text or None}
+            reasoning = "".join(b.get("text", "") for b in blocks if b.get("type") == "reasoning")
+            if reasoning:  # DeepSeek thinking mode needs it back after a tool call
+                msg["reasoning_content"] = reasoning
+            if calls:
+                msg["tool_calls"] = calls
+            out.append(msg)
+            continue
+        for b in blocks:
+            if b.get("type") == "tool_result":
+                body = b.get("content")
+                if not isinstance(body, str):
+                    body = json.dumps(body)
+                out.append({"role": "tool", "tool_call_id": b["tool_use_id"], "content": body})
+        text = "\n\n".join(b["text"] for b in blocks if b.get("type") == "text")
+        if text:
+            out.append({"role": "user", "content": text})
+    return out
+
+
+def for_anthropic(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The conversation without other companies' reasoning metadata (Claude rejects it)."""
+    out = []
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, list):
+            content = [
+                {k: v for k, v in b.items() if k != "extra_content"} if isinstance(b, dict) else b
+                for b in content
+                if not (isinstance(b, dict) and b.get("type") == "reasoning")
+            ]
+            if not content:
+                continue
+        out.append({**m, "content": content})
+    return out
+
+
+# Model IDs that can't hold a conversation (embeddings, speech, images, video, moderation)
+_NOT_CHAT = re.compile(
+    r"embed|tts|audio|transcri|whisper|speech|dall-e|imagen|image|veo|video|moderation|"
+    r"realtime|live|aqa|rerank|ocr",
+    re.I,
+)
+
+
+def chat_models(ids: list[str]) -> list[str]:
+    return [i for i in ids if not _NOT_CHAT.search(i)]
+
+
+def reads_photos(provider: str, model: str) -> bool:
+    if provider == "deepseek":  # only DeepSeek's vision model takes images
+        return "vision" in model
+    return PROVIDERS[provider].vision
+
+
+class CompatibleProvider:
+    """OpenAI, Gemini, DeepSeek, Mistral, Grok and OpenRouter through their OpenAI-style API.
+
+    Same contract as AnthropicProvider: read_booking returns a dict that the server
+    re-validates; run_turn returns Anthropic-shaped blocks so the agent loop is shared.
+    """
+
+    def __init__(self, provider: str, api_key: str, model: str, client: Any = None) -> None:
+        self.provider = provider
+        self.info = PROVIDERS[provider]
+        self.model = model
+        self.engine = f"ai:{provider}/{model}"
+        self._key = api_key
+        self._client = client or httpx.Client(timeout=120.0)
+
+    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
+        headers = {"Authorization": f"Bearer {self._key}"}
+        if self.provider == "openrouter":
+            headers["X-Title"] = "Locuvi"
+        try:
+            r = self._client.post(
+                f"{self.info.base_url}/chat/completions",
+                json={"model": self.model, self.info.tokens_field: 16000, **body},
+                headers=headers,
+            )
+            r.raise_for_status()
+            data = r.json()
+        except httpx.HTTPError as exc:
+            raise _http_error(exc) from None
+        except ValueError:
+            raise DomainError(*_FAILED) from None
+        if not isinstance(data, dict) or not data.get("choices"):
+            raise DomainError(*_FAILED)
+        served = data.get("model")
+        if isinstance(served, str) and served and served != self.model:
+            self.engine = f"ai:{self.provider}/{served}"
+        return data
+
+    def _user_content(
+        self, text: str, attachment: tuple[bytes, str] | None, practices: list[dict[str, str]],
+        today: date,
+    ) -> list[dict[str, Any]]:  # fmt: skip
+        context = f"Today's date: {today.isoformat()}\nPractices on file (id: name):\n" + (
+            "\n".join(f"- {p['id']}: {p['name']}" for p in practices) or "- none yet"
+        )
+        parts: list[dict[str, Any]] = [{"type": "text", "text": context}]
+        if attachment is not None:
+            data, ctype = attachment
+            if ctype == "application/pdf":
+                extracted = pdf_text(data)
+                if not extracted and not text:
+                    raise DomainError(
+                        "assistant.scan_unsupported",
+                        "This AI provider can't read scanned PDFs. Paste the text instead.",
+                    )
+                if extracted:
+                    text = f"{extracted}\n\n{text}".strip()
+            elif reads_photos(self.provider, self.model):
+                b64 = base64.standard_b64encode(data).decode("ascii")
+                parts.append({"type": "image_url",
+                              "image_url": {"url": f"data:{ctype};base64,{b64}"}})  # fmt: skip
+            elif not text:
+                raise DomainError(
+                    "assistant.scan_unsupported",
+                    "This AI provider can't read photos. Paste the text instead.",
+                )
+        if text:
+            parts.append({"type": "text", "text": f"<booking>\n{minimise(text)}\n</booking>"})
+        parts.append({"type": "text", "text": "List the sessions in this booking."})
+        return parts
+
+    def read_booking(
+        self,
+        *,
+        text: str,
+        attachment: tuple[bytes, str] | None,
+        practices: list[dict[str, str]],
+        today: date,
+    ) -> dict[str, Any]:
+        if self.info.strict_schema:
+            system = SYSTEM_PROMPT
+            fmt: dict[str, Any] = {
+                "type": "json_schema",
+                "json_schema": {"name": "booking", "schema": BOOKING_SCHEMA, "strict": True},
+            }
+        else:
+            system, fmt = SYSTEM_PROMPT + _JSON_ONLY, {"type": "json_object"}
+        data = self._post(
+            {
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",
+                     "content": self._user_content(text, attachment, practices, today)},
+                ],
+                "response_format": fmt,
+            }
+        )  # fmt: skip
+        choice = data["choices"][0]
+        msg = choice.get("message") or {}
+        if choice.get("finish_reason") == "content_filter" or msg.get("refusal"):
+            raise DomainError("assistant.refused", "The AI declined to read this document.")
+        raw = (msg.get("content") or "").strip()
+        if raw.startswith("```"):  # some models wrap JSON in a code fence
+            raw = raw.strip("`").removeprefix("json").strip()
+        try:
+            out = json.loads(raw)
+        except ValueError:
+            raise DomainError(*_FAILED) from None
+        if not isinstance(out, dict):
+            raise DomainError(*_FAILED)
+        return out
+
+    def run_turn(
+        self, *, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> Any:
+        """One agent step; the reply comes back as Anthropic-style blocks."""
+        data = self._post(
+            {
+                "messages": to_chat_messages(system, messages),
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": t["name"],
+                            "description": t["description"],
+                            "parameters": _tool_schema(t["input_schema"], self.provider),
+                        },
+                    }
+                    for t in tools
+                ],
+            }
+        )
+        choice = data["choices"][0]
+        msg = choice.get("message") or {}
+        blocks: list[dict[str, Any]] = []
+        if msg.get("reasoning_content"):
+            blocks.append({"type": "reasoning", "text": str(msg["reasoning_content"])})
+        if msg.get("content"):
+            blocks.append({"type": "text", "text": str(msg["content"])})
+        for i, call in enumerate(msg.get("tool_calls") or []):
+            fn = call.get("function") or {}
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except ValueError:
+                args = {}
+            block = {
+                "type": "tool_use",
+                "id": re.sub(r"[^A-Za-z0-9_-]", "_", call.get("id") or f"call_{i}"),
+                "name": fn.get("name", ""),
+                "input": args if isinstance(args, dict) else {},
+            }
+            if call.get("extra_content"):
+                block["extra_content"] = call["extra_content"]
+            blocks.append(block)
+        finish = choice.get("finish_reason")
+        if any(b["type"] == "tool_use" for b in blocks):
+            stop = "tool_use"
+        elif finish == "content_filter" or msg.get("refusal"):
+            stop = "refusal"
+        elif finish == "length":
+            stop = "max_tokens"
+        else:
+            stop = "end_turn"
+        return SimpleNamespace(stop_reason=stop, content=blocks, model=data.get("model"))
+
+    def list_models(self) -> list[str]:
+        try:
+            r = self._client.get(
+                f"{self.info.base_url}/models", headers={"Authorization": f"Bearer {self._key}"}
+            )
+            r.raise_for_status()
+            items = r.json().get("data") or []
+        except httpx.HTTPError as exc:
+            raise _http_error(exc) from None
+        except (ValueError, AttributeError):
+            raise DomainError(*_FAILED) from None
+        ids = {str(m.get("id", "")).removeprefix("models/") for m in items if isinstance(m, dict)}
+        return chat_models(sorted(i for i in ids if i))[:300]
+
+
 # ----------------------------------------------------------------------- config
 
 
@@ -251,16 +623,40 @@ def get_config(s: Session) -> AssistantConfig:
     return cfg
 
 
+def model_for(cfg: AssistantConfig, settings: Settings) -> str:
+    provider = cfg.provider if cfg.provider in PROVIDERS else "anthropic"
+    if cfg.model:
+        return cfg.model
+    if provider == "anthropic":
+        return settings.ai_model
+    return PROVIDERS[provider].default_model
+
+
+def _server_key(cfg: AssistantConfig, settings: Settings) -> str | None:
+    # ANTHROPIC_API_KEY_FILE on the server only ever goes to Anthropic
+    return settings.ai_api_key_override if cfg.provider == "anthropic" else None
+
+
 def config_public(cfg: AssistantConfig, settings: Settings) -> dict[str, Any]:
+    server = bool(_server_key(cfg, settings))
     return {
         "enabled": cfg.enabled,
         "provider": cfg.provider,
-        "model": settings.ai_model,
+        "model": model_for(cfg, settings),
+        "model_custom": bool(cfg.model),
+        "reads_photos": reads_photos(cfg.provider, model_for(cfg, settings))
+        if cfg.provider in PROVIDERS
+        else True,
         "key_saved": bool(cfg.api_key_ciphertext),
-        "key_from_server": bool(settings.ai_api_key_override),
-        "ready": cfg.enabled and bool(cfg.api_key_ciphertext or settings.ai_api_key_override),
+        "key_from_server": server,
+        "ready": cfg.enabled and bool(cfg.api_key_ciphertext or server),
         "weekly_brief": cfg.weekly_brief,
-    }
+        "providers": [
+            {"id": pid, "label": info.label, "default_model": info.default_model,
+             "key_url": info.key_url, "reads_photos": info.vision}
+            for pid, info in PROVIDERS.items()
+        ],
+    }  # fmt: skip
 
 
 def save_config(
@@ -271,10 +667,24 @@ def save_config(
     api_key: str | None,
     clear_key: bool = False,
     weekly_brief: bool | None = None,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> AssistantConfig:
     cfg = get_config(s)
     if weekly_brief is not None:
         cfg.weekly_brief = weekly_brief
+    if provider is not None and provider != cfg.provider:
+        if provider not in PROVIDERS:
+            raise DomainError("assistant.bad_provider", "Choose an AI provider from the list.")
+        # a key belongs to one provider: never send one company's key to another
+        cfg.provider = provider
+        cfg.api_key_ciphertext = None
+        cfg.model = None
+    if model is not None:
+        m = model.strip()
+        if m and (len(m) > 120 or any(c.isspace() for c in m)):
+            raise DomainError("assistant.bad_model", "That does not look like a model name.")
+        cfg.model = m or None
     if api_key is not None and api_key.strip():
         key = api_key.strip()
         if len(key) < 20 or any(c.isspace() for c in key):
@@ -284,18 +694,18 @@ def save_config(
         cfg.api_key_ciphertext = None
     cfg.enabled = enabled
     core.audit(
-        s, "settings.assistant_saved", enabled=enabled, key_changed=bool(api_key) or clear_key
+        s,
+        "settings.assistant_saved",
+        enabled=enabled,
+        provider=cfg.provider,
+        key_changed=bool(api_key) or clear_key,
     )
     s.commit()
     return cfg
 
 
-def provider_for(s: Session, settings: Settings, secrets: SecretBox) -> Provider | None:
-    """The configured AI provider, or None when the assistant is off (rules engine is used)."""
-    cfg = get_config(s)
-    if not cfg.enabled:
-        return None
-    key = settings.ai_api_key_override
+def _key(cfg: AssistantConfig, settings: Settings, secrets: SecretBox) -> str | None:
+    key = _server_key(cfg, settings)
     if not key and cfg.api_key_ciphertext:
         try:
             key = secrets.decrypt(cfg.api_key_ciphertext)
@@ -303,6 +713,34 @@ def provider_for(s: Session, settings: Settings, secrets: SecretBox) -> Provider
             raise DomainError(
                 "assistant.key_unreadable", "Re-enter the AI API key in Settings."
             ) from None
+    return key
+
+
+def build(provider: str, key: str, model: str) -> Any:
+    if provider == "anthropic":
+        return AnthropicProvider(key, model)
+    return CompatibleProvider(provider, key, model)
+
+
+def provider_for(s: Session, settings: Settings, secrets: SecretBox) -> Provider | None:
+    """The configured AI provider, or None when the assistant is off (rules engine is used)."""
+    cfg = get_config(s)
+    if not cfg.enabled or cfg.provider not in PROVIDERS:
+        return None
+    key = _key(cfg, settings, secrets)
     if not key:
         return None
-    return AnthropicProvider(key, settings.ai_model)
+    return build(cfg.provider, key, model_for(cfg, settings))
+
+
+def check_key(
+    s: Session, settings: Settings, secrets: SecretBox, factory: Any = None
+) -> dict[str, Any]:
+    """Ask the provider which models this key can use: a free check that the key works."""
+    cfg = get_config(s)
+    key = _key(cfg, settings, secrets)
+    if not key or cfg.provider not in PROVIDERS:
+        raise DomainError("assistant.no_key", "Add your API key first.")
+    p = (factory or build)(cfg.provider, key, model_for(cfg, settings))
+    models = p.list_models()
+    return {"ok": True, "models": models}

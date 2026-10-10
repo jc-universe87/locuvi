@@ -17,6 +17,18 @@ def message(content, stop="end_turn"):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802  (model list: "Check key" in Settings)
+        assert self.headers.get("x-api-key"), "API key header expected"
+        out = {"data": [{"type": "model", "id": m, "display_name": m, "created_at": "2026-01-01T00:00:00Z"}
+                        for m in ("claude-opus-5-5", "claude-sonnet-5-5")],
+               "has_more": False, "first_id": None, "last_id": None}
+        raw = json.dumps(out).encode()
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
     def do_POST(self):  # noqa: N802
         body = json.loads(self.rfile.read(int(self.headers["content-length"])))
         assert self.headers.get("x-api-key"), "API key header expected"

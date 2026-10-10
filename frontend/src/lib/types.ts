@@ -335,10 +335,21 @@ export interface Proposal {
   created_at: string;
 }
 
+export interface AiProvider {
+  id: string;
+  label: string;
+  default_model: string;
+  key_url: string;
+  reads_photos: boolean;
+}
+
 export interface AssistantConfig {
   enabled: boolean;
   provider: string;
   model: string;
+  model_custom: boolean;
+  reads_photos: boolean;
+  providers: AiProvider[];
   key_saved: boolean;
   key_from_server: boolean;
   ready: boolean;
