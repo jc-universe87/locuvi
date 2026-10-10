@@ -194,3 +194,50 @@ def test_check_key_lists_models_via_the_api(settings):
         r = c.post("/api/v1/settings/assistant/check", headers=h)
         assert r.json() == {"ok": True, "models": ["gemini-flash-latest", "gemini-pro-latest"]}
         assert str(calls[0].url).endswith("/v1beta/openai/models")
+
+
+def test_reasoning_metadata_is_replayed_and_kept_from_claude(session, settings, ready):
+    """DeepSeek's reasoning_content and Gemini's thought signature must come back unchanged."""
+    calls: list[httpx.Request] = []
+    sig = {"google": {"thought_signature": "c2lnLWZha2U="}}
+    replies = iter(
+        [
+            chat({"role": "assistant", "content": None, "reasoning_content": "Look it up.",
+                  "tool_calls": [{"id": "call_1", "type": "function", "extra_content": sig,
+                                  "function": {"name": "list_practices", "arguments": "{}"}}]},
+                 finish="tool_calls"),
+            chat({"role": "assistant", "content": "One practice."}),
+        ]
+    )  # fmt: skip
+    p = providers.CompatibleProvider(
+        "deepseek", KEY, "deepseek-v4-flash", client=fake_http(lambda r: next(replies), calls)
+    )
+    out = agent.ask(session, settings, p, "Which practices?")
+    assert out["answer"] == "One practice."
+    again = json.loads(calls[1].content)["messages"][2]
+    assert again["reasoning_content"] == "Look it up."
+    assert again["tool_calls"][0]["extra_content"] == sig
+
+    # if the owner later switches to Claude, that metadata is not sent to Anthropic
+    from locuvi.models import AgentConversation
+
+    conv = session.get(AgentConversation, out["conversation_id"])
+    cleaned = json.dumps(providers.for_anthropic(conv.messages_json))
+    assert "reasoning" not in cleaned and "extra_content" not in cleaned
+    assert "tool_use" in cleaned
+
+
+def test_model_list_offers_chat_models_and_photos_follow_the_model(session, settings):
+    ids = ["gemini-flash-latest", "gemini-embedding-001", "gemini-2.5-flash-preview-tts",
+           "imagen-4.0-generate-001", "gemini-live-2.5-flash", "gemini-pro-latest"]  # fmt: skip
+    assert providers.chat_models(ids) == ["gemini-flash-latest", "gemini-pro-latest"]
+
+    assert not providers.reads_photos("deepseek", "deepseek-v4-flash")
+    assert providers.reads_photos("deepseek", "deepseek-v4-flash-vision-exp")
+    box = SecretBox(settings)
+    providers.save_config(session, box, enabled=True, api_key=KEY, provider="deepseek")
+    cfg = providers.get_config(session)
+    assert providers.config_public(cfg, settings)["reads_photos"] is False
+    providers.save_config(session, box, enabled=True, api_key=None,
+                          model="deepseek-v4-flash-vision-exp")  # fmt: skip
+    assert providers.config_public(cfg, settings)["reads_photos"] is True

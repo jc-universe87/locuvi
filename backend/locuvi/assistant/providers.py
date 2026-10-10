@@ -199,7 +199,7 @@ class AnthropicProvider:
         import anthropic
 
         try:
-            return sorted({m.id for m in self._client.models.list(limit=100)})
+            return chat_models(sorted({m.id for m in self._client.models.list(limit=100)}))
         except anthropic.AuthenticationError:
             raise DomainError(
                 "assistant.auth_failed", "The AI provider rejected the API key."
@@ -212,7 +212,10 @@ class AnthropicProvider:
     ) -> Any:
         """One step of the agent loop (tool use, adaptive thinking, explicit effort)."""
         resp = self._create(
-            output_config={"effort": "medium"}, system=system, messages=messages, tools=tools
+            output_config={"effort": "medium"},
+            system=system,
+            messages=for_anthropic(messages),
+            tools=tools,
         )
         served = getattr(resp, "model", None)
         if served and served != self.model:
@@ -361,16 +364,22 @@ def to_chat_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[s
         blocks = [b for b in content or [] if isinstance(b, dict)]
         if m["role"] == "assistant":
             text = "\n\n".join(b["text"] for b in blocks if b.get("type") == "text")
-            calls = [
-                {
+            calls = []
+            for b in blocks:
+                if b.get("type") != "tool_use":
+                    continue
+                call = {
                     "id": b["id"],
                     "type": "function",
                     "function": {"name": b["name"], "arguments": json.dumps(b.get("input") or {})},
                 }
-                for b in blocks
-                if b.get("type") == "tool_use"
-            ]
+                if b.get("extra_content"):  # e.g. Gemini's thought signature, returned unchanged
+                    call["extra_content"] = b["extra_content"]
+                calls.append(call)
             msg: dict[str, Any] = {"role": "assistant", "content": text or None}
+            reasoning = "".join(b.get("text", "") for b in blocks if b.get("type") == "reasoning")
+            if reasoning:  # DeepSeek thinking mode needs it back after a tool call
+                msg["reasoning_content"] = reasoning
             if calls:
                 msg["tool_calls"] = calls
             out.append(msg)
@@ -385,6 +394,41 @@ def to_chat_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[s
         if text:
             out.append({"role": "user", "content": text})
     return out
+
+
+def for_anthropic(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The conversation without other companies' reasoning metadata (Claude rejects it)."""
+    out = []
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, list):
+            content = [
+                {k: v for k, v in b.items() if k != "extra_content"} if isinstance(b, dict) else b
+                for b in content
+                if not (isinstance(b, dict) and b.get("type") == "reasoning")
+            ]
+            if not content:
+                continue
+        out.append({**m, "content": content})
+    return out
+
+
+# Model IDs that can't hold a conversation (embeddings, speech, images, video, moderation)
+_NOT_CHAT = re.compile(
+    r"embed|tts|audio|transcri|whisper|speech|dall-e|imagen|image|veo|video|moderation|"
+    r"realtime|live|aqa|rerank|ocr",
+    re.I,
+)
+
+
+def chat_models(ids: list[str]) -> list[str]:
+    return [i for i in ids if not _NOT_CHAT.search(i)]
+
+
+def reads_photos(provider: str, model: str) -> bool:
+    if provider == "deepseek":  # only DeepSeek's vision model takes images
+        return "vision" in model
+    return PROVIDERS[provider].vision
 
 
 class CompatibleProvider:
@@ -444,7 +488,7 @@ class CompatibleProvider:
                     )
                 if extracted:
                     text = f"{extracted}\n\n{text}".strip()
-            elif self.info.vision:
+            elif reads_photos(self.provider, self.model):
                 b64 = base64.standard_b64encode(data).decode("ascii")
                 parts.append({"type": "image_url",
                               "image_url": {"url": f"data:{ctype};base64,{b64}"}})  # fmt: skip
@@ -522,6 +566,8 @@ class CompatibleProvider:
         choice = data["choices"][0]
         msg = choice.get("message") or {}
         blocks: list[dict[str, Any]] = []
+        if msg.get("reasoning_content"):
+            blocks.append({"type": "reasoning", "text": str(msg["reasoning_content"])})
         if msg.get("content"):
             blocks.append({"type": "text", "text": str(msg["content"])})
         for i, call in enumerate(msg.get("tool_calls") or []):
@@ -530,14 +576,15 @@ class CompatibleProvider:
                 args = json.loads(fn.get("arguments") or "{}")
             except ValueError:
                 args = {}
-            blocks.append(
-                {
-                    "type": "tool_use",
-                    "id": re.sub(r"[^A-Za-z0-9_-]", "_", call.get("id") or f"call_{i}"),
-                    "name": fn.get("name", ""),
-                    "input": args if isinstance(args, dict) else {},
-                }
-            )
+            block = {
+                "type": "tool_use",
+                "id": re.sub(r"[^A-Za-z0-9_-]", "_", call.get("id") or f"call_{i}"),
+                "name": fn.get("name", ""),
+                "input": args if isinstance(args, dict) else {},
+            }
+            if call.get("extra_content"):
+                block["extra_content"] = call["extra_content"]
+            blocks.append(block)
         finish = choice.get("finish_reason")
         if any(b["type"] == "tool_use" for b in blocks):
             stop = "tool_use"
@@ -561,7 +608,7 @@ class CompatibleProvider:
         except (ValueError, AttributeError):
             raise DomainError(*_FAILED) from None
         ids = {str(m.get("id", "")).removeprefix("models/") for m in items if isinstance(m, dict)}
-        return sorted(i for i in ids if i)[:300]
+        return chat_models(sorted(i for i in ids if i))[:300]
 
 
 # ----------------------------------------------------------------------- config
@@ -597,6 +644,9 @@ def config_public(cfg: AssistantConfig, settings: Settings) -> dict[str, Any]:
         "provider": cfg.provider,
         "model": model_for(cfg, settings),
         "model_custom": bool(cfg.model),
+        "reads_photos": reads_photos(cfg.provider, model_for(cfg, settings))
+        if cfg.provider in PROVIDERS
+        else True,
         "key_saved": bool(cfg.api_key_ciphertext),
         "key_from_server": server,
         "ready": cfg.enabled and bool(cfg.api_key_ciphertext or server),

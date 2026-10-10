@@ -688,7 +688,7 @@ function AssistantSection() {
       {cfg.enabled && info && !cfg.key_from_server && (
         <p className="form-foot">
           <a href={info.key_url} target="_blank" rel="noreferrer noopener">{t("assistant.get_key", { provider: info.label })}</a>
-          {!info.reads_photos && <> · {t("assistant.no_photos")}</>}
+          {!cfg.reads_photos && <> · {t("assistant.no_photos")}</>}
         </p>
       )}
       {checked && <div className="alert ok" role="status">✓ {tn("assistant.key_works", models.length)}</div>}

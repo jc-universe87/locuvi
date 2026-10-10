@@ -25,7 +25,7 @@ whichever you prefer:
 | **Anthropic (Claude)** | Locuvi's default. Reads emails, PDFs and photos | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 | **OpenAI (ChatGPT)** | Reads emails and photos; PDFs are read from their text | [platform.openai.com](https://platform.openai.com/api-keys) |
 | **Google Gemini** | Use a key with billing turned on: on the free tier Google may use what you send to improve its products | [aistudio.google.com](https://aistudio.google.com/apikey) |
-| **DeepSeek** | Low cost; data is processed in China. Can't read photos: paste the text instead | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
+| **DeepSeek** | Low cost; data is processed in China. Reads photos only with the model `deepseek-v4-flash-vision-exp`; otherwise paste the text | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
 | **Mistral** | European company | [console.mistral.ai](https://console.mistral.ai/api-keys) |
 | **xAI (Grok)** | | [console.x.ai](https://console.x.ai) |
 | **OpenRouter** | One key for models from many companies | [openrouter.ai](https://openrouter.ai/keys) |

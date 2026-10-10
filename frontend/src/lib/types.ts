@@ -348,6 +348,7 @@ export interface AssistantConfig {
   provider: string;
   model: string;
   model_custom: boolean;
+  reads_photos: boolean;
   providers: AiProvider[];
   key_saved: boolean;
   key_from_server: boolean;
