@@ -1,70 +1,98 @@
-# Connecting your email (booking emails)
+# Connecting your email
 
-Locuvi can check chosen email folders for locum bookings and payment notices
-(Settings › Booking emails). It only reads: nothing is marked as read, moved, sent or deleted.
-You can add several accounts (for example a Gmail and an Outlook address); each has its own
-folders, sign-in and status, and "Check for bookings now" checks them all.
+Locuvi can check chosen email folders for **booking emails** and **payment notices**, and
+show you the sessions to add to your Diary.
 
-| Account | How Locuvi connects | What you need |
+> [!NOTE]
+> Locuvi **only reads**. It never sends, moves, deletes or marks anything as read, and it only
+> looks in the folders you choose.
+
+<img src="images/settings-mailbox.png" alt="Settings › Booking emails, where you add email accounts">
+
+Open **Settings › Booking emails** and tap **Add an email account**. You can add several, for
+example your Gmail and your Outlook address. **Check for bookings now** checks them all;
+otherwise Locuvi checks every hour.
+
+> [!TIP]
+> A folder (or Gmail label) called something like **Locum**, with a rule that files booking
+> emails into it, works best. Locuvi then reads only those emails.
+
+| Your email | How it connects | What you need |
 | --- | --- | --- |
-| Gmail | IMAP with an app password | 2-Step Verification on; an app password |
-| Outlook.com, Hotmail, Live, Microsoft 365 | Microsoft sign-in (read-only) | Your own Microsoft app ID (one-off, below) |
-| NHSmail | Microsoft sign-in (read-only) | App ID **and** approval by NHSmail (see below) |
-| iCloud, Fastmail, others | IMAP with an app password | Server name and app password |
+| **Gmail** | An "app password" | 5 minutes ([steps](#gmail)) |
+| **Outlook, Hotmail, Live, Microsoft 365** | Sign in with Microsoft | 10 minutes, once ([steps](#outlook-hotmail-and-microsoft-365)) |
+| **NHSmail** | Sign in with Microsoft | Approval from NHSmail ([read this](#nhsmail)) |
+| **iCloud, Fastmail, others** | An "app password" | 5 minutes ([steps](#other-email-providers)) |
 
 ## Gmail
 
-1. Turn on 2-Step Verification for your Google account.
-2. Go to <https://myaccount.google.com/apppasswords>, create an app password called "Locuvi"
-   and copy the 16 letters.
-3. In Locuvi choose **Gmail**, enter your Gmail address and the app password, then
-   **Connect and choose folders**. Gmail labels appear as folders. A label such as "Locum"
-   (with a Gmail filter that applies it) works best.
+An **app password** is a separate password that lets one app read your email. It doesn't
+reveal your real Google password, and you can cancel it at any time.
+
+1. Make sure **2-Step Verification** is on for your Google account
+   (<https://myaccount.google.com/security>).
+2. Go to <https://myaccount.google.com/apppasswords>, create an app password called
+   **Locuvi** and copy the 16 letters.
+3. In Locuvi choose **Gmail**, type your Gmail address, paste the app password and tap
+   **Connect and choose folders**. Your Gmail labels appear as folders: tick the ones with
+   locum emails.
 
 ## Outlook, Hotmail and Microsoft 365
 
-Microsoft no longer accepts passwords for IMAP, so Locuvi signs in through Microsoft instead.
-For that, Microsoft needs to know the app: you register it once, for free, in your own
-Microsoft account. Locuvi asks only for `Mail.Read` (read mail), `User.Read` (your address)
-and `offline_access` (stay signed in).
+Microsoft doesn't let apps use your password, so Locuvi asks you to **sign in with Microsoft**
+instead. For that, Microsoft needs to know about Locuvi. You tell it once, for free, in your
+own Microsoft account. It looks technical but is mostly clicking through.
 
-1. Open <https://entra.microsoft.com> (or <https://portal.azure.com>) and sign in. A personal
-   Microsoft account works; Microsoft may ask you to create a free directory first.
-2. **App registrations › New registration**
-   - Name: `Locuvi`
-   - Supported account types: **Accounts in any organizational directory and personal
-     Microsoft accounts**
-   - Redirect URI: leave empty. Click **Register**.
-3. On the app's page, copy the **Application (client) ID**.
-4. **Authentication › Advanced settings › Allow public client flows: Yes**, then **Save**.
-5. **API permissions › Add a permission › Microsoft Graph › Delegated permissions**: tick
-   `Mail.Read`, `User.Read` and `offline_access`, then **Add permissions**.
-6. In Locuvi choose **Outlook, Hotmail or Microsoft 365**, paste the app ID and tap
-   **Sign in with Microsoft**. Open the Microsoft page, enter the code shown and approve.
-   Then choose the folders to read.
+1. Go to <https://entra.microsoft.com> and sign in. (A personal Outlook/Hotmail account works;
+   Microsoft may ask you to create a free "directory" first. Follow its prompts.)
+2. Click **App registrations › New registration** and fill in:
+   - **Name**: `Locuvi`
+   - **Supported account types**: *Accounts in any organizational directory and personal
+     Microsoft accounts*
+   - **Redirect URI**: leave empty
 
-No secret or password is stored in the app registration, and Locuvi never sees your
-Microsoft password. Locuvi keeps the sign-in token encrypted on your server. **Sign out** in
-Locuvi removes it; you can also remove "Locuvi" at <https://myapps.microsoft.com> or
-<https://account.live.com/consent/Manage>.
+   Click **Register**.
+3. Copy the **Application (client) ID**: a long code like `1a2b3c4d-…`.
+4. Click **Authentication**. Under **Advanced settings**, set **Allow public client flows** to
+   **Yes**, then **Save**.
+5. Click **API permissions › Add a permission › Microsoft Graph › Delegated permissions**.
+   Tick `Mail.Read`, `User.Read` and `offline_access`, then **Add permissions**.
+   (These mean: read mail, know your address, and stay signed in.)
+6. In Locuvi choose **Outlook, Hotmail or Microsoft 365**, paste the ID and tap
+   **Sign in with Microsoft**. Open the Microsoft page shown, type the code Locuvi gives you and
+   approve. Then tick the folders to read.
+
+Locuvi never sees your Microsoft password. It keeps only a sign-in pass, encrypted on your
+server. **Sign out** in Locuvi deletes it. You can also remove Locuvi's access at
+<https://myapps.microsoft.com> (work accounts) or <https://account.live.com/consent/Manage>
+(personal accounts).
 
 ## NHSmail
 
-NHSmail is a Microsoft 365 service run for NHS England, and it only allows apps that its
-administrators have approved. Use the same steps as for Outlook, choosing **NHSmail**.
-If Microsoft says that an administrator must approve the app ("Need admin approval"), the
-app has not been approved for NHSmail. You then have two choices:
+NHSmail runs on Microsoft 365, but only allows apps that its administrators have approved.
+Follow the [Outlook steps](#outlook-hotmail-and-microsoft-365) and choose **NHSmail**.
 
-- **Forward booking emails to Gmail** and connect Gmail. Forward individual emails by hand,
-  or ask your organisation whether a forwarding rule is allowed: NHSmail and local
-  information-governance rules may restrict automatic forwarding outside NHSmail.
-  Booking emails rarely contain patient details, but check before you forward.
+If Microsoft says **"Need admin approval"**, NHSmail hasn't approved the app. You can either:
+
+- **Forward booking emails to Gmail**, and connect Gmail. Forward them one by one, or ask your
+  organisation whether an automatic forwarding rule is allowed. NHSmail and local information
+  governance rules may restrict forwarding outside NHSmail. Booking emails rarely contain
+  patient details, but check before you forward.
 - **Ask for approval** through your local NHSmail administrator, quoting the app ID and the
   read-only permissions above.
 
-Locuvi never forwards or sends anything by itself.
+## Other email providers
 
-## Other providers (IMAP)
+Choose **Other (IMAP)** and enter:
 
-Choose **Other (IMAP)** and enter the IMAP server (for example `imap.mail.me.com` for
-iCloud or `imap.fastmail.com`), your address and an app password from your provider.
+- the **IMAP server**: for example `imap.mail.me.com` (iCloud) or `imap.fastmail.com` (Fastmail).
+  Your provider's help pages list it under "IMAP settings".
+- your **email address**
+- an **app password** from your provider (iCloud: <https://account.apple.com> › Sign-In and
+  Security › App-Specific Passwords).
+
+---
+
+**Something not working?** The account shows its last check and any problem in
+**Settings › Booking emails**. The most common fix is to create a new app password, or sign in
+with Microsoft again.

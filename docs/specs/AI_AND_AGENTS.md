@@ -131,7 +131,9 @@ This is preferable to a generic chatbot with no direct access to Locuvi's actual
 
 ## 4. Technical architecture
 AI should be implemented as an independent, optional module:
-- Provider-agnostic LLM interface.
+- Provider-agnostic LLM interface. Implemented: the owner chooses Anthropic, OpenAI, Google
+  Gemini, DeepSeek, Mistral, xAI or OpenRouter and brings their own API key
+  (`assistant/providers.py`; owner guide in `docs/AI_SETUP.md`).
 - Support for cloud AI models and potentially local models.
 - Tool-calling architecture exposing controlled application functions.
 - Read-only operations permitted for routine analysis.

@@ -8,7 +8,7 @@
   python -m locuvi.cli example-pdf out.pdf
 
 Backups contain banking details. With BACKUP_PASSPHRASE_FILE set, the nightly backup is
-also encrypted and copied to Nextcloud (README "Backups"). Encrypted files are read with the
+also encrypted and copied to Nextcloud (docs/SETUP.md "Backups"). Encrypted files are read with the
 same passphrase (or --passphrase-file). Uses DATA_DIR from the environment.
 """
 
