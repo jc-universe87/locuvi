@@ -6,6 +6,7 @@ const en = {
   "app.skip": "Skip to content",
   "app.loading": "Loading…",
   "app.language": "Language",
+  "app.source": "Source code (AGPL-3.0)",
 
   "nav.invoices": "Invoices",
   "nav.practices": "Practices",
@@ -1144,7 +1145,7 @@ const en = {
   "error.auth.same_password": "Choose a different password.",
   "error.auth.gateway_mode": "Sign-in is handled by your gateway.",
   "assistant.weekly_brief": "Assistant writes my weekly summary",
-  "assistant.weekly_brief_hint": "Adds a short prioritised brief to the Monday email (Settings › Email). The usual list stays underneath.",
+  "assistant.weekly_brief_hint": "Adds a short prioritised brief to the Monday email (Settings › Email invoices). The usual list stays underneath.",
   "pension.row_work": "{n} Forms A for work done · pensionable pay {pay} · {signed} signed",
   "pension.row_work_one": "1 Form A for work done · pensionable pay {pay} · {signed} signed",
   "pension.row_received": "Received {pay} · Form B due {due}",
@@ -1169,8 +1170,9 @@ const en = {
   "error.refund.none_due": "No refund is owed on this invoice.",
   "error.refund.too_high": "That is more than the refund owed ({due}).",
   "inbox.consent_title": "Do you want to send this file to AI?",
-  "inbox.consent_text": "This is a scan or photo. Locuvi can't check it properly for private details before sending it to the AI service (Anthropic). Only send it if you've checked that it contains no patient information.",
+  "inbox.consent_text": "This is a scan or photo. Locuvi can't check it properly for private details before sending it to {provider}. Only send it if you've checked that it contains no patient information.",
   "inbox.consent_send": "Send file to AI",
+  "inbox.consent_ai_service": "the AI service",
 } as const;
 
 export type MessageKey = keyof typeof en;

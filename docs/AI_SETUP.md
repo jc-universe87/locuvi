@@ -8,7 +8,8 @@ With it on, the assistant can:
 - 📨 read messy booking emails, scanned letters and photos, and suggest the sessions to add
 - ✨ answer questions in **Ask Locuvi**, such as *"Which practices still owe me money?"*
 - 📝 prepare invoice drafts and email drafts for you to check
-- 📬 write a short summary at the top of your Monday email (if you choose)
+- 📬 write a short summary at the top of your Monday email (if you choose; the weekly email
+  is set up in **Settings › Email invoices**)
 
 It can **never** issue an invoice, send an email, record a payment or submit a pension form.
 Every suggestion waits for you to approve it, and Locuvi checks every figure itself.
@@ -27,8 +28,12 @@ whichever you prefer:
 | **Google Gemini** | Use a key with billing turned on: on the free tier Google may use what you send to improve its products | [aistudio.google.com](https://aistudio.google.com/apikey) |
 | **DeepSeek** | Low cost; data is processed in China. Reads photos only with the model `deepseek-v4-flash-vision-exp`; otherwise paste the text | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
 | **Mistral** | European company | [console.mistral.ai](https://console.mistral.ai/api-keys) |
-| **xAI (Grok)** | | [console.x.ai](https://console.x.ai) |
+| **xAI (Grok)** | Reads emails and photos | [console.x.ai](https://console.x.ai) |
 | **OpenRouter** | One key for models from many companies | [openrouter.ai](https://openrouter.ai/keys) |
+
+**Scanned PDFs** (pictures of pages, with no text you can select) can only be read by
+Anthropic. With the other companies, Locuvi reads a PDF's text, and photos go to companies
+and models that can see images.
 
 > [!NOTE]
 > A ChatGPT Plus, Claude Pro or Gemini app subscription is **not** the same as an API key. API

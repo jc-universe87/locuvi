@@ -1,17 +1,27 @@
 # Connecting your email
 
-Locuvi can check chosen email folders for **booking emails** and **payment notices**, and
-show you the sessions to add to your Diary.
+Locuvi can use your email in two separate, optional ways:
+
+| | What it does | Where |
+| --- | --- | --- |
+| [**Part 1: Reading booking emails**](#part-1-reading-booking-emails) | Checks chosen folders for booking emails and payment notices, and shows you the sessions to add | **Settings › Booking emails** |
+| [**Part 2: Sending invoices**](#part-2-sending-invoices-from-your-email-address) | Emails an invoice from your own address when you tap **Send** | **Settings › Email invoices** |
+
+You can use either, both or neither. Without them, you can still paste booking emails in and
+download invoice PDFs to send yourself.
+
+## Part 1: Reading booking emails
 
 > [!NOTE]
 > Locuvi **only reads**. It never sends, moves, deletes or marks anything as read, and it only
-> looks in the folders you choose.
+> looks in the folders you choose. It keeps only the messages it recognises as bookings or
+> payment notices.
 
 <img src="images/settings-mailbox.png" alt="Settings › Booking emails, where you add email accounts">
 
 Open **Settings › Booking emails** and tap **Add an email account**. You can add several, for
-example your Gmail and your Outlook address. **Check for bookings now** checks them all;
-otherwise Locuvi checks every hour.
+example your Gmail and your Outlook address. Locuvi checks them every hour, or tap
+**Check for bookings now**.
 
 > [!TIP]
 > A folder (or Gmail label) called something like **Locum**, with a rule that files booking
@@ -24,7 +34,7 @@ otherwise Locuvi checks every hour.
 | **NHSmail** | Sign in with Microsoft | Approval from NHSmail ([read this](#nhsmail)) |
 | **iCloud, Fastmail, others** | An "app password" | 5 minutes ([steps](#other-email-providers)) |
 
-## Gmail
+### Gmail
 
 An **app password** is a separate password that lets one app read your email. It doesn't
 reveal your real Google password, and you can cancel it at any time.
@@ -37,7 +47,7 @@ reveal your real Google password, and you can cancel it at any time.
    **Connect and choose folders**. Your Gmail labels appear as folders: tick the ones with
    locum emails.
 
-## Outlook, Hotmail and Microsoft 365
+### Outlook, Hotmail and Microsoft 365
 
 Microsoft doesn't let apps use your password, so Locuvi asks you to **sign in with Microsoft**
 instead. For that, Microsoft needs to know about Locuvi. You tell it once, for free, in your
@@ -67,7 +77,7 @@ server. **Sign out** in Locuvi deletes it. You can also remove Locuvi's access a
 <https://myapps.microsoft.com> (work accounts) or <https://account.live.com/consent/Manage>
 (personal accounts).
 
-## NHSmail
+### NHSmail
 
 NHSmail runs on Microsoft 365, but only allows apps that its administrators have approved.
 Follow the [Outlook steps](#outlook-hotmail-and-microsoft-365) and choose **NHSmail**.
@@ -81,7 +91,7 @@ If Microsoft says **"Need admin approval"**, NHSmail hasn't approved the app. Yo
 - **Ask for approval** through your local NHSmail administrator, quoting the app ID and the
   read-only permissions above.
 
-## Other email providers
+### Other email providers
 
 Choose **Other (IMAP)** and enter:
 
@@ -91,8 +101,43 @@ Choose **Other (IMAP)** and enter:
 - an **app password** from your provider (iCloud: <https://account.apple.com> › Sign-In and
   Security › App-Specific Passwords).
 
+## Part 2: Sending invoices from your email address
+
+With this set up, **Send** on an invoice emails it to the practice with the PDF attached, from
+your own address. Locuvi only sends when you tap **Send**, and every email sent is listed on
+the invoice.
+
+<img src="images/settings-email.png" alt="Settings › Email invoices: address, name, server, security, username, password">
+
+1. Open **Settings › Email invoices**.
+2. Fill in:
+   - **Your email address** and **Name the practice will see** (for example *Dr Alex Example*).
+   - **Outgoing email server (SMTP)** and **Connection security**: see the table below.
+   - **Username**: usually your full email address.
+   - **Password**: an **app password** from your email provider, not your normal password.
+3. Leave **Send me a copy** on if you want a copy of every invoice email.
+4. Tap **Save and turn on**, then **Send test email**. You should receive it within a minute.
+
+| Your email | Outgoing server | Connection security | Password to use |
+| --- | --- | --- | --- |
+| **Gmail** | `smtp.gmail.com` | 587 · STARTTLS | A Gmail app password ([create one](https://myaccount.google.com/apppasswords)) |
+| **iCloud Mail** | `smtp.mail.me.com` | 587 · STARTTLS | An app-specific password ([account.apple.com](https://account.apple.com) › Sign-In and Security) |
+| **Fastmail** | `smtp.fastmail.com` | 465 · SSL/TLS | A Fastmail app password (Settings › Privacy & Security) |
+| **Other providers** | See your provider's "SMTP settings" help page | Usually 587 · STARTTLS | An app password if your provider offers one |
+
+> [!WARNING]
+> **Outlook, Hotmail, Microsoft 365 and NHSmail.** Microsoft is ending password-based sending
+> from apps. For Microsoft 365 it is switched off by default from the end of December 2026,
+> and many accounts already refuse it. Locuvi doesn't yet support Microsoft's newer sign-in
+> for *sending*. Use a Gmail, iCloud or other address for sending, or tap **PDF** on the
+> invoice and attach it to an email yourself.
+
+**Weekly summary.** Once sending is on, **Email me a weekly summary** (on the same page)
+sends you a short to-do list on Monday mornings, only when there's something to do.
+
 ---
 
-**Something not working?** The account shows its last check and any problem in
-**Settings › Booking emails**. The most common fix is to create a new app password, or sign in
-with Microsoft again.
+**Something not working?** For reading, each account shows its last check and any problem in
+**Settings › Booking emails**; the usual fix is a new app password, or signing in with
+Microsoft again. For sending, Locuvi tells you if the server refused your username or
+password. See also [Troubleshooting](TROUBLESHOOTING.md#email).

@@ -46,7 +46,9 @@ BASE_URL=http://127.0.0.1:8000 LOCUVI_PASSWORD=... SHOTS=./shots node e2e/docs-s
 ```
 
 The pictures in `docs/images/` come from `docs-shots.mjs` (fictional data only), resized and
-reduced to 160 colours to keep the repository small.
+reduced to 160 colours to keep the repository small. It also walks the second household
+profile that `smoke.mjs` creates (`Sam`, password from `SAM_PASSWORD`, default the smoke
+test's) through the welcome steps and a first month, so run it on a fresh instance.
 
 ## Database changes
 

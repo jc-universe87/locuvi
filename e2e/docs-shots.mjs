@@ -12,9 +12,10 @@ const BASE = process.env.BASE_URL ?? "http://127.0.0.1:8000";
 const SHOTS = process.env.SHOTS ?? "./shots";
 mkdirSync(SHOTS, { recursive: true });
 
-const browser = await chromium.launch(
-  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
-);
+const browser = await chromium.launch({
+  args: ["--lang=en-GB"], // UK date boxes (dd/mm/yyyy)
+  ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+});
 const common = { locale: "en-GB", timezoneId: "Europe/London", colorScheme: "light" };
 const ctx = await browser.newContext({ ...common, viewport: { width: 1200, height: 820 } });
 const page = await ctx.newPage();
@@ -87,6 +88,75 @@ await visit("/settings", "settings");
 for (const s of ["personalisation", "assistant", "mailbox", "profiles", "trash", "calendar"]) {
   await visit(`/settings/${s}`, `settings-${s}`);
 }
+
+
+// More Settings screens, and the menu on an issued invoice
+for (const s of ["you", "bank", "invoicing", "pension", "email", "agents", "password"]) {
+  await visit(`/settings/${s}`, `settings-${s}`);
+}
+await page.goto(`${BASE}/settings/practices`);
+await settle();
+await page.getByRole("button", { name: /Example Medical Practice/ }).first().click();
+await page.getByRole("dialog").waitFor();
+await shot("practice-sheet", page, { fullPage: false });
+await page.keyboard.press("Escape");
+await page.goto(`${BASE}/invoices`);
+await page.locator("a[href^='/invoices/']:not([href='/invoices/new'])").first().click();
+await page.locator(".inv-hero").waitFor();
+await page.getByRole("button", { name: "More" }).click();
+await page.getByRole("dialog").waitFor();
+await shot("invoice-more", page, { fullPage: false });
+await page.keyboard.press("Escape");
+
+// A first day and a first month, as the second household profile (fresh data):
+// welcome steps -> tap days -> "You can invoice" -> draft -> issue confirmation (not issued)
+const sam = await browser.newContext({ ...common, viewport: { width: 1200, height: 820 } });
+const sp = await sam.newPage();
+await sp.goto(`${BASE}/`);
+await sp.getByLabel("Your name").fill("Sam");
+await sp.getByLabel("Password").fill(process.env.SAM_PASSWORD ?? "sam-e2e-password");
+await sp.getByRole("button", { name: "Sign in" }).click();
+await sp.getByRole("heading", { name: "Sign in" }).waitFor({ state: "detached" });
+await sp.goto(`${BASE}/welcome`);
+await sp.getByRole("heading", { name: "Let's set up your invoices" }).waitFor();
+await settle(sp);
+await sp.getByLabel("Legal name").fill("Dr Sam Example");
+await sp.getByLabel("Address").fill("3 Sample Lane\nTestville");
+await sp.getByLabel("Postcode").fill("TV1 3CC");
+await sp.getByLabel("Email").fill("sam@example.invalid");
+await shot("welcome-1", sp, { fullPage: false });
+await sp.getByRole("button", { name: "Continue" }).click();
+await sp.getByRole("heading", { name: "Where practices should pay you" }).waitFor();
+await sp.getByLabel("Sort code").fill("00-00-00");
+await sp.getByLabel("Account number").fill("00000000");
+await shot("welcome-2", sp, { fullPage: false });
+await sp.getByRole("button", { name: "Continue" }).click();
+await sp.getByRole("heading", { name: "Add your first practice" }).waitFor();
+await sp.getByLabel("Practice name").fill("Example Health Centre");
+await sp.getByLabel("Billing address").fill("4 Test Street\nSampleford\nSF1 4DD");
+await sp.getByLabel("Agreed fee per session (£)").fill("620.00");
+await shot("welcome-3", sp, { fullPage: false });
+await sp.getByRole("button", { name: "Get started" }).click();
+await sp.getByRole("heading", { name: /Sam$/ }).waitFor();
+await sp.goto(`${BASE}/diary`);
+await sp.getByRole("button", { name: "Previous month" }).click();
+await settle(sp);
+const days = sp.locator(".cal button.day:not(.weekend)");
+for (const i of [1, 2, 6, 9]) {
+  await days.nth(i).click();
+  await sp.waitForTimeout(250);
+}
+await shot("diary-month", sp);
+await sp.goto(`${BASE}/`);
+await sp.getByText(/You can invoice for/).waitFor();
+await shot("today-ready", sp);
+await sp.getByRole("button", { name: "Create invoice" }).first().click();
+await sp.getByRole("heading", { name: "Draft invoice" }).waitFor();
+await shot("invoice-draft", sp);
+await sp.getByRole("button", { name: "Issue invoice and download" }).click();
+await sp.getByRole("dialog").getByText("Ready to issue this invoice?").waitFor();
+await shot("issue-confirm", sp, { fullPage: false });
+await sp.keyboard.press("Escape");
 
 const mobile = await browser.newContext({
   ...common, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2,
