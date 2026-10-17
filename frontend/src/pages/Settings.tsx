@@ -76,7 +76,9 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
           <button className="list-row" onClick={onSignOut} style={{ color: "var(--err)", fontWeight: 600 }}>{t("nav.signout")}</button>
         </div>
       )}
-      <p className="form-foot" style={{ textAlign: "center", marginTop: "1.5rem" }}>Locuvi · {t("app.tagline")}</p>
+      <p className="form-foot" style={{ textAlign: "center", marginTop: "1.5rem" }}>
+        Locuvi · {t("app.tagline")} · <a href="https://github.com/jc-universe87/locuvi" target="_blank" rel="noreferrer noopener">{t("app.source")}</a>
+      </p>
     </>
   );
 }

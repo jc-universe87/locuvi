@@ -20,11 +20,30 @@ helper. Each step says **what to type** and **what it does**. If you only use Lo
 
 ## What you need
 
-- **A computer that stays on**, running Linux: a home server, a mini PC or a small cloud
-  server. A Raspberry Pi 4/5 works (both Intel/AMD and ARM are supported).
+### Is self-hosting right for you?
+
+Locuvi isn't a website you sign up to. It runs on **a computer you control**, so your
+records never sit on someone else's servers. That computer is called the *server*. It needs
+to stay switched on so Locuvi can make backups and check your email, and you open Locuvi from
+your phone or laptop like a website.
+
+If you're comfortable following step-by-step instructions and typing a few commands, you can
+do this yourself in about 15 minutes. If not, ask a friend or IT helper to do this page once
+for you: after that, everything happens in the app.
+
+| Option | Good for | Notes |
+| --- | --- | --- |
+| **A spare PC or mini PC at home** running Linux (for example Ubuntu) | Most people | Quiet, low power, fully private |
+| **Raspberry Pi 4 or 5** (4 GB or more, with an SSD or good SD card) | Low cost | ARM computers are supported |
+| **A NAS** that runs Docker (for example Synology, QNAP, Unraid) | If you already have one | Use its terminal or Docker/Container app |
+| **A small cloud server** (VPS) | If you have nowhere at home | Keep it private with Tailscale; never open the port to the internet |
+
+### What to install
+
 - **Docker** with Compose. Docker runs Locuvi in a sealed box, so you don't have to install
-  anything else. Install it with the official guide: <https://docs.docker.com/engine/install/>.
-- About 15 minutes.
+  anything else. Follow the official guide: <https://docs.docker.com/engine/install/>.
+- **git**, to download Locuvi and its updates (on Ubuntu: `sudo apt install git`).
+- About **1 GB** of disk space, plus room for backups.
 
 > [!IMPORTANT]
 > Locuvi is designed to be **private**. Out of the box, only the server itself can open it.
@@ -78,9 +97,9 @@ This downloads Locuvi and starts it in the background. Wait until `docker compos
 <details>
 <summary>If <code>docker compose pull</code> says "denied" or "unauthorized"</summary>
 
-The Locuvi image is stored on GitHub. If it's private, log in once with a GitHub token that
-can only read packages (GitHub → Settings → Developer settings → Personal access tokens
-(classic) → tick only `read:packages`):
+The Locuvi image is published on GitHub's container registry. If the image isn't public, log
+in once with a GitHub token that can only read packages (GitHub → Settings → Developer
+settings → Personal access tokens (classic) → tick only `read:packages`):
 
 ```bash
 echo '<token>' | docker login ghcr.io -u <your-github-username> --password-stdin
@@ -97,6 +116,18 @@ Build the image yourself and give Docker the proxy's certificate:
 `docker build --secret id=build_ca,src=/path/ca.pem -t locuvi:1.0.0 .` then
 `docker compose up -d --no-build`.
 </details>
+
+**5. Sign in for the first time**
+
+Open Locuvi (see the next section for how) and sign in with the password you chose in
+step 2. Locuvi then asks three short questions: your details, your bank details and your
+first practice. The [user manual](USER_GUIDE.md#3-your-first-five-minutes) walks you through
+them.
+
+> [!TIP]
+> Change the password afterwards in **Settings › Password** if you like. The file in
+> `secrets/` is only used for the very first sign-in and for [resetting a forgotten
+> password](#forgotten-password).
 
 ## Open it on your devices
 
@@ -253,13 +284,13 @@ Locuvi can put a copy of every issued invoice PDF into your Nextcloud.
    password**, named "Locuvi". Never use your main Nextcloud password.
 2. In Nextcloud **Files › ⚙ Files settings**, copy the **WebDAV** address, like
    `https://cloud.example.org/remote.php/dav/files/USERNAME/`.
-3. In Locuvi, **Settings › Nextcloud copies**: turn it on, paste the address, your username and
-   the app password, then **Test connection** and **Save**.
+3. In Locuvi, **Settings › Nextcloud copies**: paste the address, your username and the app
+   password, tap **Check Nextcloud connection**, then **Save and turn on**.
 
 PDFs are saved as `Locuvi/Invoices/YYYY/MM/LOC-2026-0001.pdf`. Each upload is checked by
 downloading it again and comparing fingerprints. Locuvi never overwrites a different file and
 never deletes anything in Nextcloud. Each invoice page shows whether its copy is safely
-stored, with a **Retry** button. **Save previous invoices to Nextcloud** sends invoices issued
+stored, with a **Try saving to Nextcloud again** button. **Save previous invoices to Nextcloud** sends invoices issued
 before you connected.
 
 > [!NOTE]

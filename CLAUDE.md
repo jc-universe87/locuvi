@@ -28,8 +28,10 @@ never submit pension forms or send email without an explicit owner tap.
   toast+undo, autosave), `i18n/` (en complete; use `tn()` for counts), `lib/`.
 - `e2e/smoke.mjs` Playwright UI smoke; `e2e/assistant.mjs` + `e2e/fake_anthropic.py` AI paths;
   `e2e/docs-shots.mjs` screenshots for `docs/images/`; `docs/` decisions, report, example PDF.
-- User-facing docs (plain English, non-technical readers): `README.md`, `docs/USER_GUIDE.md`,
-  `docs/SETUP.md`, `docs/EMAIL_SETUP.md`, `docs/AI_SETUP.md`; technical: `docs/DEVELOPERS.md`.
+- User-facing docs (plain English, non-technical readers; written for public release): `README.md`,
+  `docs/README.md` (index), `docs/USER_GUIDE.md`, `docs/SETUP.md`, `docs/EMAIL_SETUP.md`,
+  `docs/AI_SETUP.md`, `docs/PRIVACY.md`, `docs/TROUBLESHOOTING.md`; project: `SECURITY.md`,
+  `CHANGELOG.md`, `CONTRIBUTING.md`, `LICENSE` (AGPL-3.0); technical: `docs/DEVELOPERS.md`.
   Update them (and the screenshots) when a visible feature changes. The repo is public: no
   personal data anywhere.
 

@@ -314,3 +314,15 @@ before enabling a cloud model.
   `README.md`, `docs/USER_GUIDE.md`, `docs/SETUP.md`, `docs/EMAIL_SETUP.md`,
   `docs/AI_SETUP.md`, `docs/DEVELOPERS.md`; pictures come from `e2e/docs-shots.mjs`.
 - Repository checked for personal data before going public: fictional fixtures only.
+
+## Public-release documentation (owner request, 17 Oct 2026) ✅
+
+- Documentation prepared as for a public release: a full user manual (every screen, a normal
+  month, settings one by one, FAQ, glossary), setup guide with hosting options, email guide
+  for reading **and** sending, AI guide, privacy page, troubleshooting by message, docs index,
+  `SECURITY.md`, `CHANGELOG.md`, `CONTRIBUTING.md` and an AGPL-3.0 `LICENSE` (with a
+  "Source code" link in Settings, as the AGPL expects for network use).
+- Screenshots extended (welcome steps, first month, issue check, practice sheet, settings),
+  UK date formats.
+- Fixes found while documenting: the scan-to-AI warning now names the chosen AI company; the
+  weekly-brief hint points to Settings › Email invoices.

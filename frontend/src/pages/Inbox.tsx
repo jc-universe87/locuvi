@@ -296,7 +296,7 @@ function DocSheet({
       {consent && (
         <div className="alert warn" role="alertdialog" aria-label={t("inbox.consent_title")}>
           <strong>{t("inbox.consent_title")}</strong>
-          <p style={{ margin: "0.4rem 0 0.6rem" }}>{t("inbox.consent_text")}</p>
+          <p style={{ margin: "0.4rem 0 0.6rem" }}>{t("inbox.consent_text", { provider: assistant?.providers.find((x) => x.id === assistant.provider)?.label ?? t("inbox.consent_ai_service") })}</p>
           <div className="actions">
             <button className="btn small" disabled={busy} onClick={() => void read(true)}>{t("inbox.consent_send")}</button>
             <button className="btn ghost small" onClick={() => setConsent(false)}>{t("common.cancel")}</button>
