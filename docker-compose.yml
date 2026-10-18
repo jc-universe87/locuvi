@@ -12,6 +12,10 @@ services:
     image: ghcr.io/jc-universe87/gp-locum-manager:${LOCUVI_TAG:-latest}
     build: .
     restart: unless-stopped
+    # Lets the optional AI assistant reach a model running on this same computer (for example
+    # Ollama) at http://host.docker.internal:11434/v1. Harmless if you don't use one.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${LOCUVI_BIND:-127.0.0.1}:${LOCUVI_PORT:-8000}:8000"
     environment:

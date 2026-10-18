@@ -25,6 +25,8 @@ await page.getByRole("switch").click();
 // the company can be changed; a key is never carried over to another company
 await page.getByLabel("AI company").selectOption("deepseek");
 await page.getByText("Get a key from DeepSeek").waitFor();
+await page.getByLabel("AI company").selectOption("custom");
+await page.getByLabel("Server address").waitFor();
 await page.getByLabel("AI company").selectOption("anthropic");
 await page.getByLabel("Your API key").fill("sk-ant-e2e-fake-key-0000000000000000000000");
 await page.getByRole("button", { name: "Save" }).click();

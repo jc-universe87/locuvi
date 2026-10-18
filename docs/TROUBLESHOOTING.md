@@ -278,9 +278,20 @@ reads photos (see [Choose an AI company](AI_SETUP.md#choose-an-ai-company)).
 <details>
 <summary><b>"This AI company can read bookings but can't answer questions."</b></summary>
 
-Some companies (currently Perplexity) don't support the "tools" Ask Locuvi needs to look up
-your records. Booking reading still works. To use Ask Locuvi or the assistant-written weekly
-summary, choose another company in **Settings › Assistant**.
+Some models don't support the "tools" Ask Locuvi needs to look up your records. Booking reading
+still works. To use Ask Locuvi or the assistant-written weekly summary, choose a model that
+supports tools (function calling), or another company in **Settings › Assistant**.
+</details>
+
+<details>
+<summary><b>Your own server: "Couldn't reach the AI service."</b></summary>
+
+- Check the **Server address**, including the port and `/v1` at the end.
+- 🛠 If the model runs on the same computer as Locuvi, use `host.docker.internal`, not
+  `localhost` (inside Docker, `localhost` means Locuvi itself).
+- 🛠 Ollama must be started with `OLLAMA_HOST=0.0.0.0` to accept connections from Docker or
+  other computers. In LM Studio, turn on **Serve on Local Network**.
+- Large models on a small computer can take minutes to answer; Locuvi waits up to 5 minutes.
 </details>
 
 <details>

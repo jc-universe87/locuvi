@@ -27,7 +27,6 @@ whichever you prefer:
 | **Anthropic** 🇺🇸 | Claude | [Models](https://docs.claude.com/en/docs/about-claude/models/overview) · [Pricing](https://claude.com/pricing#api) | [console.anthropic.com](https://console.anthropic.com/settings/keys) | Locuvi's default. Reads emails, PDFs (including scans) and photos |
 | **Google** 🇺🇸 | Gemini | [Models](https://ai.google.dev/gemini-api/docs/models) · [Pricing](https://ai.google.dev/gemini-api/docs/pricing) | [aistudio.google.com](https://aistudio.google.com/apikey) | Use a key with billing on: on the free tier Google may use what you send to improve its products |
 | **xAI** 🇺🇸 | Grok | [Models](https://docs.x.ai/docs/models) · [Pricing](https://x.ai/api) | [console.x.ai](https://console.x.ai) | Reads emails and photos |
-| **Perplexity** 🇺🇸 | Sonar | [API docs](https://docs.perplexity.ai/docs/sonar/overview) · [Pricing](https://docs.perplexity.ai/getting-started/pricing) | [perplexity.ai](https://www.perplexity.ai/account/api/keys) | Reads booking text only. **Ask Locuvi and the weekly summary aren't available**. Perplexity is moving to a new API, so this may stop working |
 | **Mistral** 🇫🇷 | Mistral, Codestral | [Models](https://docs.mistral.ai/getting-started/models/) · [Pricing](https://mistral.ai/pricing#api-pricing) | [console.mistral.ai](https://console.mistral.ai/api-keys) | European company |
 | **Cohere** 🇨🇦 | Command | [Models](https://docs.cohere.com/docs/models) · [Pricing](https://cohere.com/pricing) | [dashboard.cohere.com](https://dashboard.cohere.com/api-keys) | Reads booking text (not photos) |
 | **DeepSeek** 🇨🇳 | DeepSeek | [Models & pricing](https://api-docs.deepseek.com/quick_start/pricing) | [platform.deepseek.com](https://platform.deepseek.com/api_keys) | Low cost. Reads photos only with a vision model such as `deepseek-v4-flash-vision-exp` |
@@ -36,6 +35,7 @@ whichever you prefer:
 | **Z.ai** 🇨🇳 | GLM | [Models & API](https://docs.z.ai/guides/overview/pricing) | [z.ai](https://z.ai/manage-apikey/apikey-list) | General API key (not a GLM Coding Plan key). Photos with a vision model such as `glm-4.5v` |
 | **MiniMax** 🇨🇳 | MiniMax | [Models & API](https://platform.minimax.io/docs) | [platform.minimax.io](https://platform.minimax.io/user-center/basic-information/interface-key) | Reads booking text (not photos) |
 | **OpenRouter** | Many companies | [Models & prices](https://openrouter.ai/models) | [openrouter.ai](https://openrouter.ai/keys) | One key for models from many companies |
+| **Your own server** 🖥 | Any | See below | Usually none | A model you run yourself, or your organisation's own AI server. [How](#use-your-own-server) |
 
 The flag shows where each company is based. With companies based in China, your data is
 usually processed there; check each company's data terms (see
@@ -64,7 +64,7 @@ and models that can see images.
 3. Choose your **AI company**.
 4. Paste the key into **Your API key** and tap **Save**.
 5. Tap **Check key**. Locuvi asks the company which models your key can use. This is free.
-   Companies that don't publish a model list (Perplexity, Cohere, Z.ai, MiniMax) get one
+   Companies that don't publish a model list (Cohere, Z.ai, MiniMax) get one
    one-word test request instead, which costs a tiny fraction of a penny.
    You should see *"Your key works"*.
 
@@ -74,6 +74,50 @@ and models that can see images.
 > [!TIP]
 > Changing to a different AI company forgets the saved key, so one company's key is never sent
 > to another. Paste the new company's key and tap **Save**.
+
+## Use your own server
+
+Already run an AI model yourself, or does your organisation have its own AI server? Locuvi
+can use any server with an **OpenAI-compatible API**, which most do: [Ollama](https://ollama.com),
+[LM Studio](https://lmstudio.ai), [vLLM](https://docs.vllm.ai), [llama.cpp](https://github.com/ggml-org/llama.cpp),
+[LocalAI](https://localai.io) and many company AI gateways.
+
+The big advantage: **booking text never leaves your network.**
+
+1. In **Settings › Assistant**, choose **Your own server (Ollama, LM Studio…)**.
+2. **Server address**: the address of its OpenAI-compatible API, usually ending in `/v1`:
+
+   | Where your model runs | Server address |
+   | --- | --- |
+   | Ollama on the **same computer** as Locuvi | `http://host.docker.internal:11434/v1` |
+   | LM Studio on the same computer | `http://host.docker.internal:1234/v1` |
+   | Another computer on your home network | `http://192.168.1.50:11434/v1` (that computer's address) |
+   | A server elsewhere, over Tailscale | `http://<its Tailscale name or address>:11434/v1` |
+   | Your organisation's AI server | the address your IT team gives you |
+
+3. **Your API key**: leave empty unless your server asks for one.
+4. **Model**: the model's name on your server, for example `llama3.1` or `qwen3`. Tap
+   **Save**, then **Check key** to see the models your server offers.
+
+> [!TIP]
+> **Which model?** Booking emails are short, so a mid-sized model (around 8 billion
+> parameters or more) usually reads them well. For **Ask Locuvi**, choose a model that
+> supports "tools" (function calling). Smaller models make more mistakes, but Locuvi always
+> shows you the suggestions to check, and checks the figures itself.
+
+<details>
+<summary><b>For the person running the server</b>: making Ollama reachable</summary>
+
+- `host.docker.internal` reaches the computer Locuvi runs on. Locuvi's
+  `docker-compose.yml` already sets this up.
+- Ollama only listens to its own computer by default. For Locuvi in Docker (or another
+  computer) to reach it, start Ollama with `OLLAMA_HOST=0.0.0.0`
+  ([Ollama FAQ](https://github.com/ollama/ollama/blob/main/docs/faq.md)), and keep its port
+  (11434) closed to the internet.
+- In LM Studio, turn on **Serve on Local Network** in the Developer tab.
+- For safety, Locuvi refuses cloud-metadata and link-local addresses here.
+
+</details>
 
 ## What is sent to the AI company
 

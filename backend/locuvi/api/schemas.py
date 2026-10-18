@@ -356,6 +356,7 @@ class AssistantIn(Strict):
     weekly_brief: bool | None = None
     provider: Annotated[str, StringConstraints(max_length=20)] | None = None
     model: Annotated[str, StringConstraints(max_length=120)] | None = None
+    base_url: Annotated[str, StringConstraints(max_length=300)] | None = None
 
 
 class ProposalChoice(Strict):

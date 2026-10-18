@@ -260,6 +260,9 @@ class AnthropicProvider:
 # ------------------------------------------------------------ other providers
 
 
+CUSTOM = "custom"
+
+
 @dataclass(frozen=True)
 class ProviderInfo:
     label: str
@@ -303,13 +306,6 @@ PROVIDERS: dict[str, ProviderInfo] = {
     "xai": ProviderInfo(
         "xAI (Grok)", "grok-4", "https://api.x.ai/v1", "https://console.x.ai",
         "https://docs.x.ai/docs/models", "https://x.ai/api", "US",
-    ),
-    "perplexity": ProviderInfo(
-        "Perplexity (Sonar)", "sonar", "https://api.perplexity.ai",
-        "https://www.perplexity.ai/account/api/keys",
-        "https://docs.perplexity.ai/docs/sonar/overview",
-        "https://docs.perplexity.ai/getting-started/pricing", "US",
-        vision=False, json_mode="schema", agent=False, can_list=False,
     ),
     "mistral": ProviderInfo(
         "Mistral", "mistral-large-latest", "https://api.mistral.ai/v1",
@@ -361,12 +357,55 @@ PROVIDERS: dict[str, ProviderInfo] = {
         "https://openrouter.ai/api/v1", "https://openrouter.ai/keys",
         "https://openrouter.ai/models", "https://openrouter.ai/models", "US",
     ),
+    # A model the owner runs themselves (Ollama, LM Studio, vLLM, llama.cpp, LocalAI…) or a
+    # company server with an OpenAI-style API. The address and model come from Settings; a key
+    # is optional. Replies are parsed from the prompt alone, since local servers vary.
+    CUSTOM: ProviderInfo(
+        "Your own server (Ollama, LM Studio…)", "", None, "", "", "", "",
+        vision=False, json_mode="none",
+    ),
 }  # fmt: skip
 
 # Some models write their reasoning into the answer between these tags; it is never shown or
 # parsed as the answer.
 _THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
-_VISION_NAME = re.compile(r"vision|-vl\b|vl-|\d(\.\d+)?v\b", re.I)
+_VISION_NAME = re.compile(r"vision|llava|-vl\b|vl-|\d(\.\d+)?v\b", re.I)
+# Cloud metadata services: never reachable through an owner-entered AI address
+_METADATA = {"metadata.google.internal", "metadata", "169.254.169.254", "fd00:ec2::254"}
+
+
+def validate_ai_url(raw: str) -> str:
+    """The owner's own AI server address: http(s), no credentials or query; private and local
+    addresses are allowed (that's the point), cloud metadata and link-local ones are not."""
+    import ipaddress
+    from urllib.parse import urlsplit
+
+    url = (raw or "").strip().rstrip("/")
+    bad = DomainError(
+        "assistant.bad_url", "Enter the server address, for example http://192.168.1.20:11434/v1."
+    )
+    if not url or len(url) > 300 or any(c.isspace() for c in url):
+        raise bad
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise bad
+    if parts.username or parts.password or parts.query or parts.fragment:
+        raise bad
+    host = parts.hostname.lower().rstrip(".")
+    if host in _METADATA:
+        raise bad
+    try:
+        ip = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        ip = None
+    if ip is not None and (ip.is_link_local or ip.is_multicast or ip.is_unspecified):
+        raise bad
+    try:
+        parts.port  # noqa: B018 - raises on a malformed port
+    except ValueError:
+        raise bad from None
+    return url
+
 
 _JSON_ONLY = (
     "\n\nReply with one JSON object only (no other text) that follows this JSON schema:\n"
@@ -501,22 +540,34 @@ class CompatibleProvider:
     re-validates; run_turn returns Anthropic-shaped blocks so the agent loop is shared.
     """
 
-    def __init__(self, provider: str, api_key: str, model: str, client: Any = None) -> None:
+    def __init__(
+        self,
+        provider: str,
+        api_key: str,
+        model: str,
+        client: Any = None,
+        base_url: str | None = None,
+    ) -> None:
         self.provider = provider
         self.info = PROVIDERS[provider]
+        self.base_url = (base_url or self.info.base_url or "").rstrip("/")
         self.model = model
         self.engine = f"ai:{provider}/{model}"
         self._key = api_key
-        self._client = client or httpx.Client(timeout=120.0)
+        # a model on the owner's own computer can be slow
+        self._client = client or httpx.Client(timeout=300.0 if provider == CUSTOM else 120.0)
         self.supports_agent = self.info.agent
 
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._key}"} if self._key else {}
+
     def _post(self, body: dict[str, Any], max_tokens: int = 16000) -> dict[str, Any]:
-        headers = {"Authorization": f"Bearer {self._key}"}
+        headers = self._headers()
         if self.provider == "openrouter":
             headers["X-Title"] = "Locuvi"
         try:
             r = self._client.post(
-                f"{self.info.base_url}/chat/completions",
+                f"{self.base_url}/chat/completions",
                 json={"model": self.model, self.info.tokens_field: max_tokens, **body},
                 headers=headers,
             )
@@ -672,9 +723,7 @@ class CompatibleProvider:
             self._ping()
             return []
         try:
-            r = self._client.get(
-                f"{self.info.base_url}/models", headers={"Authorization": f"Bearer {self._key}"}
-            )
+            r = self._client.get(f"{self.base_url}/models", headers=self._headers())
             r.raise_for_status()
             items = r.json().get("data") or []
         except httpx.HTTPStatusError as exc:
@@ -728,7 +777,13 @@ def config_public(cfg: AssistantConfig, settings: Settings) -> dict[str, Any]:
         else True,
         "key_saved": bool(cfg.api_key_ciphertext),
         "key_from_server": server,
-        "ready": cfg.enabled and bool(cfg.api_key_ciphertext or server),
+        "base_url": cfg.base_url or "",
+        "ready": cfg.enabled
+        and (
+            bool(cfg.base_url and cfg.model)
+            if cfg.provider == CUSTOM
+            else bool(cfg.api_key_ciphertext or server)
+        ),
         "weekly_brief": cfg.weekly_brief,
         "providers": [
             {"id": pid, "label": info.label, "default_model": info.default_model,
@@ -750,6 +805,7 @@ def save_config(
     weekly_brief: bool | None = None,
     provider: str | None = None,
     model: str | None = None,
+    base_url: str | None = None,
 ) -> AssistantConfig:
     cfg = get_config(s)
     if weekly_brief is not None:
@@ -761,14 +817,18 @@ def save_config(
         cfg.provider = provider
         cfg.api_key_ciphertext = None
         cfg.model = None
+        cfg.base_url = None
     if model is not None:
         m = model.strip()
         if m and (len(m) > 120 or any(c.isspace() for c in m)):
             raise DomainError("assistant.bad_model", "That does not look like a model name.")
         cfg.model = m or None
+    if base_url is not None and cfg.provider == CUSTOM:
+        cfg.base_url = validate_ai_url(base_url) if base_url.strip() else None
     if api_key is not None and api_key.strip():
         key = api_key.strip()
-        if len(key) < 20 or any(c.isspace() for c in key):
+        too_short = len(key) < (1 if cfg.provider == CUSTOM else 20)  # own servers: any token
+        if too_short or any(c.isspace() for c in key):
             raise DomainError("assistant.bad_key", "That does not look like an API key.")
         cfg.api_key_ciphertext = secrets.encrypt(key)
     elif clear_key:
@@ -797,10 +857,10 @@ def _key(cfg: AssistantConfig, settings: Settings, secrets: SecretBox) -> str | 
     return key
 
 
-def build(provider: str, key: str, model: str) -> Any:
+def build(provider: str, key: str, model: str, base_url: str | None = None) -> Any:
     if provider == "anthropic":
         return AnthropicProvider(key, model)
-    return CompatibleProvider(provider, key, model)
+    return CompatibleProvider(provider, key, model, base_url=base_url)
 
 
 def provider_for(s: Session, settings: Settings, secrets: SecretBox) -> Provider | None:
@@ -809,6 +869,10 @@ def provider_for(s: Session, settings: Settings, secrets: SecretBox) -> Provider
     if not cfg.enabled or cfg.provider not in PROVIDERS:
         return None
     key = _key(cfg, settings, secrets)
+    if cfg.provider == CUSTOM:  # own server: the address and model matter, a key is optional
+        if not cfg.base_url or not cfg.model:
+            return None
+        return build(CUSTOM, key or "", cfg.model, cfg.base_url)
     if not key:
         return None
     return build(cfg.provider, key, model_for(cfg, settings))
@@ -820,6 +884,11 @@ def check_key(
     """Ask the provider which models this key can use: a free check that the key works."""
     cfg = get_config(s)
     key = _key(cfg, settings, secrets)
+    if cfg.provider == CUSTOM:
+        if not cfg.base_url:
+            raise DomainError("assistant.no_url", "Add your server's address first.")
+        p = (factory or build)(CUSTOM, key or "", cfg.model or "", cfg.base_url)
+        return {"ok": True, "models": p.list_models()}
     if not key or cfg.provider not in PROVIDERS:
         raise DomainError("assistant.no_key", "Add your API key first.")
     p = (factory or build)(cfg.provider, key, model_for(cfg, settings))

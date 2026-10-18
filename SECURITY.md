@@ -39,7 +39,8 @@ Update with `./update.sh` (see [Setting up Locuvi](docs/SETUP.md#updates)).
 - **Safe outgoing connections.** Nextcloud and email server addresses are checked, and private
   or internal addresses are refused unless the administrator allows them, to prevent the
   server being used to reach internal systems (SSRF). AI companies are a fixed list of
-  official addresses.
+  official addresses; an owner's own AI server may be on the home network, but cloud-metadata
+  and link-local addresses are refused.
 - **Uploads.** SVG logos are cleaned of scripts and external references; other images are
   re-encoded. Documents are size-limited.
 - **Container.** Runs as a non-root user with a read-only filesystem, all Linux capabilities
