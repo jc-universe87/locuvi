@@ -378,6 +378,11 @@ def agent_ask(body: S.AgentAskIn, request: Request, s: DB) -> dict[str, Any]:
     provider = _provider(request, s)
     if provider is None or not hasattr(provider, "run_turn"):
         raise DomainError("assistant.off", "Turn on the assistant in Settings first.")
+    if not getattr(provider, "supports_agent", True):
+        raise DomainError(
+            "assistant.no_agent",
+            "This AI company can read bookings but can't answer questions.",
+        )
     return agent.ask(s, state(request).settings, provider, body.question, body.conversation_id)
 
 

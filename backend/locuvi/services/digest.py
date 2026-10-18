@@ -114,7 +114,11 @@ BRIEF_QUESTION = (
 
 def ai_brief(s: Session, settings: Settings, provider: Any) -> str | None:
     """The assistant's short prioritised brief, or None (the rule-based summary still goes)."""
-    if provider is None or not hasattr(provider, "run_turn"):
+    if (
+        provider is None
+        or not hasattr(provider, "run_turn")
+        or not getattr(provider, "supports_agent", True)
+    ):
         return None
     from locuvi.assistant import agent
 

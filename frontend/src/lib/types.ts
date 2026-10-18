@@ -340,7 +340,11 @@ export interface AiProvider {
   label: string;
   default_model: string;
   key_url: string;
+  models_url: string;
+  pricing_url: string;
+  country: string;
   reads_photos: boolean;
+  ask: boolean;
 }
 
 export interface AssistantConfig {
