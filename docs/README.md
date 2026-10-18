@@ -30,3 +30,12 @@ Start with what you want to do.
 | 💻 [Developer notes](DEVELOPERS.md) | Stack, running locally, tests, screenshots |
 | 🤝 [Contributing](../CONTRIBUTING.md) | How to help, and the rules that keep Locuvi trustworthy |
 | 🗺 [Roadmap](ROADMAP.md) · [Decisions](decisions/) · [AI spec](specs/AI_AND_AGENTS.md) | Background and design choices |
+
+## Support the project
+
+Locuvi is free and made in spare time. If it helps you, you can say thanks:
+
+<p>
+  <a href="https://github.com/sponsors/jc-universe87"><img src="https://img.shields.io/badge/GitHub%20Sponsors-♥-ea4aaa?logo=github" alt="GitHub Sponsors"></a>
+  <a href="https://ko-fi.com/pistio"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+</p>
