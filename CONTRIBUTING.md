@@ -47,6 +47,12 @@ English (`en.ts`) is the reference. Other languages live next to it; missing key
 English. A test makes sure the main screens (sign-in, settings, password) are translated in
 every language.
 
+## Other ways to help
+
+Not a coder? Clearer wording, translations and bug reports all help. You can also support
+the project on [GitHub Sponsors](https://github.com/sponsors/jc-universe87) or
+[Ko-fi](https://ko-fi.com/pistio).
+
 ## Licence
 
 By contributing, you agree that your contribution is licensed under the

@@ -159,6 +159,16 @@ An example invoice made from fictional data:
 [`docs/examples/example-invoice.pdf`](docs/examples/example-invoice.pdf). All names and
 figures in the pictures are made up.
 
+## 💛 Support the project
+
+Locuvi is built and maintained by one person in their spare time, and it's free. If it saves
+you an evening of invoices and pension forms each month, consider saying thanks:
+
+<p>
+  <a href="https://github.com/sponsors/jc-universe87"><img src="https://img.shields.io/badge/GitHub%20Sponsors-♥-ea4aaa?logo=github" alt="GitHub Sponsors"></a>
+  <a href="https://ko-fi.com/pistio"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+</p>
+
 ## Licence
 
 Locuvi is free software, released under the [GNU Affero General Public Licence v3.0](LICENSE).
