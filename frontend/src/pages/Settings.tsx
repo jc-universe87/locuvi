@@ -607,6 +607,11 @@ function StorageSection() {
   );
 }
 
+/** A country code as its flag emoji (regional indicator letters). */
+function flag(code: string): string {
+  return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)));
+}
+
 function AssistantSection() {
   const { t, tn } = useT();
   const [cfg, setCfg] = useState<AssistantConfig | null>(null);
@@ -672,7 +677,7 @@ function AssistantSection() {
           <>
             <Row id="ai-provider" label={t("assistant.provider")} hint={t("assistant.provider_hint")}>
               <select id="ai-provider" value={cfg.provider} onChange={(e) => void choose(e.target.value)}>
-                {cfg.providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                {cfg.providers.map((p) => <option key={p.id} value={p.id}>{flag(p.country)} {p.label}</option>)}
               </select>
             </Row>
             <Row id="ai-key" label={t("assistant.key")} hint={cfg.key_from_server ? t("assistant.key_server") : t("assistant.key_hint")}>
@@ -690,10 +695,13 @@ function AssistantSection() {
       {cfg.enabled && info && !cfg.key_from_server && (
         <p className="form-foot">
           <a href={info.key_url} target="_blank" rel="noreferrer noopener">{t("assistant.get_key", { provider: info.label })}</a>
-          {!cfg.reads_photos && <> · {t("assistant.no_photos")}</>}
+          {" · "}<a href={info.models_url} target="_blank" rel="noreferrer noopener">{t("assistant.models_link")}</a>
+          {" · "}<a href={info.pricing_url} target="_blank" rel="noreferrer noopener">{t("assistant.pricing_link")}</a>
+          {!cfg.reads_photos && <><br />{t("assistant.no_photos")}</>}
+          {!info.ask && <><br />{t("assistant.no_ask")}</>}
         </p>
       )}
-      {checked && <div className="alert ok" role="status">✓ {tn("assistant.key_works", models.length)}</div>}
+      {checked && <div className="alert ok" role="status">✓ {models.length ? tn("assistant.key_works", models.length) : t("assistant.key_works_plain")}</div>}
       {cfg.ready && (
         <div className="form-list" style={{ marginTop: "0.75rem" }}>
           <SwitchRow label={t("assistant.weekly_brief")} hint={t("assistant.weekly_brief_hint")} checked={cfg.weekly_brief}

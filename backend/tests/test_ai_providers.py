@@ -31,7 +31,10 @@ def chat(message, finish="stop", model=None):
     return {"model": model, "choices": [{"message": message, "finish_reason": finish}]}
 
 
-@pytest.mark.parametrize("pid", ["openai", "gemini", "deepseek", "mistral", "xai", "openrouter"])
+COMPATIBLE = [p for p in providers.PROVIDERS if p != "anthropic"]
+
+
+@pytest.mark.parametrize("pid", COMPATIBLE)
 def test_booking_read_through_each_provider(pid):
     calls: list[httpx.Request] = []
     booking = {"summary": "One session", "items": [], "questions": []}
@@ -53,8 +56,12 @@ def test_booking_read_through_each_provider(pid):
     assert req.headers["Authorization"] == f"Bearer {KEY}"
     sent = json.loads(req.content)
     assert sent["model"] == info.default_model
-    fmt = sent["response_format"]["type"]
-    assert fmt == ("json_schema" if pid == "openai" else "json_object")
+    expected = {"strict": "json_schema", "schema": "json_schema", "object": "json_object"}
+    mode = info.json_mode
+    if mode == "none":
+        assert "response_format" not in sent
+    else:
+        assert sent["response_format"]["type"] == expected[mode]
     text = json.dumps(sent["messages"])
     assert "12 Oct AM" in text and "01/02/1960" not in text and "example.invalid" not in text
     assert KEY not in text
@@ -241,3 +248,85 @@ def test_model_list_offers_chat_models_and_photos_follow_the_model(session, sett
     providers.save_config(session, box, enabled=True, api_key=None,
                           model="deepseek-v4-flash-vision-exp")  # fmt: skip
     assert providers.config_public(cfg, settings)["reads_photos"] is True
+
+
+def test_every_company_lists_its_models_and_prices():
+    assert set(providers.PROVIDERS) >= {
+        "openai", "anthropic", "gemini", "xai", "perplexity", "mistral", "cohere",
+        "deepseek", "alibaba", "moonshot", "zai", "minimax",
+    }  # fmt: skip
+    for info in providers.PROVIDERS.values():
+        assert info.models_url.startswith("https://") and info.pricing_url.startswith("https://")
+        assert info.key_url.startswith("https://") and len(info.country) == 2
+        assert info.json_mode in ("strict", "schema", "object", "none")
+
+
+def test_reasoning_written_into_the_answer_is_removed():
+    booking = (
+        '<think>The user wants dates.</think>Here it is: {"summary":"s","items":[],"questions":[]}'
+    )
+    calls: list[httpx.Request] = []
+    p = providers.CompatibleProvider(
+        "minimax", KEY, "MiniMax-M2.7",
+        client=fake_http(chat({"role": "assistant", "content": booking}), calls),
+    )  # fmt: skip
+    assert p.read_booking(text="x", attachment=None, practices=[], today=TODAY)["summary"] == "s"
+    p = providers.CompatibleProvider(
+        "minimax", KEY, "MiniMax-M2.7",
+        client=fake_http(chat({"role": "assistant", "content": "<think>hmm</think>All done."}), []),
+    )  # fmt: skip
+    turn = p.run_turn(system="s", messages=[{"role": "user", "content": "q"}], tools=agent.TOOLS)
+    assert turn.content == [{"type": "text", "text": "All done."}]
+
+
+def test_check_key_without_a_model_list_sends_one_tiny_request():
+    calls: list[httpx.Request] = []
+    p = providers.CompatibleProvider(
+        "zai", KEY, "glm-5.1", client=fake_http(chat({"role": "assistant", "content": "OK"}), calls)
+    )
+    assert p.list_models() == []
+    (req,) = calls
+    assert req.url.path.endswith("/chat/completions") and json.loads(req.content)["max_tokens"] == 5
+
+    # a company whose /models turns out to be missing falls back the same way
+    def reply(req):
+        if req.url.path.endswith("/models"):
+            return httpx.Response(404, json={})
+        return chat({"role": "assistant", "content": "OK"})
+
+    calls.clear()
+    p = providers.CompatibleProvider("moonshot", KEY, "kimi-k2.6", client=fake_http(reply, calls))
+    assert p.list_models() == [] and len(calls) == 2
+
+    bad = providers.CompatibleProvider(
+        "cohere", KEY, "m", client=fake_http(httpx.Response(401, json={}), [])
+    )
+    with pytest.raises(DomainError) as e:
+        bad.list_models()
+    assert e.value.code == "assistant.auth_failed"
+
+
+def test_company_without_tool_calling_reads_bookings_but_not_questions(settings):
+    from fastapi.testclient import TestClient
+
+    from locuvi.main import create_app
+
+    app = create_app(settings)
+    with TestClient(app) as c:
+        h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
+        sonar = providers.CompatibleProvider("perplexity", KEY, "sonar", client=fake_http({}, []))
+        assert sonar.supports_agent is False
+        app.state.ai_provider_factory = lambda s: sonar
+        r = c.post("/api/v1/assistant/ask", json={"question": "hi"}, headers=h)
+        assert r.status_code == 400 and r.json()["error"]["code"] == "assistant.no_agent"
+        pub = c.get("/api/v1/settings/assistant").json()
+        ask = {p["id"]: p["ask"] for p in pub["providers"]}
+        assert ask["perplexity"] is False and ask["openai"] is True
+
+
+def test_photos_follow_vision_model_names():
+    assert providers.reads_photos("alibaba", "qwen-vl-max")
+    assert providers.reads_photos("zai", "glm-4.5v")
+    assert not providers.reads_photos("zai", "glm-5.1")
+    assert not providers.reads_photos("moonshot", "kimi-k2.6")
+    assert providers.reads_photos("openai", "gpt-5.5")

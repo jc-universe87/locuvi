@@ -276,6 +276,14 @@ reads photos (see [Choose an AI company](AI_SETUP.md#choose-an-ai-company)).
 </details>
 
 <details>
+<summary><b>"This AI company can read bookings but can't answer questions."</b></summary>
+
+Some companies (currently Perplexity) don't support the "tools" Ask Locuvi needs to look up
+your records. Booking reading still works. To use Ask Locuvi or the assistant-written weekly
+summary, choose another company in **Settings › Assistant**.
+</details>
+
+<details>
 <summary><b>The model I chose stopped working</b></summary>
 
 AI companies retire model names. Tap **Check key**, pick a model from the list, and **Save**.

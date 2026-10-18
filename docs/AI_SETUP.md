@@ -21,18 +21,32 @@ You use your **own account** with an AI company and pay them directly for what y
 use usually costs very little, and most companies let you set a monthly spending limit. Pick
 whichever you prefer:
 
-| Company | Good to know | Get a key |
-| --- | --- | --- |
-| **Anthropic (Claude)** | Locuvi's default. Reads emails, PDFs and photos | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
-| **OpenAI (ChatGPT)** | Reads emails and photos; PDFs are read from their text | [platform.openai.com](https://platform.openai.com/api-keys) |
-| **Google Gemini** | Use a key with billing turned on: on the free tier Google may use what you send to improve its products | [aistudio.google.com](https://aistudio.google.com/apikey) |
-| **DeepSeek** | Low cost; data is processed in China. Reads photos only with the model `deepseek-v4-flash-vision-exp`; otherwise paste the text | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
-| **Mistral** | European company | [console.mistral.ai](https://console.mistral.ai/api-keys) |
-| **xAI (Grok)** | Reads emails and photos | [console.x.ai](https://console.x.ai) |
-| **OpenRouter** | One key for models from many companies | [openrouter.ai](https://openrouter.ai/keys) |
+| Company | Models | Official reference | Get a key | Good to know |
+| --- | --- | --- | --- | --- |
+| **OpenAI** 🇺🇸 | GPT | [Models](https://platform.openai.com/docs/models) · [Pricing](https://openai.com/api/pricing/) | [platform.openai.com](https://platform.openai.com/api-keys) | Reads emails and photos |
+| **Anthropic** 🇺🇸 | Claude | [Models](https://docs.claude.com/en/docs/about-claude/models/overview) · [Pricing](https://claude.com/pricing#api) | [console.anthropic.com](https://console.anthropic.com/settings/keys) | Locuvi's default. Reads emails, PDFs (including scans) and photos |
+| **Google** 🇺🇸 | Gemini | [Models](https://ai.google.dev/gemini-api/docs/models) · [Pricing](https://ai.google.dev/gemini-api/docs/pricing) | [aistudio.google.com](https://aistudio.google.com/apikey) | Use a key with billing on: on the free tier Google may use what you send to improve its products |
+| **xAI** 🇺🇸 | Grok | [Models](https://docs.x.ai/docs/models) · [Pricing](https://x.ai/api) | [console.x.ai](https://console.x.ai) | Reads emails and photos |
+| **Perplexity** 🇺🇸 | Sonar | [API docs](https://docs.perplexity.ai/docs/sonar/overview) · [Pricing](https://docs.perplexity.ai/getting-started/pricing) | [perplexity.ai](https://www.perplexity.ai/account/api/keys) | Reads booking text only. **Ask Locuvi and the weekly summary aren't available**. Perplexity is moving to a new API, so this may stop working |
+| **Mistral** 🇫🇷 | Mistral, Codestral | [Models](https://docs.mistral.ai/getting-started/models/) · [Pricing](https://mistral.ai/pricing#api-pricing) | [console.mistral.ai](https://console.mistral.ai/api-keys) | European company |
+| **Cohere** 🇨🇦 | Command | [Models](https://docs.cohere.com/docs/models) · [Pricing](https://cohere.com/pricing) | [dashboard.cohere.com](https://dashboard.cohere.com/api-keys) | Reads booking text (not photos) |
+| **DeepSeek** 🇨🇳 | DeepSeek | [Models & pricing](https://api-docs.deepseek.com/quick_start/pricing) | [platform.deepseek.com](https://platform.deepseek.com/api_keys) | Low cost. Reads photos only with a vision model such as `deepseek-v4-flash-vision-exp` |
+| **Alibaba** 🇨🇳 | Qwen | [Models](https://www.alibabacloud.com/help/en/model-studio/models) | [Model Studio](https://modelstudio.console.alibabacloud.com/) | Uses the international (Singapore) endpoint; your key must be from the same region. Photos with a `-vl` model |
+| **Moonshot AI** 🇨🇳 | Kimi | [API docs](https://platform.moonshot.ai/docs) · [Pricing](https://platform.moonshot.ai/docs/pricing/chat) | [platform.moonshot.ai](https://platform.moonshot.ai/console/api-keys) | Reads booking text (not photos) |
+| **Z.ai** 🇨🇳 | GLM | [Models & API](https://docs.z.ai/guides/overview/pricing) | [z.ai](https://z.ai/manage-apikey/apikey-list) | General API key (not a GLM Coding Plan key). Photos with a vision model such as `glm-4.5v` |
+| **MiniMax** 🇨🇳 | MiniMax | [Models & API](https://platform.minimax.io/docs) | [platform.minimax.io](https://platform.minimax.io/user-center/basic-information/interface-key) | Reads booking text (not photos) |
+| **OpenRouter** | Many companies | [Models & prices](https://openrouter.ai/models) | [openrouter.ai](https://openrouter.ai/keys) | One key for models from many companies |
+
+The flag shows where each company is based. With companies based in China, your data is
+usually processed there; check each company's data terms (see
+[What is sent](#what-is-sent-to-the-ai-company)).
+
+Prices change often and are set by each company, per million "tokens" (roughly ¾ of a word).
+Reading one booking email uses a few thousand tokens, so it usually costs well under a penny
+with the cheaper models.
 
 **Scanned PDFs** (pictures of pages, with no text you can select) can only be read by
-Anthropic. With the other companies, Locuvi reads a PDF's text, and photos go to companies
+Anthropic (Claude). With the other companies, Locuvi reads a PDF's text, and photos go to companies
 and models that can see images.
 
 > [!NOTE]
@@ -50,6 +64,8 @@ and models that can see images.
 3. Choose your **AI company**.
 4. Paste the key into **Your API key** and tap **Save**.
 5. Tap **Check key**. Locuvi asks the company which models your key can use. This is free.
+   Companies that don't publish a model list (Perplexity, Cohere, Z.ai, MiniMax) get one
+   one-word test request instead, which costs a tiny fraction of a penny.
    You should see *"Your key works"*.
 
 **Model** is filled in for you. Leave it as it is unless you know you want another one; after

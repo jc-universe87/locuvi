@@ -326,3 +326,11 @@ before enabling a cloud model.
   UK date formats.
 - Fixes found while documenting: the scan-to-AI warning now names the chosen AI company; the
   weekly-brief hint points to Settings › Email invoices.
+
+## More AI companies (owner request, 18 Oct 2026) ✅
+
+- Added Perplexity (Sonar), Cohere (Command), Alibaba (Qwen), Moonshot AI (Kimi), Z.ai (GLM)
+  and MiniMax through the OpenAI-compatible adapter; each company carries its country, model
+  list and price list links (shown in Settings › Assistant and docs/AI_SETUP.md), its JSON
+  mode, and whether it supports tools (Ask Locuvi) and a model list (else Check key sends one
+  tiny request). `<think>` reasoning in answers is stripped.

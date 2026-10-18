@@ -266,44 +266,107 @@ class ProviderInfo:
     default_model: str
     base_url: str | None  # OpenAI-compatible endpoint; None for Anthropic (own SDK)
     key_url: str  # where the owner creates a key
-    vision: bool = True  # can read photos of bookings
-    strict_schema: bool = False  # supports response_format json_schema (else json_object)
+    models_url: str  # the company's own model list
+    pricing_url: str  # the company's own price list
+    country: str  # ISO code, shown as a flag
+    vision: bool = True  # can read photos of bookings (see reads_photos for per-model rules)
+    # How the booking reply is forced into JSON: "strict" (json_schema, strict), "schema"
+    # (json_schema), "object" (json_object) or "none" (prompt only; the server still checks it)
+    json_mode: str = "object"
     tokens_field: str = "max_tokens"
+    agent: bool = True  # supports tool calling, so Ask Locuvi and the weekly brief work
+    can_list: bool = True  # GET /models works; otherwise Check key sends a one-word request
 
 
 # Defaults are only a starting point: model names change often, so the owner can pick another
 # from the provider's own list (Settings › AI assistant › Check key).
 PROVIDERS: dict[str, ProviderInfo] = {
+    "openai": ProviderInfo(
+        "OpenAI (GPT)", "gpt-5.5", "https://api.openai.com/v1",
+        "https://platform.openai.com/api-keys",
+        "https://platform.openai.com/docs/models", "https://openai.com/api/pricing/", "US",
+        json_mode="strict", tokens_field="max_completion_tokens",
+    ),
     "anthropic": ProviderInfo(
         "Anthropic (Claude)", "claude-opus-5-5", None,
         "https://console.anthropic.com/settings/keys",
-    ),
-    "openai": ProviderInfo(
-        "OpenAI (ChatGPT)", "gpt-5.5", "https://api.openai.com/v1",
-        "https://platform.openai.com/api-keys", strict_schema=True,
-        tokens_field="max_completion_tokens",
+        "https://docs.claude.com/en/docs/about-claude/models/overview",
+        "https://claude.com/pricing#api", "US",
     ),
     "gemini": ProviderInfo(
-        "Google Gemini", "gemini-flash-latest",
+        "Google (Gemini)", "gemini-flash-latest",
         "https://generativelanguage.googleapis.com/v1beta/openai",
         "https://aistudio.google.com/apikey",
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/pricing", "US",
     ),
-    "deepseek": ProviderInfo(
-        "DeepSeek", "deepseek-v4-flash", "https://api.deepseek.com",
-        "https://platform.deepseek.com/api_keys", vision=False,
+    "xai": ProviderInfo(
+        "xAI (Grok)", "grok-4", "https://api.x.ai/v1", "https://console.x.ai",
+        "https://docs.x.ai/docs/models", "https://x.ai/api", "US",
+    ),
+    "perplexity": ProviderInfo(
+        "Perplexity (Sonar)", "sonar", "https://api.perplexity.ai",
+        "https://www.perplexity.ai/account/api/keys",
+        "https://docs.perplexity.ai/docs/sonar/overview",
+        "https://docs.perplexity.ai/getting-started/pricing", "US",
+        vision=False, json_mode="schema", agent=False, can_list=False,
     ),
     "mistral": ProviderInfo(
         "Mistral", "mistral-large-latest", "https://api.mistral.ai/v1",
         "https://console.mistral.ai/api-keys",
+        "https://docs.mistral.ai/getting-started/models/",
+        "https://mistral.ai/pricing#api-pricing", "FR",
     ),
-    "xai": ProviderInfo(
-        "xAI (Grok)", "grok-4", "https://api.x.ai/v1", "https://console.x.ai",
+    "cohere": ProviderInfo(
+        "Cohere (Command)", "command-a-plus-05-2026", "https://api.cohere.ai/compatibility/v1",
+        "https://dashboard.cohere.com/api-keys",
+        "https://docs.cohere.com/docs/models", "https://cohere.com/pricing", "CA",
+        vision=False, json_mode="schema", can_list=False,
+    ),
+    "deepseek": ProviderInfo(
+        "DeepSeek", "deepseek-v4-flash", "https://api.deepseek.com",
+        "https://platform.deepseek.com/api_keys",
+        "https://api-docs.deepseek.com/quick_start/pricing",
+        "https://api-docs.deepseek.com/quick_start/pricing", "CN",
+        vision=False,
+    ),
+    "alibaba": ProviderInfo(
+        "Alibaba (Qwen)", "qwen3.6-plus",
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "https://modelstudio.console.alibabacloud.com/",
+        "https://www.alibabacloud.com/help/en/model-studio/models",
+        "https://www.alibabacloud.com/help/en/model-studio/models", "CN",
+        vision=False,
+    ),
+    "moonshot": ProviderInfo(
+        "Moonshot AI (Kimi)", "kimi-k2.6", "https://api.moonshot.ai/v1",
+        "https://platform.moonshot.ai/console/api-keys",
+        "https://platform.moonshot.ai/docs", "https://platform.moonshot.ai/docs/pricing/chat",
+        "CN", vision=False,
+    ),
+    "zai": ProviderInfo(
+        "Z.ai (GLM)", "glm-5.1", "https://api.z.ai/api/paas/v4",
+        "https://z.ai/manage-apikey/apikey-list",
+        "https://docs.z.ai/guides/overview/pricing", "https://docs.z.ai/guides/overview/pricing",
+        "CN", vision=False, can_list=False,
+    ),
+    "minimax": ProviderInfo(
+        "MiniMax", "MiniMax-M2.7", "https://api.minimax.io/v1",
+        "https://platform.minimax.io/user-center/basic-information/interface-key",
+        "https://platform.minimax.io/docs", "https://platform.minimax.io/docs", "CN",
+        vision=False, json_mode="none", can_list=False,
     ),
     "openrouter": ProviderInfo(
-        "OpenRouter (many models, one key)", "openrouter/auto", "https://openrouter.ai/api/v1",
-        "https://openrouter.ai/keys",
+        "OpenRouter (many companies, one key)", "openrouter/auto",
+        "https://openrouter.ai/api/v1", "https://openrouter.ai/keys",
+        "https://openrouter.ai/models", "https://openrouter.ai/models", "US",
     ),
 }  # fmt: skip
+
+# Some models write their reasoning into the answer between these tags; it is never shown or
+# parsed as the answer.
+_THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
+_VISION_NAME = re.compile(r"vision|-vl\b|vl-|\d(\.\d+)?v\b", re.I)
 
 _JSON_ONLY = (
     "\n\nReply with one JSON object only (no other text) that follows this JSON schema:\n"
@@ -426,13 +489,13 @@ def chat_models(ids: list[str]) -> list[str]:
 
 
 def reads_photos(provider: str, model: str) -> bool:
-    if provider == "deepseek":  # only DeepSeek's vision model takes images
-        return "vision" in model
-    return PROVIDERS[provider].vision
+    """Whether photos can be sent: the company's main models, or a vision model chosen by name
+    (for example deepseek-v4-flash-vision-exp, qwen-vl-max or glm-4.5v)."""
+    return PROVIDERS[provider].vision or bool(_VISION_NAME.search(model))
 
 
 class CompatibleProvider:
-    """OpenAI, Gemini, DeepSeek, Mistral, Grok and OpenRouter through their OpenAI-style API.
+    """Every company except Anthropic, through its OpenAI-style chat completions API.
 
     Same contract as AnthropicProvider: read_booking returns a dict that the server
     re-validates; run_turn returns Anthropic-shaped blocks so the agent loop is shared.
@@ -445,15 +508,16 @@ class CompatibleProvider:
         self.engine = f"ai:{provider}/{model}"
         self._key = api_key
         self._client = client or httpx.Client(timeout=120.0)
+        self.supports_agent = self.info.agent
 
-    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, body: dict[str, Any], max_tokens: int = 16000) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {self._key}"}
         if self.provider == "openrouter":
             headers["X-Title"] = "Locuvi"
         try:
             r = self._client.post(
                 f"{self.info.base_url}/chat/completions",
-                json={"model": self.model, self.info.tokens_field: 16000, **body},
+                json={"model": self.model, self.info.tokens_field: max_tokens, **body},
                 headers=headers,
             )
             r.raise_for_status()
@@ -510,31 +574,32 @@ class CompatibleProvider:
         practices: list[dict[str, str]],
         today: date,
     ) -> dict[str, Any]:
-        if self.info.strict_schema:
-            system = SYSTEM_PROMPT
-            fmt: dict[str, Any] = {
-                "type": "json_schema",
-                "json_schema": {"name": "booking", "schema": BOOKING_SCHEMA, "strict": True},
-            }
-        else:
-            system, fmt = SYSTEM_PROMPT + _JSON_ONLY, {"type": "json_object"}
-        data = self._post(
-            {
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user",
-                     "content": self._user_content(text, attachment, practices, today)},
-                ],
-                "response_format": fmt,
-            }
-        )  # fmt: skip
+        mode = self.info.json_mode
+        system = SYSTEM_PROMPT if mode == "strict" else SYSTEM_PROMPT + _JSON_ONLY
+        body: dict[str, Any] = {
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user",
+                 "content": self._user_content(text, attachment, practices, today)},
+            ],
+        }  # fmt: skip
+        if mode in ("strict", "schema"):
+            schema: dict[str, Any] = {"name": "booking", "schema": BOOKING_SCHEMA}
+            if mode == "strict":
+                schema["strict"] = True
+            body["response_format"] = {"type": "json_schema", "json_schema": schema}
+        elif mode == "object":
+            body["response_format"] = {"type": "json_object"}
+        data = self._post(body)
         choice = data["choices"][0]
         msg = choice.get("message") or {}
         if choice.get("finish_reason") == "content_filter" or msg.get("refusal"):
             raise DomainError("assistant.refused", "The AI declined to read this document.")
-        raw = (msg.get("content") or "").strip()
+        raw = _THINK.sub("", msg.get("content") or "").strip()
         if raw.startswith("```"):  # some models wrap JSON in a code fence
             raw = raw.strip("`").removeprefix("json").strip()
+        if not raw.startswith("{") and "{" in raw:  # a sentence before the JSON object
+            raw = raw[raw.index("{") : raw.rindex("}") + 1]
         try:
             out = json.loads(raw)
         except ValueError:
@@ -568,8 +633,9 @@ class CompatibleProvider:
         blocks: list[dict[str, Any]] = []
         if msg.get("reasoning_content"):
             blocks.append({"type": "reasoning", "text": str(msg["reasoning_content"])})
-        if msg.get("content"):
-            blocks.append({"type": "text", "text": str(msg["content"])})
+        answer = _THINK.sub("", str(msg.get("content") or "")).strip()
+        if answer:
+            blocks.append({"type": "text", "text": answer})
         for i, call in enumerate(msg.get("tool_calls") or []):
             fn = call.get("function") or {}
             try:
@@ -596,13 +662,26 @@ class CompatibleProvider:
             stop = "end_turn"
         return SimpleNamespace(stop_reason=stop, content=blocks, model=data.get("model"))
 
+    def _ping(self) -> None:
+        """A one-word request, for companies without a model list: proves the key works."""
+        self._post({"messages": [{"role": "user", "content": "Reply with OK."}]}, max_tokens=5)
+
     def list_models(self) -> list[str]:
+        """The models this key can use, or [] when the company has no list (key still checked)."""
+        if not self.info.can_list:
+            self._ping()
+            return []
         try:
             r = self._client.get(
                 f"{self.info.base_url}/models", headers={"Authorization": f"Bearer {self._key}"}
             )
             r.raise_for_status()
             items = r.json().get("data") or []
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (404, 405):  # no list here after all
+                self._ping()
+                return []
+            raise _http_error(exc) from None
         except httpx.HTTPError as exc:
             raise _http_error(exc) from None
         except (ValueError, AttributeError):
@@ -653,7 +732,9 @@ def config_public(cfg: AssistantConfig, settings: Settings) -> dict[str, Any]:
         "weekly_brief": cfg.weekly_brief,
         "providers": [
             {"id": pid, "label": info.label, "default_model": info.default_model,
-             "key_url": info.key_url, "reads_photos": info.vision}
+             "key_url": info.key_url, "models_url": info.models_url,
+             "pricing_url": info.pricing_url, "country": info.country,
+             "reads_photos": info.vision, "ask": info.agent}
             for pid, info in PROVIDERS.items()
         ],
     }  # fmt: skip

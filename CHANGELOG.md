@@ -4,6 +4,15 @@ What's new in each version of Locuvi, in plain English. Every change merged into
 published as a new image (`latest`, plus a `sha-…` tag), so this file groups them into
 releases.
 
+## Unreleased
+
+- More AI companies to choose from: Perplexity (Sonar), Cohere (Command), Alibaba (Qwen),
+  Moonshot AI (Kimi), Z.ai (GLM) and MiniMax, alongside OpenAI, Anthropic, Google, xAI,
+  Mistral, DeepSeek and OpenRouter. Settings › Assistant shows each company's flag and links
+  to its own model list and prices; the AI guide has the full table.
+- **Check key** also works for companies without a model list (one tiny test request).
+- Reasoning text that some models write into their answer is removed.
+
 ## 1.0.0 (October 2026): first public release
 
 **Everyday work**
