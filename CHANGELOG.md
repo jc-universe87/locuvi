@@ -6,9 +6,12 @@ releases.
 
 ## Unreleased
 
-- More AI companies to choose from: Perplexity (Sonar), Cohere (Command), Alibaba (Qwen),
-  Moonshot AI (Kimi), Z.ai (GLM) and MiniMax, alongside OpenAI, Anthropic, Google, xAI,
-  Mistral, DeepSeek and OpenRouter. Settings › Assistant shows each company's flag and links
+- More AI companies to choose from: Cohere (Command), Alibaba (Qwen), Moonshot AI (Kimi),
+  Z.ai (GLM) and MiniMax, alongside OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek and
+  OpenRouter.
+- **Your own AI server**: use a self-hosted model (Ollama, LM Studio, vLLM, llama.cpp,
+  LocalAI) or your organisation's OpenAI-compatible server, so booking text never leaves
+  your network. Settings › Assistant shows each company's flag and links
   to its own model list and prices; the AI guide has the full table.
 - **Check key** also works for companies without a model list (one tiny test request).
 - Reasoning text that some models write into their answer is removed.

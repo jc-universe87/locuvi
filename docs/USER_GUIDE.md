@@ -465,9 +465,10 @@ Fastmail and most others work, and you can add several accounts.
 
 Locuvi reads most simple booking emails by itself. If you'd like help with messy emails,
 scanned letters and photos, you can turn on an AI assistant from the company of your choice:
-OpenAI (GPT), Anthropic (Claude), Google (Gemini), xAI (Grok), Perplexity (Sonar), Mistral,
-Cohere (Command), DeepSeek, Alibaba (Qwen), Moonshot AI (Kimi), Z.ai (GLM), MiniMax or
-OpenRouter. It's **off** until you turn it on.
+OpenAI (GPT), Anthropic (Claude), Google (Gemini), xAI (Grok), Mistral, Cohere (Command),
+DeepSeek, Alibaba (Qwen), Moonshot AI (Kimi), Z.ai (GLM), MiniMax or OpenRouter, or **your own
+server** (for example Ollama), so booking text never leaves your network. It's **off** until
+you turn it on.
 
 With it on, the ✨ icon opens **Ask Locuvi**:
 

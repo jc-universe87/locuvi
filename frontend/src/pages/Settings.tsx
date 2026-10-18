@@ -609,6 +609,7 @@ function StorageSection() {
 
 /** A country code as its flag emoji (regional indicator letters). */
 function flag(code: string): string {
+  if (!code) return "🖥"; // your own server
   return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)));
 }
 
@@ -617,12 +618,13 @@ function AssistantSection() {
   const [cfg, setCfg] = useState<AssistantConfig | null>(null);
   const [key, setKey] = useState("");
   const [model, setModel] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [models, setModels] = useState<string[]>([]);
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    api.get<AssistantConfig>("/settings/assistant").then((c) => { setCfg(c); setModel(c.model); }, setError);
+    api.get<AssistantConfig>("/settings/assistant").then((c) => { setCfg(c); setModel(c.model); setBaseUrl(c.base_url); }, setError);
   }, []);
   if (!cfg) return <ErrorAlert error={error} />;
   const put = async (body: Record<string, unknown>) => {
@@ -632,6 +634,7 @@ function AssistantSection() {
       const next = await api.put<AssistantConfig>("/settings/assistant", body);
       setCfg(next);
       setModel(next.model);
+      setBaseUrl(next.base_url);
       return next;
     } catch (e) {
       setError(e);
@@ -639,8 +642,10 @@ function AssistantSection() {
     }
   };
   const save = async (enabled: boolean, clear = false) => {
-    const custom = model.trim() && model.trim() !== info?.default_model ? model.trim() : "";
-    if (await put({ enabled, api_key: key || null, clear_key: clear, model: custom })) {
+    const custom = own || (model.trim() && model.trim() !== info?.default_model) ? model.trim() : "";
+    const body: Record<string, unknown> = { enabled, api_key: key || null, clear_key: clear, model: custom };
+    if (own) body.base_url = baseUrl.trim();
+    if (await put(body)) {
       setKey("");
       setSaved(true);
     }
@@ -663,7 +668,9 @@ function AssistantSection() {
     }
   };
   const info = cfg.providers.find((p) => p.id === cfg.provider);
+  const own = cfg.provider === "custom";
   const hasKey = cfg.key_saved || cfg.key_from_server;
+  const canSave = own ? !!baseUrl.trim() && !!model.trim() : !!key || hasKey;
   const placeholder = cfg.provider === "anthropic" ? "sk-ant-…" : cfg.provider === "gemini" ? "AIza…" : "sk-…";
   return (
     <>
@@ -672,7 +679,7 @@ function AssistantSection() {
       {saved && <div className="alert ok" role="status">✓ {cfg.ready ? t("assistant.on") : t("common.saved")}</div>}
       <div className="form-list">
         <SwitchRow label={t("assistant.toggle")} hint={t("assistant.toggle_hint")} checked={cfg.enabled}
-          onChange={(v) => { if (!v || hasKey || key) void save(v); else setCfg({ ...cfg, enabled: true }); }} />
+          onChange={(v) => { if (!v || (!own && (hasKey || key)) || (own && cfg.ready)) void save(v); else setCfg({ ...cfg, enabled: true }); }} />
         {cfg.enabled && (
           <>
             <Row id="ai-provider" label={t("assistant.provider")} hint={t("assistant.provider_hint")}>
@@ -680,11 +687,17 @@ function AssistantSection() {
                 {cfg.providers.map((p) => <option key={p.id} value={p.id}>{flag(p.country)} {p.label}</option>)}
               </select>
             </Row>
-            <Row id="ai-key" label={t("assistant.key")} hint={cfg.key_from_server ? t("assistant.key_server") : t("assistant.key_hint")}>
+            {own && (
+              <Row id="ai-url" label={t("assistant.base_url")} hint={t("assistant.base_url_hint")}>
+                <input id="ai-url" type="url" autoComplete="off" spellCheck={false} placeholder="http://host.docker.internal:11434/v1"
+                  value={baseUrl} onChange={(e) => setBaseUrl(e.target.value.trim())} />
+              </Row>
+            )}
+            <Row id="ai-key" label={t("assistant.key")} hint={cfg.key_from_server ? t("assistant.key_server") : own ? t("assistant.key_optional") : t("assistant.key_hint")}>
               <input id="ai-key" type="password" autoComplete="off" spellCheck={false} disabled={cfg.key_from_server}
-                placeholder={cfg.key_saved ? "••••••••" : placeholder} value={key} onChange={(e) => setKey(e.target.value.trim())} />
+                placeholder={cfg.key_saved ? "••••••••" : own ? "" : placeholder} value={key} onChange={(e) => setKey(e.target.value.trim())} />
             </Row>
-            <Row id="ai-model" label={t("assistant.model_label")} hint={t("assistant.model_hint", { model: info?.default_model ?? "" })}>
+            <Row id="ai-model" label={t("assistant.model_label")} hint={own ? t("assistant.model_own_hint") : t("assistant.model_hint", { model: info?.default_model ?? "" })}>
               <input id="ai-model" type="text" list="ai-models" autoComplete="off" spellCheck={false} value={model}
                 onChange={(e) => setModel(e.target.value.trim())} />
               <datalist id="ai-models">{models.map((m) => <option key={m} value={m} />)}</datalist>
@@ -692,7 +705,8 @@ function AssistantSection() {
           </>
         )}
       </div>
-      {cfg.enabled && info && !cfg.key_from_server && (
+      {cfg.enabled && own && <p className="form-foot">{t("assistant.own_hint")}</p>}
+      {cfg.enabled && info && !own && !cfg.key_from_server && (
         <p className="form-foot">
           <a href={info.key_url} target="_blank" rel="noreferrer noopener">{t("assistant.get_key", { provider: info.label })}</a>
           {" · "}<a href={info.models_url} target="_blank" rel="noreferrer noopener">{t("assistant.models_link")}</a>
@@ -710,8 +724,8 @@ function AssistantSection() {
       )}
       {cfg.enabled && (
         <div className="actions" style={{ marginTop: "0.5rem" }}>
-          <button className="btn" disabled={!key && !hasKey} onClick={() => void save(true)}>{t("common.save")}</button>
-          {hasKey && <button className="btn ghost" onClick={() => void check()}>{t("assistant.check_key")}</button>}
+          <button className="btn" disabled={!canSave} onClick={() => void save(true)}>{t("common.save")}</button>
+          {(own ? !!cfg.base_url : hasKey) && <button className="btn ghost" onClick={() => void check()}>{t("assistant.check_key")}</button>}
           {cfg.key_saved && <button className="btn ghost" onClick={() => void save(false, true)}>{t("assistant.forget_key")}</button>}
         </div>
       )}

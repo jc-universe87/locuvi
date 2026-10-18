@@ -31,7 +31,7 @@ def chat(message, finish="stop", model=None):
     return {"model": model, "choices": [{"message": message, "finish_reason": finish}]}
 
 
-COMPATIBLE = [p for p in providers.PROVIDERS if p != "anthropic"]
+COMPATIBLE = [p for p in providers.PROVIDERS if p not in ("anthropic", providers.CUSTOM)]
 
 
 @pytest.mark.parametrize("pid", COMPATIBLE)
@@ -252,10 +252,13 @@ def test_model_list_offers_chat_models_and_photos_follow_the_model(session, sett
 
 def test_every_company_lists_its_models_and_prices():
     assert set(providers.PROVIDERS) >= {
-        "openai", "anthropic", "gemini", "xai", "perplexity", "mistral", "cohere",
+        "openai", "anthropic", "gemini", "xai", "mistral", "cohere",
         "deepseek", "alibaba", "moonshot", "zai", "minimax",
     }  # fmt: skip
-    for info in providers.PROVIDERS.values():
+    assert "perplexity" not in providers.PROVIDERS
+    for pid, info in providers.PROVIDERS.items():
+        if pid == providers.CUSTOM:
+            continue
         assert info.models_url.startswith("https://") and info.pricing_url.startswith("https://")
         assert info.key_url.startswith("https://") and len(info.country) == 2
         assert info.json_mode in ("strict", "schema", "object", "none")
@@ -314,14 +317,66 @@ def test_company_without_tool_calling_reads_bookings_but_not_questions(settings)
     app = create_app(settings)
     with TestClient(app) as c:
         h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
-        sonar = providers.CompatibleProvider("perplexity", KEY, "sonar", client=fake_http({}, []))
-        assert sonar.supports_agent is False
-        app.state.ai_provider_factory = lambda s: sonar
+        plain = providers.CompatibleProvider("mistral", KEY, "m", client=fake_http({}, []))
+        plain.supports_agent = False  # e.g. a company or model without tool calling
+        app.state.ai_provider_factory = lambda s: plain
         r = c.post("/api/v1/assistant/ask", json={"question": "hi"}, headers=h)
         assert r.status_code == 400 and r.json()["error"]["code"] == "assistant.no_agent"
-        pub = c.get("/api/v1/settings/assistant").json()
-        ask = {p["id"]: p["ask"] for p in pub["providers"]}
-        assert ask["perplexity"] is False and ask["openai"] is True
+
+
+def test_own_server_needs_an_address_and_model_but_no_key(session, settings):
+    box = SecretBox(settings)
+    providers.save_config(session, box, enabled=True, api_key=None, provider="custom")
+    cfg = providers.get_config(session)
+    assert providers.provider_for(session, settings, box) is None  # no address yet
+    assert providers.config_public(cfg, settings)["ready"] is False
+    with pytest.raises(DomainError) as e:
+        providers.check_key(session, settings, box)
+    assert e.value.code == "assistant.no_url"
+
+    providers.save_config(
+        session, box, enabled=True, api_key=None,
+        base_url="http://host.docker.internal:11434/v1/", model="llama3.1",
+    )  # fmt: skip
+    p = providers.provider_for(session, settings, box)
+    assert isinstance(p, providers.CompatibleProvider)
+    assert p.base_url == "http://host.docker.internal:11434/v1" and p.model == "llama3.1"
+    pub = providers.config_public(cfg, settings)
+    assert pub["ready"] and pub["base_url"] == "http://host.docker.internal:11434/v1"
+
+    # a short token is fine for an own server; switching company forgets address and key
+    providers.save_config(session, box, enabled=True, api_key="local")
+    assert providers.config_public(cfg, settings)["key_saved"]
+    providers.save_config(session, box, enabled=True, api_key=None, provider="openai")
+    assert cfg.base_url is None and cfg.api_key_ciphertext is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["ftp://x/v1", "http://user:pw@host/v1", "http://host/v1?x=1", "http://169.254.169.254/v1",
+     "http://metadata.google.internal/v1", "http://[fe80::1]/v1", "not a url", ""],
+)  # fmt: skip
+def test_own_server_address_is_checked(url):
+    with pytest.raises(DomainError):
+        providers.validate_ai_url(url)
+
+
+def test_own_server_addresses_on_the_home_network_are_allowed():
+    for url in ["http://localhost:11434/v1", "http://192.168.1.20:1234/v1",
+                "https://llm.example.invalid/v1", "http://100.101.102.103:8000/v1"]:  # fmt: skip
+        assert providers.validate_ai_url(url) == url
+
+
+def test_own_server_is_called_without_a_key_header_when_none_is_set():
+    calls: list[httpx.Request] = []
+    ok = chat({"role": "assistant", "content": '{"summary":"s","items":[],"questions":[]}'})
+    p = providers.CompatibleProvider(
+        "custom", "", "llama3.1", client=fake_http(ok, calls), base_url="http://localhost:11434/v1"
+    )
+    assert p.read_booking(text="x", attachment=None, practices=[], today=TODAY)["summary"] == "s"
+    (req,) = calls
+    assert str(req.url) == "http://localhost:11434/v1/chat/completions"
+    assert "authorization" not in req.headers and "response_format" not in json.loads(req.content)
 
 
 def test_photos_follow_vision_model_names():

@@ -278,7 +278,8 @@ Each item is useful on its own and gives the AI something reliable to work with.
   any AI failure falls back to the plain digest.
 - 💭 Calendar connector (bookings from a calendar feed).
 - ✅ Microsoft 365 / NHSmail sign-in for the email connector (read-only; see Email folders).
-- 💭 Optional local models for maximum privacy (the provider interface is ready).
+- ✅ Optional local models for maximum privacy: **Your own server** (any OpenAI-compatible
+  API, such as Ollama or LM Studio), 18 Oct 2026.
 - 💭 Controlled execution of workflows the owner has approved in advance.
 
 ### Privacy guardrails (binding for every AI item)
@@ -329,8 +330,11 @@ before enabling a cloud model.
 
 ## More AI companies (owner request, 18 Oct 2026) ✅
 
-- Added Perplexity (Sonar), Cohere (Command), Alibaba (Qwen), Moonshot AI (Kimi), Z.ai (GLM)
+- Added Cohere (Command), Alibaba (Qwen), Moonshot AI (Kimi), Z.ai (GLM)
   and MiniMax through the OpenAI-compatible adapter; each company carries its country, model
   list and price list links (shown in Settings › Assistant and docs/AI_SETUP.md), its JSON
   mode, and whether it supports tools (Ask Locuvi) and a model list (else Check key sends one
   tiny request). `<think>` reasoning in answers is stripped.
+  Perplexity was tried and left out (its chat endpoint is being retired). The same day:
+  **Your own server** (`custom`): owner-entered OpenAI-compatible address (migration 0025),
+  optional key, compose maps `host.docker.internal` for a model on the same computer.
