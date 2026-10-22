@@ -14,8 +14,8 @@ and where Locuvi takes the admin off your hands.**
 > April. Each rule below links to its official source; check it there before you rely on it,
 > and use an accountant who knows GP work. Checked in October 2026 and written for
 > **England**. Where Wales, Scotland or Northern Ireland differ, it says so, and where this
-> handbook doesn't cover them, it says that too. Dr Alex Example, Example Medical Practice
-> and every figure in the worked example are made up.
+> handbook doesn't cover them, it says that too. Example Medical Practice and every figure in
+> the worked example are made up.
 
 ## Contents
 
@@ -39,29 +39,28 @@ and where Locuvi takes the admin off your hands.**
 
 ## 1. The deal you're signing up for
 
-Dr Alex Example finished GP training in August 2026 and chose to locum rather than take a
-salaried post. That choice is a trade. Alex gains control over where, when and how much to
-work. In exchange, Alex takes on the jobs a salaried post does in the background: nobody
-deducts tax from the fees, nobody sends the pension contributions, nobody pays for sick days
-or holidays, and nobody chases a practice that pays late.
+Choosing to locum rather than take a salaried post is a trade. You gain control over where,
+when and how much you work. In exchange, you take on the jobs a salaried post does in the
+background: nobody deducts tax from your fees, nobody sends your pension contributions,
+nobody pays for sick days or holidays, and nobody chases a practice that pays late.
 
-Alex's first booking is four Tuesday mornings in September 2026 at Example Medical Practice,
-at £600 a session. This handbook follows that booking from the first email to the tax return
-it ends up on. Each section explains the rules first, then shows what they mean for Alex, then
-what Locuvi does with them.
+Say you finished GP training in August 2026, and your first booking is four Tuesday mornings
+in September 2026 at Example Medical Practice, at £600 a session. This handbook follows that
+booking from the first email to the tax return it ends up on. Each section explains the rules
+first, then shows what they mean for that booking, then what Locuvi does with them.
 
 ---
 
 ## 2. Before your first session
 
-Several of these take weeks, so Alex started on them in the last months of training.
+Several of these take weeks, so start on them in the last months of training.
 
 **GMC registration.** You need a licence to practise and a place on the GP Register. Keep the
 email address in GMC Online current; PCSE uses it to find you.
 
 **The Performers List.** This is what lets you do NHS GP work. In England it's the National
 Performers List, run through [PCSE Online](https://pcse.england.nhs.uk/services/performers-lists/gp-performers).
-As a registrar Alex was already on it, so the only step was changing status to
+If you were on it as a registrar, the only step is changing your status to
 "GP Performer". Wales, Scotland and Northern Ireland keep their own lists. An enhanced DBS
 check is usually part of the application.
 
@@ -78,11 +77,11 @@ your MDO.
 
 **HMRC.** Self-employed people register for Self Assessment by 5 October after the end of the
 tax year in which they started ([gov.uk](https://www.gov.uk/register-for-self-assessment)).
-Alex started in the 2026–27 tax year, so the deadline is 5 October 2027.
-[Section 10](#10-tax-and-money) follows the rest of Alex's tax year.
+Starting in September 2026 puts you in the 2026–27 tax year, so the deadline is
+5 October 2027. [Section 10](#10-tax-and-money) follows the rest of that tax year.
 
-**A separate bank account.** Not a legal requirement for a sole trader. Alex opened one
-anyway, so that every payment in it is locum income. That keeps the tax records clean and
+**A separate bank account.** Not a legal requirement for a sole trader. Open one anyway, so
+that every payment in it is locum income. That keeps the tax records clean and
 makes Locuvi's bank matching straightforward.
 
 **An accountant who knows GPs.** NHS pension and locum tax rules have quirks a general
@@ -93,34 +92,33 @@ represents GPs in an area) are the usual places to ask for names.
 account. Many practices need both before you can use their systems.
 
 **Colleagues.** A locum doesn't have a practice team. The BMA's sessional GP community,
-NASGP, the LMC and local locum groups are where Alex hears about work, rates and rule changes.
+NASGP, the LMC and local locum groups are where you hear about work, rates and rule changes.
 
 > [!TIP]
 > Keep one folder, paper or digital, with your GMC certificate, Performers List confirmation,
 > DBS, indemnity certificate, CV, references, hepatitis B immunity and training certificates.
-> New practices ask for copies before a first session; Example Medical Practice asked Alex for
-> five of them.
+> New practices ask for copies before a first session, often several at once.
 
 ---
 
 ## 3. Setting up Locuvi
 
-Locuvi asks three things on first opening: Alex's details, the bank account practices should
+Locuvi asks three things on first opening: your details, the bank account practices should
 pay into, and the first practice. That's enough for a correct invoice. The
 [user manual](USER_GUIDE.md#3-your-first-five-minutes) shows each step.
 
 Five further settings each remove a later job:
 
-- **Settings › NHS pension.** Alex's contribution rate (the "tier", which depends on
+- **Settings › NHS pension.** Your contribution rate (the "tier", which depends on
   pensionable pay), the NHS pension reference (SD number, the scheme membership number) and
   GMC number. Locuvi needs the tier to work out the monthly Form B total.
-- **Settings › Invoice settings.** **Days before an invoice is due.** Alex agreed 14 days with
-  Example Medical Practice.
+- **Settings › Invoice settings.** **Days before an invoice is due.** In the example, you
+  agreed 14 days with Example Medical Practice.
 - **Settings › Invoice appearance.** A logo, a colour and a footer line, for example "Payment
   within 14 days, please quote the invoice number".
-- **Settings › Email invoices.** Sends invoices from Alex's own address
+- **Settings › Email invoices.** Sends invoices from your own address
   ([how](EMAIL_SETUP.md#part-2-sending-invoices-from-your-email-address)).
-- **Settings › Phone or computer calendar.** Puts the bookings in Alex's phone calendar.
+- **Settings › Phone or computer calendar.** Puts your bookings in your phone calendar.
 
 Each practice also has an **Email address for invoices**. Fill it in even if you post
 invoices: Locuvi uses it to recognise that practice's booking emails.
@@ -139,19 +137,19 @@ invoices: Locuvi uses it to recognise that practice's booking emails.
 | **Locum groups, LMC lists, chambers** | Shared lists of available locums and sessions | Useful in a new area. Chambers may charge a fee |
 | **Agencies** | The agency books you and pays you | Work arranged and paid through an agency can't be pensioned as freelance locum work ([NHSBSA Form A guidance](https://www.nhsbsa.nhs.uk/sites/default/files/2026-03/NHS%20Pensions%20-%20GP%20Locum%20A%201%20April%202026%20to%2031%20March%202027%20-%2020260226-%20%28V1%29%20.pdf)) |
 
-Alex's first booking came direct, through a practice manager Alex had met in training.
+In the example, the first booking comes direct, from a practice manager you met in training.
 
 ### What a session actually is
 
 The number on the booking is half the agreement. A "session" differs between practices, so
-before accepting, Alex asked Example Medical Practice:
+before accepting, ask:
 
 - when it starts and finishes,
 - how many appointments, and how long each is,
 - whether home visits, telephone lists, prescriptions, results, letters or duty doctor cover
   are part of it,
-- what happens if it **overruns**. Alex charges for extra time in 30-minute blocks, agreed
-  in advance.
+- what happens if it **overruns**. One common approach is to charge for extra time in
+  30-minute blocks, agreed in advance.
 
 Locuvi handles fees **per session** or **per hour**, set per practice under
 **How is the fee agreed?**
@@ -165,7 +163,7 @@ practices pay is 14.38% of pensionable pay
 and pensionable pay is 90% of the basic fee. So "£600 a session" can mean two different
 amounts, and the difference is worth settling before the first session.
 
-For Alex, £600 is the basic fee and the contribution comes on top:
+In the example, £600 is the basic fee and the contribution comes on top:
 
 | | Per session |
 | --- | --- |
@@ -183,8 +181,8 @@ and the LMC know what's usual locally.
 
 ### Written terms, once per practice
 
-The BMA and NASGP publish model locum terms. Alex adapted one and sent it with the reply to
-the first booking. It covers:
+The BMA and NASGP publish model locum terms. Adapt one and send it with your reply to the
+first booking. The terms in the example cover:
 
 - the fee and what a session includes,
 - overrun charges,
@@ -213,11 +211,11 @@ enough, and it's the record if a rate or a date is ever disputed.
 | An email listing dates | **Add bookings from a message**: paste it, check the dates Locuvi finds |
 | Many booking emails | **Settings › Booking emails** reads a folder you choose ([how](EMAIL_SETUP.md)) |
 
-Example Medical Practice confirmed Alex's booking by email: Tuesday 8, 15, 22 and 29
-September, mornings, £600. Alex pasted it into **Add bookings from a message**, and Locuvi
+In the example, Example Medical Practice confirms the booking by email: Tuesday 8, 15, 22 and 29
+September, mornings, £600. Paste it into **Add bookings from a message**, and Locuvi
 found the four dates and the fee. Locuvi compares new work with the diary before adding it,
 and warns about a session entered twice, two bookings that overlap, a fee different from
-usual, or a cancellation in the email. Nothing is added until Alex accepts it.
+usual, or a cancellation in the email. Nothing is added until you accept it.
 
 > [!TIP]
 > An email folder (or Gmail label) called **Locum**, with a rule that files booking emails into
@@ -237,8 +235,8 @@ of work you'll need for appraisal ([section 11](#11-appraisal-revalidation-and-c
 
 ## 6. On the day
 
-A locum arrives without the background knowledge the regular team has. Alex's first morning
-at Example Medical Practice started 30 minutes early to cover it.
+A locum arrives without the background knowledge the regular team has. Arriving 30 minutes
+early on your first morning at a practice gives you time to cover it.
 
 **Before the first patient:**
 - Logins: the clinical system (often EMIS Web or SystmOne), the smartcard, printers,
@@ -252,8 +250,8 @@ at Example Medical Practice started 30 minutes early to cover it.
 
 **During and after:** keep to the agreed session. Agree any extra work and its fee at the
 time. Write notes for the clinician who picks them up next. Hand over anything outstanding in
-writing before you leave. On 15 September Alex's session ran 40 minutes over; Alex added the
-extra time in Locuvi that afternoon as **Hours**, at the agreed overrun rate.
+writing before you leave. In the example, the 15 September session runs 40 minutes over; add
+the extra time in Locuvi that afternoon as **Hours**, at the agreed overrun rate.
 
 > [!TIP]
 > Keep a private learning log for appraisal: cases, things you looked up, significant events.
@@ -266,9 +264,9 @@ extra time in Locuvi that afternoon as **Hours**, at the agreed overrun rate.
 
 The sooner an invoice goes out, the sooner it can be paid, and the pension deadlines run
 from the date of the work, not the date of the invoice ([section 9](#9-your-nhs-pension)).
-Alex invoices monthly, on the first working day after the month ends.
+In the example you invoice monthly, on the first working day after the month ends.
 
-On 1 October **Today** showed *"You can invoice for September"*. **Create invoice** filled in
+On 1 October **Today** shows *"You can invoice for September"*. **Create invoice** fills in
 the four sessions, the overrun and the employer contribution:
 
 | | Amount |
@@ -278,8 +276,8 @@ the four sessions, the overrun and the employer contribution:
 | Employer contribution (4 × £77.65) | £310.60 |
 | **Total for the sessions** | **£2,710.60**, plus the overrun |
 
-Alex checked it, tapped **Issue invoice and download**, and the invoice received its number
-and PDF. **Send** emailed it to the practice. Locuvi never sends without that tap.
+Check it, tap **Issue invoice and download**, and the invoice receives its number
+and PDF. **Send** emails it to the practice. Locuvi never sends without that tap.
 
 Four rules Locuvi applies, and the reason for each:
 
@@ -303,8 +301,8 @@ each date and session, and the employer contribution as its own line.
 
 ## 8. Getting paid
 
-Alex's invoice was due on 15 October. Locuvi showed it on **Today** as late from 16 October,
-with the number of days. The routine Alex follows:
+In the example, the invoice is due on 15 October. From 16 October Locuvi shows it on
+**Today** as late, with the number of days. A routine for chasing it:
 
 1. **On the due date:** check the practice received it.
 2. **One week late:** a short reminder quoting the invoice number, amount and due date.
@@ -313,11 +311,11 @@ with the number of days. The routine Alex follows:
    Act 1998, a business can claim statutory interest at 8% above the Bank of England base
    rate, plus fixed compensation of £40 for a debt under £1,000, £70 from £1,000 to £9,999.99,
    and £100 from £10,000 ([gov.uk](https://www.gov.uk/late-commercial-payments-interest-debt-recovery)).
-   For Alex's £2,710.60 the fixed sum would be £70.
+   For the example's £2,710.60 the fixed sum would be £70.
 
-Alex's reminder went on 22 October. The money arrived on 23 October, and Alex uploaded the
-bank statement in **Invoices › Check bank payments**. Locuvi matched the payment to the
-invoice by its number in the payment reference, and recorded it when Alex confirmed. Locuvi
+In the example, your reminder goes on 22 October and the money arrives on 23 October.
+Upload the bank statement in **Invoices › Check bank payments**. Locuvi matches the payment to the
+invoice by its number in the payment reference, and records it when you confirm. Locuvi
 stores only money coming in; spending in the statement is ignored. For a single payment,
 **Record as paid** on the invoice does the same.
 
@@ -340,7 +338,7 @@ Freelance locums can choose whether to add their NHS work to the NHS Pension Sch
 
 Which side is better depends on your age, other pension savings, tax position and plans.
 This handbook doesn't reach a verdict on that. An accountant or independent financial adviser
-who knows the NHS scheme can. Alex chose to pension the work after one such conversation.
+who knows the NHS scheme can. The example assumes you've decided to pension the work.
 
 ### What can be pensioned
 
@@ -356,21 +354,21 @@ and [PCSE](https://pcse.england.nhs.uk/help/gp-pensions/pension-contributions-lo
 
 Pensionable pay is 90% of the basic fee, no more and no less.
 
-### The two forms, with Alex's dates
+### The two forms, with the example's dates
 
 **Form A** ("Locum A") is one per practice per month: the work and the fee. You submit it on
 PCSE Online and the practice approves it there. Work can only be pensioned if the form
 reaches PCSE within **10 weeks** of the work ending; later forms can be rejected
-([PCSE](https://pcse.england.nhs.uk/services/gp-pensions/locum-gps)). Alex's last September
-session was on 29 September, so the deadline was 8 December 2026. Alex submitted Form A on
-1 October, with the invoice, and set it to **Sent** in Locuvi. The practice approved it on
-9 October, and Alex set it to **Signed by practice**.
+([PCSE](https://pcse.england.nhs.uk/services/gp-pensions/locum-gps)). The example's last
+September session is on 29 September, so the deadline is 8 December 2026. You submit Form A on
+1 October, with the invoice, and set it to **Sent** in Locuvi. The practice approves it on
+9 October, and you set it to **Signed by practice**.
 
 **Form B** ("Locum B") is one per month: the pensionable fees you were **paid** that month,
 whenever the work was done. It's due by the 7th of the following month, together with
-payment of your own and the practice's contributions, usually by card on PCSE Online. Alex
-was paid on 23 October, so the September work went on the **October** Form B, due with
-payment by **7 November 2026**.
+payment of your own and the practice's contributions, usually by card on PCSE Online. In the
+example you're paid on 23 October, so the September work goes on the **October** Form B, due
+with payment by **7 November 2026**.
 
 Locuvi works out the figures for both forms, tracks each Form A from **Not sent** to
 **Signed by practice**, and shows the 10-week and 7th-of-the-month deadlines on **Today**
@@ -390,16 +388,16 @@ lists where they go.
 
 ## 10. Tax and money
 
-### The tax year, and Alex's first one
+### The tax year, and your first one
 
 A self-employed locum is a sole trader: fees arrive with no tax deducted, and tax is paid
 through Self Assessment. The tax year runs from 6 April to 5 April
-([deadlines on gov.uk](https://www.gov.uk/self-assessment-tax-returns/deadlines)). For Alex,
-who started in September 2026:
+([deadlines on gov.uk](https://www.gov.uk/self-assessment-tax-returns/deadlines)). If you
+started in September 2026:
 
 | Date | What happens |
 | --- | --- |
-| 6 April 2026 – 5 April 2027 | Alex's first tax year as a locum (2026–27) |
+| 6 April 2026 – 5 April 2027 | Your first tax year as a locum (2026–27) |
 | 5 October 2027 | Deadline to register for Self Assessment |
 | 31 January 2028 | Online return for 2026–27 due; the 2026–27 tax due; first payment on account for 2027–28 due |
 | 31 July 2028 | Second payment on account for 2027–28 due |
@@ -407,7 +405,7 @@ who started in September 2026:
 **Payments on account** are advance payments towards the next year's tax, each normally half
 of the previous year's bill ([gov.uk](https://www.gov.uk/understanding-your-self-assessment-tax-bill/payments-on-account)).
 In the first year they arrive on top of the year's bill. With an illustrative first-year bill
-of £8,412.60, Alex would pay on 31 January 2028 the £8,412.60 plus a first payment on account
+of £8,412.60, you would pay on 31 January 2028 the £8,412.60 plus a first payment on account
 of £4,206.30, so £12,618.90, then a further £4,206.30 on 31 July 2028.
 
 > [!TIP]
@@ -421,7 +419,7 @@ of £4,206.30, so £12,618.90, then a further £4,206.30 on 31 July 2028.
 invoiced it, unless they chose otherwise. From 2024–25, counting it when it's received (the
 "cash basis") is the default ([gov.uk](https://www.gov.uk/simpler-income-tax-cash-basis)). In
 **Reports**, **Show income by › Date you were paid** matches the cash basis, and **Date you
-invoiced** matches the older method. Alex's accountant uses the cash basis, so the September
+invoiced** matches the older method. On the cash basis, the September
 invoice, paid on 23 October 2026, belongs to 2026–27 either way.
 
 **The employer contributions.** They pass through you to the pension scheme.
@@ -453,7 +451,7 @@ stages:
 | April 2027 | £30,000 in the 2025–26 tax year |
 | Later | A lower threshold has been proposed, but isn't settled as of October 2026 |
 
-Alex had no self-employment income before 2026–27, so neither of the first two stages
+If you had no self-employment income before 2026–27, neither of the first two stages
 applies. Whether a later stage will depends on a threshold that hasn't been set yet. Locuvi
 isn't MTD software. Its **Invoice list (CSV)** and **Download payments (CSV)** give you or your
 accountant the income figures to enter into MTD software.
@@ -472,7 +470,7 @@ you plan not to work, and get independent advice on income protection insurance.
 A yearly appraisal and GMC revalidation every five years apply to locums as to any GP. The
 difference is that you collect the evidence yourself, from every practice you work at.
 
-- **A record of your work**: practices, number of sessions, type of work. For Alex this comes
+- **A record of your work**: practices, number of sessions, type of work. This comes
   from Locuvi: **Settings › Phone or computer calendar › Spreadsheet (.csv)** lists every
   session, and **Reports › By practice** gives the totals.
 - **CPD and reflections**, written down at the time rather than reconstructed before
@@ -493,7 +491,7 @@ Working in a different building each week means fewer colleagues who notice how 
 doing. Three things help:
 
 - **Leave space.** Booking every available session leaves no time for admin, CPD or rest.
-  Alex keeps one weekday a fortnight free.
+  Keeping one weekday a fortnight free is one way to protect that time.
 - **Stay in touch** through locum groups, the LMC, BMA sessional GP events or a peer learning
   group.
 - **Use the support that exists.** [NHS Practitioner Health](https://www.practitionerhealth.nhs.uk/)
@@ -501,7 +499,7 @@ doing. Three things help:
   also run support lines.
 
 Admin done in short, regular sittings doesn't pile up before a deadline. The routine below
-takes Alex about ten minutes a week in Locuvi.
+is short enough to keep to each week.
 
 ---
 
