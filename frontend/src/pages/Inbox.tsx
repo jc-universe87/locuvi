@@ -44,6 +44,8 @@ export default function InboxPage() {
   const [docs, setDocs] = useState<Doc[] | null>(null);
   const [pending, setPending] = useState<Proposal[]>([]);
   const [open, setOpen] = useState<Doc | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const confirm = useConfirm();
   const [review, setReview] = useState<Proposal | null>(null);
   const [pasting, setPasting] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -95,6 +97,56 @@ export default function InboxPage() {
     const id = setTimeout(load, 120);
     return () => clearTimeout(id);
   }, [load]);
+  useEffect(() => setSelected(new Set()), [filter, q]);
+
+  /** Several at once; every change can be undone from the message that follows. */
+  const batch = async (ids: string[], action: "done" | "new" | "delete" | "restore", quiet = false) => {
+    try {
+      const r = await api.post<{ changed: string[] }>("/documents/batch", { ids, action });
+      setSelected(new Set());
+      await load();
+      if (quiet || r.changed.length === 0) return;
+      const undo = action === "delete" ? "restore" : action === "done" ? "new" : "done";
+      const text = action === "delete" ? tn("inbox.batch_deleted", r.changed.length)
+        : action === "done" ? tn("inbox.batch_done", r.changed.length) : tn("inbox.batch_new", r.changed.length);
+      toast({ text, undo: () => void batch(r.changed, undo, true) });
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const removeSelected = async () => {
+    const ids = [...selected];
+    const ok = await confirm({
+      title: tn("inbox.ask_delete_many", ids.length),
+      confirm: tn("inbox.delete_many", ids.length),
+      danger: ids.length > 1 ? t("inbox.danger_many", { n: ids.length }) : undefined,
+      body: ids.length > 1 ? t("inbox.restore_many_note") : undefined,
+      bin: ids.length === 1,
+    });
+    if (ok) await batch(ids, "delete");
+  };
+  /** After "I've dealt with this" (or moving it back): show the next one, or the list. */
+  const moved = async (doc: Doc, status: "new" | "done") => {
+    const list = docs ?? [];
+    const at = list.findIndex((x) => x.id === doc.id);
+    const next = list.slice(at + 1).find((x) => x.id !== doc.id) ?? list.slice(0, Math.max(at, 0)).reverse()[0];
+    try {
+      await api.patch<Doc>(`/documents/${doc.id}`, { status });
+      toast({
+        text: status === "done" ? t("inbox.dealt_one") : t("inbox.moved_back_one"),
+        undo: () => void api.patch(`/documents/${doc.id}`, { status: status === "done" ? "new" : "done" }).then(load, () => undefined),
+      });
+      await load();
+      setOpen(next ? await api.get<Doc>(`/documents/${next.id}`) : null);
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const toggle = (id: string) => setSelected((cur) => {
+    const n = new Set(cur);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
 
   const upload = async (files: FileList | File[]) => {
     setError(null);
@@ -173,24 +225,53 @@ export default function InboxPage() {
         </div>
       )}
       {docs && docs.length > 0 && (
-        <div className="card flush">
-          {docs.map((d) => (
-            <button key={d.id} className="list-row" onClick={() => api.get<Doc>(`/documents/${d.id}`).then(setOpen, setError)}>
-              <span className="task-icon"><Icon name={KIND_ICON[d.kind]} /></span>
-              <span className="list-main">
-                <span className="list-title">{d.title}</span>
-                <span className="list-sub">
-                  {t(`inbox.kind_${d.kind}` as MessageKey)} · {ukDate(d.created_at.slice(0, 10))}
-                  {practiceName(d.practice_id) ? ` · ${practiceName(d.practice_id)}` : ""}
-                </span>
-              </span>
-              <span className="chev"><Icon name="chevron" size={18} /></span>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="row wrap batch-bar" role="toolbar" aria-label={t("inbox.batch_label")}>
+            <label className="check" style={{ alignItems: "center" }}>
+              <input type="checkbox" checked={selected.size === docs.length}
+                ref={(el) => { if (el) el.indeterminate = selected.size > 0 && selected.size < docs.length; }}
+                onChange={(e) => setSelected(e.target.checked ? new Set(docs.map((d) => d.id)) : new Set())} />
+              <span>{selected.size ? tn("inbox.selected", selected.size) : t("inbox.select_all")}</span>
+            </label>
+            <span className="spacer" />
+            {selected.size > 0 ? (
+              <>
+                {filter === "new"
+                  ? <button className="btn secondary small" onClick={() => void batch([...selected], "done")}><Icon name="check" size={16} /> {t("inbox.mark_done_selected")}</button>
+                  : <button className="btn secondary small" onClick={() => void batch([...selected], "new")}>{t("inbox.mark_new_selected")}</button>}
+                <button className="btn danger small" onClick={() => void removeSelected()}><Icon name="trash" size={16} /> {t("inbox.delete_selected")}</button>
+                <button className="btn ghost small" onClick={() => setSelected(new Set())}>{t("common.cancel")}</button>
+              </>
+            ) : filter === "new" && (
+              <button className="btn secondary small" onClick={() => void batch(docs.map((d) => d.id), "done")}>
+                <Icon name="check" size={16} /> {q ? tn("inbox.done_all_shown", docs.length) : tn("inbox.done_all", docs.length)}
+              </button>
+            )}
+          </div>
+          <div className="card flush">
+            {docs.map((d) => (
+              <div key={d.id} className={`list-row selectable${selected.has(d.id) ? " is-selected" : ""}`}>
+                <input type="checkbox" checked={selected.has(d.id)} onChange={() => toggle(d.id)}
+                  aria-label={t("inbox.select_item", { title: d.title })} />
+                <button type="button" className="list-hit" onClick={() => api.get<Doc>(`/documents/${d.id}`).then(setOpen, setError)}>
+                  <span className="task-icon"><Icon name={KIND_ICON[d.kind]} /></span>
+                  <span className="list-main">
+                    <span className="list-title">{d.title}</span>
+                    <span className="list-sub">
+                      {t(`inbox.kind_${d.kind}` as MessageKey)} · {ukDate(d.created_at.slice(0, 10))}
+                      {practiceName(d.practice_id) ? ` · ${practiceName(d.practice_id)}` : ""}
+                    </span>
+                  </span>
+                  <span className="chev"><Icon name="chevron" size={18} /></span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <DocSheet doc={open} practices={practices} onClose={() => setOpen(null)} onChanged={load}
+        onMove={(doc, status) => void moved(doc, status)}
         onProposal={(p) => { setOpen(null); setReview(p); }} />
       <BookingSheet open={pasting} onClose={() => setPasting(false)} onChanged={load} />
       <Dialog open={review !== null} onClose={() => setReview(null)} title={t("booking.review_title")}>
@@ -206,12 +287,14 @@ function DocSheet({
   onClose,
   onChanged,
   onProposal,
+  onMove,
 }: {
   doc: Doc | null;
   practices: { id: string; name: string }[];
   onClose: () => void;
   onChanged: () => void;
   onProposal: (p: Proposal) => void;
+  onMove: (doc: Doc, status: "new" | "done") => void;
 }) {
   const { t } = useT();
   const toast = useToast();
@@ -328,7 +411,7 @@ function DocSheet({
         </div>
         <div className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>
           <span>{d.status === "done" ? t("inbox.is_done") : t("inbox.is_new")}</span>
-          <button className="btn secondary small" onClick={() => void patch({ status: d.status === "done" ? "new" : "done" })}>
+          <button className={`btn small${d.status === "done" ? " secondary" : ""}`} onClick={() => onMove(d, d.status === "done" ? "new" : "done")}>
             {d.status === "done" ? t("inbox.mark_new") : t("inbox.mark_done")}
           </button>
         </div>

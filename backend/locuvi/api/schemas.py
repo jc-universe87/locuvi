@@ -341,6 +341,12 @@ class PasteIn(Strict):
     kind: DocKind | None = None
 
 
+class DocumentBatchIn(Strict):
+    ids: Annotated[list[Annotated[str, StringConstraints(min_length=1, max_length=36)]],
+                   Field(min_length=1, max_length=500)]  # fmt: skip
+    action: Literal["done", "new", "delete", "restore"]
+
+
 class DocumentPatch(Strict):
     invoice_id: Annotated[str, StringConstraints(max_length=36)] | None = None
     kind: DocKind | None = None

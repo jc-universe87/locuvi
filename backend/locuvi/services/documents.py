@@ -284,6 +284,33 @@ def trash(s: Session, doc: Document) -> None:
     s.commit()
 
 
+def batch(s: Session, ids: list[str], action: str) -> list[str]:
+    """Mark several items dealt with / back to do, delete them (to Recently deleted) or put
+    them back, in one go. Returns the ids actually changed, so the owner can undo."""
+    wanted = list(dict.fromkeys(ids))
+    rows = s.scalars(select(Document).where(Document.id.in_(wanted)))
+    changed: list[str] = []
+    now = utcnow()
+    for doc in rows:
+        if action == "restore":
+            if doc.deleted_at is None:
+                continue
+            doc.deleted_at = None
+        elif doc.deleted_at is not None:
+            continue  # binned items only come back through restore
+        elif action == "delete":
+            doc.deleted_at = now
+        elif doc.status != action:  # "done" | "new"
+            doc.status = action
+        else:
+            continue
+        changed.append(doc.id)
+    if changed:
+        core.audit(s, f"document.batch_{action}", count=len(changed))
+    s.commit()
+    return changed
+
+
 def restore(s: Session, doc: Document) -> Document:
     doc.deleted_at = None
     s.commit()

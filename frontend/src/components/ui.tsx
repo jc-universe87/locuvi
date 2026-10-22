@@ -264,6 +264,8 @@ export interface ConfirmOptions {
   confirm: string;
   /** Mention that it can be restored from Recently deleted (default true). */
   bin?: boolean;
+  /** A second layer for bigger deletions: this box must be ticked before the button works. */
+  danger?: string;
 }
 type Ask = (o: ConfirmOptions) => Promise<boolean>;
 const ConfirmCtx = createContext<Ask>((o) => Promise.resolve(window.confirm(o.title)));
@@ -273,7 +275,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const { t } = useT();
   const [req, setReq] = useState<(ConfirmOptions & { resolve: (ok: boolean) => void }) | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const ask = useCallback<Ask>((o) => new Promise<boolean>((resolve) => setReq({ ...o, resolve })), []);
+  const [ack, setAck] = useState(false);
+  const ask = useCallback<Ask>((o) => new Promise<boolean>((resolve) => { setAck(false); setReq({ ...o, resolve }); }), []);
   const done = (ok: boolean) => {
     req?.resolve(ok);
     setReq(null);
@@ -288,10 +291,18 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         footer={req && (
           <>
             <button ref={cancelRef} type="button" className="btn secondary" onClick={() => done(false)}>{t("common.cancel")}</button>
-            <button type="button" className="btn destructive" onClick={() => done(true)}>{req.confirm}</button>
+            <button type="button" className="btn destructive" disabled={!!req.danger && !ack} onClick={() => done(true)}>{req.confirm}</button>
           </>
         )}>
         {req?.body && <p>{req.body}</p>}
+        {req?.danger && (
+          <div className="alert warn">
+            <label className="check">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+              <span>{req.danger}</span>
+            </label>
+          </div>
+        )}
         {req && req.bin !== false && <p className="hint">{t("trash.confirm_note")}</p>}
       </Dialog>
     </ConfirmCtx.Provider>
