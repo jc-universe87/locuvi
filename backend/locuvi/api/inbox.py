@@ -14,7 +14,7 @@ from locuvi.api.routes import DB, api, state
 from locuvi.assistant import providers
 from locuvi.errors import DomainError, NotFound
 from locuvi.models import Document, Proposal
-from locuvi.services import documents, proposals
+from locuvi.services import core, documents, proposals
 
 
 def _doc_out(d: Document, *, full: bool = False) -> dict[str, Any]:
@@ -475,6 +475,27 @@ def calendar_ics(token: str, request: Request) -> Response:
             "Content-Disposition": 'inline; filename="locum.ics"',
         },
     )
+
+
+@api.get("/calendar/export.{fmt}")
+def calendar_export(fmt: str, s: DB, fees: bool = False) -> Response:
+    """A one-off copy of every session, to import or keep. It doesn't update by itself."""
+    from locuvi.services import calendar
+
+    if fmt == "ics":
+        body, media = calendar.render(s, include_fees=fees, everything=True), "text/calendar"
+    elif fmt == "csv":
+        body, media = calendar.render_csv(s, include_fees=fees), "text/csv"
+    else:
+        raise NotFound("calendar.not_found", "Not found.")
+    core.audit(s, "calendar.exported", format=fmt, include_fees=fees)
+    s.commit()
+    return Response(
+        body.encode("utf-8-sig" if fmt == "csv" else "utf-8"),  # BOM: Excel reads £ correctly
+        media_type=f"{media}; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="locum-sessions.{fmt}"',
+                 "Cache-Control": "no-store"},
+    )  # fmt: skip
 
 
 @api.get("/settings/calendar")

@@ -620,15 +620,37 @@ named by invoice number, not practice name. Ask whoever set up Locuvi to help; s
 <details>
 <summary><b>Phone or computer calendar</b>: see your bookings in your usual calendar</summary>
 
-<img src="images/settings-calendar.png" alt="Calendar settings: share bookings, include fees, private link and Add to my calendar">
+<img src="images/settings-calendar.png" alt="Calendar settings: subscribe buttons for Apple, Google and Outlook, the private link, and downloads">
 
-Turn on **Share bookings with my calendar** and tap **Add to my calendar**. Your bookings
-then appear in your calendar app (iPhone, Android, Outlook, Google Calendar) and update by
-themselves. Fees are left out unless you turn on **Include fees in calendar events**.
+**Subscribe (updates by itself).** Turn on **Share bookings with my calendar**, then tap the
+button for your calendar:
+
+| Button | For | Notes |
+| --- | --- | --- |
+| **Apple Calendar or Outlook app** | iPhone, iPad, Mac, Outlook on a computer | Opens straight in the app |
+| **Google Calendar** | Google Calendar | Google fetches it from the internet (see below) |
+| **Outlook.com** | Outlook.com and Hotmail | Same as Google |
+| **Microsoft 365 (work)** | A work or NHS Microsoft 365 account | Same as Google |
+
+New, changed and cancelled bookings then appear in that calendar by themselves. Calendar apps
+usually check about once an hour. For any other calendar, tap **Copy link** and choose
+"Subscribe" or "Add from URL" in that calendar. Fees are left out unless you turn on
+**Include fees in calendar events**.
+
+> [!NOTE]
+> Your phone or computer must be able to reach Locuvi, on your home network or through
+> Tailscale (see [Setting up Locuvi](SETUP.md)). **Google Calendar** and **Outlook on the web**
+> are different: they fetch the calendar from their own servers on the internet, so they only
+> work if your Locuvi address can be reached from the internet. If it can't, use the calendar
+> app on your iPhone, Mac or computer instead. On Android, use an app such as ICSx⁵.
 
 Anyone with the link can see your bookings. If you share it by mistake, tap
-**Replace link**; the old one stops working. Your phone needs to be able to reach Locuvi (on
-your home network, or through Tailscale; see [Setting up Locuvi](SETUP.md)).
+**Replace link**; the old one stops working.
+
+**Download a copy (doesn't update).** Under **Download a copy**, tap **Calendar file (.ics)**
+to import every session into any calendar once, or **Spreadsheet (.csv)** for Excel, Numbers
+or Google Sheets. Turn on **Include fees in the download** if you want the fees in it. A
+download doesn't change when your bookings do: download again, or subscribe instead.
 </details>
 
 <details>

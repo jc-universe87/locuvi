@@ -352,11 +352,17 @@ def undo(s: Session, p: Proposal) -> Proposal:
     return p
 
 
+def not_binned() -> Any:
+    """Suggestions whose email or file is in Recently deleted are hidden with it."""
+    binned = select(Document.id).where(Document.deleted_at.is_not(None))
+    return Proposal.document_id.is_(None) | Proposal.document_id.not_in(binned)
+
+
 def pending(s: Session) -> list[Proposal]:
     return list(
         s.scalars(
             select(Proposal)
-            .where(Proposal.status == "pending")
+            .where(Proposal.status == "pending", not_binned())
             .order_by(Proposal.created_at.desc())
             .limit(50)
         )

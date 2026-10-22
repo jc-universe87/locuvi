@@ -355,8 +355,12 @@ def _archive(s: Session) -> list[Finding]:
 
 
 def _inbox(s: Session, today: date) -> list[Finding]:
+    from locuvi.services import proposals  # proposals imports this module
+
     out = []
-    waiting = s.scalar(select(func.count(Proposal.id)).where(Proposal.status == "pending"))
+    waiting = s.scalar(
+        select(func.count(Proposal.id)).where(Proposal.status == "pending", proposals.not_binned())
+    )
     if waiting:
         out.append(Finding(
             key="proposals_pending", kind="proposals_pending", severity="info",

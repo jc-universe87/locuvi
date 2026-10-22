@@ -9,7 +9,8 @@ Rules that keep this safe:
 - Folders are opened read-only (EXAMINE) and messages fetched with BODY.PEEK, so nothing is
   marked read, moved, flagged or deleted. No IMAP write command is ever sent.
 - Only emails that look like bookings or remittances are kept (as inbox documents); everything
-  else is skipped and not stored.
+  else is skipped and not stored. ``relevance`` scores each one; emails kept by an earlier,
+  looser check are moved to Recently deleted by ``tidy``.
 - Bookings are read into *proposals* checked against the Diary ("already booked", "rate
   differs", "clashes"…). Nothing becomes a diary entry until the owner accepts it.
 - TLS certificates are verified; the server address goes through the same private-address
@@ -46,10 +47,30 @@ MAX_MESSAGE_BYTES = 10 * 1024 * 1024
 MAX_PER_FOLDER = 200  # per scan; the rest is picked up next time
 _scan_lock = threading.Lock()
 
-_BOOKING_WORDS = re.compile(
-    r"\b(locum|sessions?|booking|booked|cover|rota|shift|surgery|clinic)\b", re.I
+# Relevance is scored, not keyword-matched: words like "session", "cover" or "paid" appear in
+# most emails, and every email carries a date in its headers. See ``relevance``.
+_LOCUM = re.compile(r"\blocums?\b", re.I)
+_BOOKING_TERMS = re.compile(
+    r"\b(book(ed|ing|ings)?|confirm(s|ed|ing|ation)?|cover(ing)?|shifts?|rota|availability)\b", re.I
 )
-_REMITTANCE_WORDS = re.compile(r"\b(remittance|payment advice|bacs|paid)\b", re.I)
+_SESSION_TERMS = re.compile(
+    r"\b(sessions?|am|pm|morning|afternoon|surgery|surgeries|clinics?|half[- ]day|full[- ]day)\b",
+    re.I,
+)
+_MONEY = re.compile(r"£\s?\d")
+_REMITTANCE_STRONG = re.compile(r"\b(remittance|payment advice)\b", re.I)
+_PAYMENT_TERMS = re.compile(r"\b(bacs|paid|payment|transferred)\b", re.I)
+_INVOICE_TERMS = re.compile(r"\binvoices?\b", re.I)
+_BULK_TEXT = re.compile(r"\b(unsubscribe|view (this email )?in (your )?browser|newsletter)\b", re.I)
+# Quoted replies ("> …", "On … wrote:") and the header blocks of replies and forwards
+# ("From: … / Sent: …"): their dates belong to older messages, not to the work.
+_QUOTE_LINE = re.compile(r"^\s*(>|on .{4,160} wrote:\s*$)", re.I)
+_HEADER_LINE = re.compile(r"^\s*\**(from|sent|date|to|cc|subject)\**:", re.I)
+# Shared addresses: the same domain is used by many unrelated senders.
+_SHARED_DOMAINS = {"nhs.net", "nhs.uk", "gmail.com", "googlemail.com", "outlook.com", "hotmail.com",
+                   "hotmail.co.uk", "live.co.uk", "icloud.com", "me.com", "yahoo.com",
+                   "yahoo.co.uk", "btinternet.com"}  # fmt: skip
+BOOKING_SCORE = 3
 
 
 # --------------------------------------------------------------------- accounts
@@ -355,14 +376,136 @@ def _logout(conn: Any) -> None:
 # ------------------------------------------------------------------------- scan
 
 
-def classify(text: str, today: date) -> str | None:
-    """'booking', 'remittance' or None (not kept). Bookings need a date and a booking word."""
-    head = text[:20000]
-    if _BOOKING_WORDS.search(head) and rules.find_dates(head, today):
-        return "booking"
-    if _REMITTANCE_WORDS.search(head):
-        return "remittance"
-    return None
+def known_senders(s: Session) -> tuple[set[str], set[str], list[str]]:
+    """(addresses, domains, practice names) from the owner's practices."""
+    from locuvi.models import Practice
+
+    addresses: set[str] = set()
+    domains: set[str] = set()
+    names: list[str] = []
+    for p in s.scalars(select(Practice)):
+        if p.name and len(p.name.strip()) >= 4:
+            names.append(p.name.strip().lower())
+        for addr in re.findall(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", p.billing_email or ""):
+            addr = addr.lower()
+            addresses.add(addr)
+            domain = addr.split("@", 1)[1]
+            if domain not in _SHARED_DOMAINS:
+                domains.add(domain)
+    return addresses, domains, names
+
+
+def _own_text(msg: EmailMessage, text: str) -> str:
+    """Subject, body and attachments, without the header block, quoted lines or the header
+    blocks of replies and forwards. A forwarded booking's own text is kept."""
+    body, sep, attachments = text.partition("\n\n--- Attachment: ")
+    head, _, rest = body.partition("\n\n")
+    if head.startswith("From:"):
+        body = rest
+    lines = body.splitlines()
+    header = [bool(_HEADER_LINE.match(x)) for x in lines]
+    kept = []
+    for i, line in enumerate(lines):
+        if _QUOTE_LINE.match(line):
+            continue
+        # a header line next to another header line is a reply/forward header block
+        if header[i] and ((i > 0 and header[i - 1]) or (i + 1 < len(lines) and header[i + 1])):
+            continue
+        kept.append(line)
+    return f"{msg.get('subject', '') or ''}\n" + "\n".join(kept) + sep + attachments
+
+
+def relevance(
+    msg: EmailMessage, text: str, today: date, known: tuple[set[str], set[str], list[str]]
+) -> tuple[str | None, int]:
+    """('booking' | 'remittance' | None, booking score). Only these two kinds are kept.
+
+    A booking needs a work date near today in the message's own words (not its headers or a
+    quoted reply) and enough signs that it is about locum work: the word "locum", a known
+    practice as sender or named, booking and session words, a fee. Newsletters, mailing
+    lists and automatic replies count against it (an agency's no-reply confirmation doesn't)."""
+    own = _own_text(msg, text)[:20000]
+    low = own.lower()
+    sender = str(msg.get("from", "") or "").lower()
+    addr = (re.findall(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", sender) or [""])[-1]
+    addresses, domains, names = known
+    from_practice = bool(addr) and (addr in addresses or addr.split("@")[-1] in domains)
+    names_practice = any(n in low for n in names)
+    bulk = bool(
+        msg.get("list-unsubscribe") or msg.get("list-id")
+        or str(msg.get("precedence", "")).lower() in {"bulk", "list", "junk"}
+        or str(msg.get("auto-submitted", "no")).lower() not in {"", "no"}
+        or _BULK_TEXT.search(own)
+    )  # fmt: skip
+
+    score = 0
+    score += 2 if _LOCUM.search(own) else 0
+    score += 2 if from_practice or names_practice else 0
+    score += 1 if _BOOKING_TERMS.search(own) else 0
+    score += 1 if _SESSION_TERMS.search(own) else 0
+    score += 1 if _MONEY.search(own) else 0
+    score -= 3 if bulk else 0
+    near = [d for _, d in rules.find_dates(own, today)
+            if today - timedelta(days=120) <= d <= today + timedelta(days=550)]  # fmt: skip
+    if near and score >= BOOKING_SCORE:
+        return "booking", score
+    if not bulk and (
+        _REMITTANCE_STRONG.search(own)
+        or (_MONEY.search(own) and _PAYMENT_TERMS.search(own)
+            and (from_practice or names_practice or _INVOICE_TERMS.search(own)))
+    ):  # fmt: skip
+        return "remittance", score
+    return None, score
+
+
+def classify(
+    msg: EmailMessage, text: str, today: date,
+    known: tuple[set[str], set[str], list[str]] = (set(), set(), []),
+) -> str | None:  # fmt: skip
+    """'booking', 'remittance' or None (not kept)."""
+    return relevance(msg, text, today, known)[0]
+
+
+def tidy(s: Session, settings: Settings, today: date | None = None) -> int:
+    """Move emails kept by earlier, looser scans that don't look like bookings or remittances
+    to Recently deleted (30 days, can be restored). Only untouched ones: nothing the owner
+    accepted, filed against a practice or invoice, or that matched the diary."""
+    from locuvi.models import Proposal
+
+    today = today or core.today_london()
+    known = known_senders(s)
+    handled = select(Proposal.document_id).where(
+        Proposal.document_id.is_not(None), Proposal.status != "pending"
+    )
+    docs = s.scalars(
+        select(Document).where(
+            Document.source == "email", Document.deleted_at.is_(None), Document.status == "new",
+            Document.practice_id.is_(None), Document.invoice_id.is_(None),
+            Document.id.not_in(handled),
+        )
+    )  # fmt: skip
+    moved = 0
+    for doc in list(docs):
+        path = documents.file_path(settings, doc)
+        if path is None:
+            continue
+        try:
+            msg: EmailMessage = email.message_from_bytes(  # type: ignore[assignment]
+                path.read_bytes(), policy=email.policy.default
+            )
+            kind = classify(msg, documents.email_text(msg), today, known)
+        except Exception:  # an unreadable file is left alone
+            log.info("kept email could not be re-checked", exc_info=True)
+            continue
+        if kind is None:
+            doc.deleted_at = utcnow()
+            moved += 1
+        elif kind != doc.kind:
+            doc.kind = kind
+    if moved:
+        core.audit(s, "mailbox.tidied", moved=moved)
+    s.commit()
+    return moved
 
 
 def _uidvalidity(conn: Any) -> int:
@@ -515,7 +658,7 @@ def _import_message(
         totals["already_seen"] += 1
         return
     text = documents.email_text(msg)
-    kind = classify(text, today)
+    kind = classify(msg, text, today, known_senders(s))
     if kind is None:
         totals["skipped"] += 1
         return
@@ -617,6 +760,7 @@ def scan(
                 errors.append({"account_id": acc.id, "label": label, "error": exc.code})
         if first is not None and len(errors) == len(accounts):
             raise first
+        totals["tidied"] = tidy(s, settings, today)
         core.audit(s, "mailbox.scanned", accounts=len(accounts), failed=len(errors), **totals)
         s.commit()
         return {**totals, "errors": errors}
