@@ -343,6 +343,10 @@ class PasteIn(Strict):
     kind: DocKind | None = None
 
 
+class DesktopIn(Strict):
+    phone_access: bool
+
+
 class DocumentBatchIn(Strict):
     ids: Annotated[list[Annotated[str, StringConstraints(min_length=1, max_length=36)]],
                    Field(min_length=1, max_length=500)]  # fmt: skip

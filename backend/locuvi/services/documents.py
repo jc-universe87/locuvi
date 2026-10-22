@@ -19,6 +19,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from locuvi import db
 from locuvi.config import Settings
 from locuvi.errors import DomainError, NotFound
 from locuvi.models import Document, Practice, utcnow
@@ -209,6 +210,7 @@ def add_upload(
         practice_id=guess_practice(s, text),
         invoice_id=guess_invoice(s, text),
     )
+    db.end_read(s)  # reading the file took a while; another write may have landed meanwhile
     s.add(doc)
     core.audit(s, "document.added", source="upload", content_type=ctype, size=len(data))
     s.commit()

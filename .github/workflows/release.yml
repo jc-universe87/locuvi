@@ -1,0 +1,255 @@
+# Builds the apps, tests each one on its own system, and publishes them as a GitHub release.
+#
+#   Windows  Locuvi-Windows-Setup.exe  (PyInstaller + Inno Setup; installed and tested)
+#   macOS    Locuvi-macOS.dmg          (Apple Silicon; tested from the mounted disk image)
+#   Android  Locuvi-Android.apk        (tested on an emulator against a running Locuvi)
+#
+# Pull requests that touch the apps build and test them; nothing is published. A release is
+# made when this workflow is run by hand (Actions › Release › Run workflow) or a v* tag is
+# pushed. README links use releases/latest/download/…, so they always fetch the newest.
+name: Release
+
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "mobile/**"
+      - ".github/workflows/release.yml"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # v1.2.3 for a tag, otherwise 1.1.<run number>
+  LOCUVI_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('1.1.{0}', github.run_number) }}
+  PLAYWRIGHT_VERSION: "1.56.1"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the web app
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Install Locuvi and PyInstaller
+        run: python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
+      - name: Build the desktop app
+        working-directory: desktop
+        run: pyinstaller --noconfirm locuvi.spec
+      - name: Install the test browser
+        run: npm i -g playwright@$PLAYWRIGHT_VERSION && npx -y playwright@$PLAYWRIGHT_VERSION install chromium
+      - name: Test the built app
+        run: desktop/ci-test.sh desktop/dist/Locuvi/Locuvi.exe "$RUNNER_TEMP/built"
+      - name: Make the installer
+        working-directory: desktop/windows
+        run: |
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -x "$ISCC" ]; then choco install innosetup -y --no-progress; fi
+          "$ISCC" "//DAppVersion=${LOCUVI_VERSION#v}" locuvi.iss
+          ls -la ../dist
+      - name: Install it as a user would, then test the installed app
+        run: |
+          ./desktop/dist/Locuvi-Windows-Setup.exe //VERYSILENT //SUPPRESSMSGBOXES //NORESTART //CURRENTUSER
+          APP="$LOCALAPPDATA/Programs/Locuvi/Locuvi.exe"
+          test -f "$APP"
+          desktop/ci-test.sh "$APP" "$RUNNER_TEMP/installed"
+      - name: Keep test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test
+          path: ${{ runner.temp }}/*/shots
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Locuvi-Windows-Setup
+          path: desktop/dist/Locuvi-Windows-Setup.exe
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-14 # Apple Silicon
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the web app
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Install Locuvi and PyInstaller
+        run: python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
+      - name: Build the desktop app
+        working-directory: desktop
+        run: pyinstaller --noconfirm locuvi.spec
+      - name: Make the disk image
+        run: |
+          mkdir -p "$RUNNER_TEMP/dmg"
+          cp -R desktop/dist/Locuvi.app "$RUNNER_TEMP/dmg/"
+          ln -s /Applications "$RUNNER_TEMP/dmg/Applications"
+          hdiutil create -volname Locuvi -srcfolder "$RUNNER_TEMP/dmg" -ov -format UDZO desktop/dist/Locuvi-macOS.dmg
+      - name: Install the test browser
+        run: npm i -g playwright@$PLAYWRIGHT_VERSION && npx -y playwright@$PLAYWRIGHT_VERSION install chromium
+      - name: Open the disk image as a user would, then test the app on it
+        run: |
+          hdiutil attach desktop/dist/Locuvi-macOS.dmg -mountpoint "$RUNNER_TEMP/mnt" -nobrowse
+          codesign --verify --deep "$RUNNER_TEMP/mnt/Locuvi.app" && echo "signature (ad hoc) is intact"
+          desktop/ci-test.sh "$RUNNER_TEMP/mnt/Locuvi.app/Contents/MacOS/Locuvi" "$RUNNER_TEMP/installed"
+          hdiutil detach "$RUNNER_TEMP/mnt"
+      - name: Keep test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-test
+          path: ${{ runner.temp }}/installed/shots
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Locuvi-macOS
+          path: desktop/dist/Locuvi-macOS.dmg
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: Build the APK
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          LOCUVI_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          LOCUVI_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          LOCUVI_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          LOCUVI_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          # Optional: with the ANDROID_KEYSTORE_* secrets every release has the same signature,
+          # so a new APK installs over the old one. Without them each build gets its own key.
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export LOCUVI_KEYSTORE="$RUNNER_TEMP/release.jks"
+          fi
+          export LOCUVI_VERSION_NAME="${LOCUVI_VERSION#v}"
+          gradle -p mobile/android --no-daemon assembleRelease
+          mkdir -p dist
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk dist/Locuvi-Android.apk
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --print-certs dist/Locuvi-Android.apk
+      # The emulator talks to a Locuvi running on this machine, as a phone would to yours.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Start a Locuvi for the phone to use
+        run: |
+          (cd frontend && npm ci && npm run build)
+          (cd backend && uv sync --locked)
+          S="$RUNNER_TEMP/srv"; mkdir -p "$S"; printf "e2e-pass" > "$S/pw"
+          cd backend
+          APP_ENV=production DATA_DIR="$S/data" KEY_DIR="$S/keys" LOCUVI_PASSWORD_FILE="$S/pw" \
+            COOKIE_SECURE=false STATIC_DIR=../frontend/dist ARCHIVE_WORKER_ENABLED=false \
+            nohup uv run uvicorn locuvi.main:create_app --factory --host 127.0.0.1 --port 8000 \
+            > "$S/access.log" 2>&1 &
+          for _ in $(seq 60); do curl -fs http://127.0.0.1:8000/api/v1/health/ready && break; sleep 1; done
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test the APK on an Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash mobile/android/emulator-test.sh dist/Locuvi-Android.apk "$RUNNER_TEMP/srv/access.log" "$RUNNER_TEMP/android-test"
+      - name: Keep test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test
+          path: |
+            ${{ runner.temp }}/android-test
+            ${{ runner.temp }}/srv/access.log
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Locuvi-Android
+          path: dist/Locuvi-Android.apk
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: [windows, macos, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Locuvi-*
+          merge-multiple: true
+          path: dist
+      - run: ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(env.LOCUVI_VERSION, 'v') && env.LOCUVI_VERSION || format('v{0}', env.LOCUVI_VERSION) }}
+          target_commitish: ${{ github.sha }}
+          name: Locuvi ${{ env.LOCUVI_VERSION }}
+          make_latest: "true"
+          fail_on_unmatched_files: true
+          files: |
+            dist/Locuvi-Windows-Setup.exe
+            dist/Locuvi-macOS.dmg
+            dist/Locuvi-Android.apk
+          body: |
+            Locuvi for your computer, phone and tablet. Each file was built and tested by the
+            release workflow on its own system before it was published here.
+
+            | Device | Download |
+            |---|---|
+            | Windows 10 and 11 | **Locuvi-Windows-Setup.exe** |
+            | Mac (Apple Silicon: M1 or newer) | **Locuvi-macOS.dmg** |
+            | Android 10 or newer (phones and tablets) | **Locuvi-Android.apk** |
+            | iPhone and iPad | No download: add Locuvi to your Home Screen from Safari |
+
+            How to install each one, and what to do about the first-run warnings:
+            [docs/APPS.md](https://github.com/jc-universe87/locuvi/blob/main/docs/APPS.md)

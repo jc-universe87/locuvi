@@ -117,6 +117,28 @@ def immediate_session() -> Iterator[Session]:
             session.close()
 
 
+def end_read(s: Session) -> None:
+    """End a transaction that has only read, so the next write starts a fresh one.
+
+    In WAL mode SQLite can't turn a read into a write once another connection has written
+    since the read began: it fails at once with "database is locked" instead of waiting.
+    Call this between slow work (saving a file, reading a PDF) and the writes that follow.
+    """
+    if not (s.new or s.dirty or s.deleted or s.info.get("wrote")):
+        s.rollback()
+
+
+@event.listens_for(Session, "after_flush")
+def _wrote(s: Session, _ctx) -> None:  # type: ignore[no-untyped-def]
+    s.info["wrote"] = True  # this transaction has written, so end_read must keep it
+
+
+@event.listens_for(Session, "after_commit")
+@event.listens_for(Session, "after_rollback")
+def _ended(s: Session) -> None:
+    s.info.pop("wrote", None)
+
+
 def get_session() -> Iterator[Session]:
     """FastAPI dependency."""
     session = new_session()

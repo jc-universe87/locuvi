@@ -565,6 +565,8 @@ const es: Catalogue = {
   "repeat.usual_rate": "Se usará la tarifa habitual de la consulta.",
   "settings.s_calendar": "Calendario del móvil",
   "settings.s_calendar_sub": "Ver sustituciones reservadas en tu calendario",
+  "settings.s_apps": "Móvil, tableta y ordenador",
+  "settings.s_apps_sub": "Las apps de Locuvi y la conexión desde el móvil",
   "calendar.intro": "Suscríbete una vez y tus sustituciones aparecerán y se actualizarán en el calendario.",
   "calendar.feed_name": "Sesiones de locum",
   "calendar.live_title": "Ver las reservas en otro calendario (se actualiza solo)",

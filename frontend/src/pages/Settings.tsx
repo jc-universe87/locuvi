@@ -5,16 +5,18 @@ import { TrashSection } from "../components/Trash";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob, openPendingTab, setCsrf } from "../lib/api";
+import { APPS_GUIDE, DOWNLOADS } from "../lib/apps";
+import { nativeApp } from "../lib/native";
 import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
 import type { AssistantConfig, Branding, HouseholdProfile, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "mailbox", "assistant", "agents", "trash", "password", "profiles"] as const;
+const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "apps", "mailbox", "assistant", "agents", "trash", "password", "profiles"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
+  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", apps: "today", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
 };
 
 export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?: () => void; profile?: HouseholdProfile | null }) {
@@ -38,6 +40,7 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
         {section === "email" && <EmailSection />}
         {section === "storage" && <StorageSection />}
         {section === "calendar" && <CalendarSection />}
+        {section === "apps" && <AppsSection />}
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
         {section === "agents" && <AgentsSection />}
@@ -1382,6 +1385,92 @@ function CalendarSection() {
         <button className="btn secondary" onClick={() => void download("ics")}><Icon name="download" size={18} /> {t("calendar.export_ics")}</button>
         <button className="btn secondary" onClick={() => void download("csv")}><Icon name="download" size={18} /> {t("calendar.export_csv")}</button>
       </div>
+    </>
+  );
+}
+
+interface DesktopState { available: boolean; phone_access?: boolean; listening?: boolean; restart_needed?: boolean; own_password?: boolean; addresses?: string[] }
+
+function AppsSection() {
+  const { t } = useT();
+  const [desk, setDesk] = useState<DesktopState | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const native = nativeApp();
+  useEffect(() => {
+    api.get<DesktopState>("/desktop").then(setDesk, () => setDesk({ available: false }));
+  }, []);
+  const phones = async (on: boolean) => {
+    try {
+      setError(null);
+      setDesk(await api.put<DesktopState>("/desktop", { phone_access: on }));
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <>
+      <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("apps.intro")}</p>
+      <ErrorAlert error={error} />
+      {native && (
+        <>
+          <h3>{t("apps.this_app")}</h3>
+          <div className="form-list">
+            <div className="form-row stacked"><span>{t("apps.connected_to")}</span><code style={{ wordBreak: "break-all" }}>{native.serverUrl()}</code></div>
+          </div>
+          <div className="actions" style={{ marginTop: "0.5rem" }}>
+            <button className="btn secondary" onClick={() => native.changeServer()}>{t("apps.change_server")}</button>
+          </div>
+        </>
+      )}
+      {desk?.available && (
+        <>
+          <h3>{t("apps.computer_title")}</h3>
+          <div className="form-list">
+            <SwitchRow label={t("apps.phone_access")} hint={t("apps.phone_access_hint")} checked={!!desk.phone_access}
+              onChange={(v) => void phones(v)} />
+          </div>
+          {!desk.own_password && (
+            <p className="form-foot">{t("apps.password_first")} <Link to="/settings/password">{t("settings.s_password")}</Link></p>
+          )}
+          {desk.restart_needed && <div className="alert info" style={{ marginTop: "0.5rem" }}>{t("apps.restart")}</div>}
+          {desk.listening && desk.addresses && desk.addresses.length > 0 && (
+            <>
+              <p className="hint">{t("apps.addresses")}</p>
+              <div className="form-list">
+                {desk.addresses.map((a) => <div key={a} className="form-row stacked"><code>{a}</code></div>)}
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {!desk?.available && !native && (
+        <>
+          <h3>{t("apps.address_title")}</h3>
+          <div className="form-list">
+            <div className="form-row stacked"><code style={{ wordBreak: "break-all" }}>{window.location.origin}</code></div>
+          </div>
+          <p className="form-foot">{t("apps.address_hint")}</p>
+        </>
+      )}
+      <h3>{t("apps.get_title")}</h3>
+      <div className="form-list">
+        <a className="list-row" href={DOWNLOADS.android} target="_blank" rel="noreferrer noopener">
+          <span className="list-main"><span className="list-title">{t("apps.android")}</span><span className="list-sub">{t("apps.android_sub")}</span></span>
+          <span className="chev"><Icon name="download" size={18} /></span>
+        </a>
+        <div className="list-row">
+          <span className="list-main"><span className="list-title">{t("apps.iphone")}</span><span className="list-sub">{t("apps.iphone_sub")}</span></span>
+        </div>
+        <a className="list-row" href={DOWNLOADS.windows} target="_blank" rel="noreferrer noopener">
+          <span className="list-main"><span className="list-title">{t("apps.windows")}</span><span className="list-sub">{t("apps.windows_sub")}</span></span>
+          <span className="chev"><Icon name="download" size={18} /></span>
+        </a>
+        <a className="list-row" href={DOWNLOADS.mac} target="_blank" rel="noreferrer noopener">
+          <span className="list-main"><span className="list-title">{t("apps.mac")}</span><span className="list-sub">{t("apps.mac_sub")}</span></span>
+          <span className="chev"><Icon name="download" size={18} /></span>
+        </a>
+      </div>
+      <p className="form-foot"><a href={APPS_GUIDE} target="_blank" rel="noreferrer noopener">{t("apps.guide")}</a></p>
     </>
   );
 }

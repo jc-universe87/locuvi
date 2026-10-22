@@ -88,6 +88,11 @@ class Settings:
     ai_api_key_override: str | None = field(default=None, repr=False)
     ai_model: str = "claude-opus-5-5"
     log_level: str = "INFO"
+    # The Windows/macOS app (desktop/locuvi_desktop.py) sets these: a one-launch sign-in token
+    # for its own window, and the file holding "let phones and tablets connect".
+    desktop: bool = False
+    desktop_token: str | None = field(default=None, repr=False)
+    desktop_config: Path | None = None
 
     @property
     def debug(self) -> bool:
@@ -136,6 +141,11 @@ class Settings:
             or "Locuvi/Backups",
             ai_api_key_override=_read_secret_file(e.get("ANTHROPIC_API_KEY_FILE")),
             ai_model=e.get("LOCUVI_AI_MODEL", "claude-opus-5-5").strip() or "claude-opus-5-5",
+            desktop=_bool(e.get("LOCUVI_DESKTOP")),
+            desktop_token=e.get("LOCUVI_DESKTOP_TOKEN") or None,
+            desktop_config=Path(e["LOCUVI_DESKTOP_CONFIG"])
+            if e.get("LOCUVI_DESKTOP_CONFIG")
+            else None,
         )
 
     def validate(self) -> None:

@@ -565,6 +565,8 @@ const de: Catalogue = {
   "repeat.usual_rate": "Das übliche Honorar der Praxis wird verwendet.",
   "settings.s_calendar": "Smartphone-Kalender",
   "settings.s_calendar_sub": "Gebuchte Einsätze in Ihrem Kalender anzeigen",
+  "settings.s_apps": "Smartphone, Tablet und Computer",
+  "settings.s_apps_sub": "Die Locuvi-Apps und Zugriff vom Smartphone",
   "calendar.intro": "Einmal abonnieren: Gebuchte Einsätze erscheinen automatisch im Kalender auf Smartphone oder Computer.",
   "calendar.feed_name": "Locum-Einsätze",
   "calendar.live_title": "Einsätze in einem anderen Kalender anzeigen (aktualisiert sich selbst)",
