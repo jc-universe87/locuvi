@@ -338,3 +338,19 @@ before enabling a cloud model.
   Perplexity was tried and left out (its chat endpoint is being retired). The same day:
   **Your own server** (`custom`): owner-entered OpenAI-compatible address (migration 0025),
   optional key, compose maps `host.docker.internal` for a model on the same computer.
+
+## Email, pension guide, calendar and Inbox (owner requests, 22 Oct 2026) ✅
+
+- Sending email checked end to end against real TLS mail servers (STARTTLS 587 and SSL 465,
+  with login) in `tests/test_mail_real_smtp.py`; messages now carry a Date header, and an
+  unknown server name has its own plain message.
+- Pension page: **How to send your pension forms**, a step-by-step guide to Forms A and B on
+  PCSE Online with official links (`components/PensionGuide.tsx`).
+- Booking emails: relevance is scored (`mailbox.relevance`), ignoring header dates and quoted
+  replies and counting newsletters and auto-replies against; earlier junk is tidied to
+  Recently deleted on the next scan.
+- Calendar: subscribe buttons for Apple, Google, Outlook.com and Microsoft 365; one-off
+  `.ics` and `.csv` downloads of every session.
+- Inbox: next item after **I've dealt with this**, tick boxes and batch actions
+  (`POST /documents/batch`), a second tick for deleting several, **I've dealt with all**.
+- Documentation: [the first-time GP locum's handbook](LOCUM_HANDBOOK.md).

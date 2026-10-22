@@ -165,9 +165,22 @@ in your Microsoft account, sign in again in Locuvi.
 <summary><b>Reading: booking emails aren't being found</b></summary>
 
 - Check you ticked the right folders, and **Check emails from the last …** covers the dates.
-- Tap **Check for bookings now** to try straight away.
+- Tap **Check for bookings now** to try straight away. The message afterwards says how many
+  emails were **not about locum work (not kept)**.
+- Locuvi keeps an email when it's clearly about locum work: it says "locum" or comes from one
+  of your practices, and gives a work date in the message itself
+  ([details](EMAIL_SETUP.md#which-emails-locuvi-keeps)). Add each practice's **Email address
+  for invoices** in **Settings › Practices** so their emails are recognised.
 - Very unusual booking emails may need the [AI assistant](AI_SETUP.md), or paste them in by
-  hand.
+  hand with **Add bookings from a message**.
+</details>
+
+<details>
+<summary><b>Reading: emails disappeared from my Inbox after updating</b></summary>
+
+Earlier versions kept too many emails. The first check after updating moves emails that
+aren't about locum work to **Settings › Recently deleted**. Emails you'd already dealt with
+stay put. Anything there can be restored for 30 days: tap **Restore**.
 </details>
 
 ## Phone calendar
@@ -178,6 +191,16 @@ in your Microsoft account, sign in again in Locuvi.
 - Your phone must be able to reach Locuvi: on your home Wi-Fi, or with Tailscale switched on.
 - Calendar apps check for changes on their own schedule, sometimes only every few hours.
 - If you tapped **Replace link**, add the new link to your calendar again.
+</details>
+
+<details>
+<summary><b>Google Calendar or Outlook on the web never shows my bookings</b></summary>
+
+Google Calendar and Outlook on the web fetch the calendar from their own servers on the
+internet, so they can only see Locuvi if it can be reached from the internet. If Locuvi is
+only on your home network or Tailscale, use the calendar app on your iPhone, Mac or computer
+instead (on Android, an app such as ICSx⁵). Or use **Download a copy › Calendar file (.ics)**
+and import it, which doesn't update by itself.
 </details>
 
 ## Nextcloud

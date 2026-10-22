@@ -14,7 +14,7 @@ and tax-year reports in one place, running on your own computer.
 ![Self-hosted](https://img.shields.io/badge/self--hosted-your%20data%20stays%20yours-294d63)
 ![Made for](https://img.shields.io/badge/made%20for-UK%20GP%20locums-294d63)
 
-[**User manual**](docs/USER_GUIDE.md) · [**Install**](docs/SETUP.md) ·
+[**User manual**](docs/USER_GUIDE.md) · [**New to locum work?**](docs/LOCUM_HANDBOOK.md) · [**Install**](docs/SETUP.md) ·
 [Email](docs/EMAIL_SETUP.md) · [AI assistant](docs/AI_SETUP.md) · [Privacy](docs/PRIVACY.md) ·
 [Help](docs/TROUBLESHOOTING.md)
 
@@ -76,9 +76,12 @@ downloads for your accountant.
 
 **Also included:**
 - 💷 Matching bank statements to invoices
-- 📨 Reading booking emails (Gmail, Outlook, Microsoft 365, iCloud…)
-- ✨ An optional AI assistant from the company you choose
-- 📱 Your bookings in your phone's calendar
+- 📨 Reading booking emails (Gmail, Outlook, Microsoft 365, iCloud…), keeping only the ones
+  about locum work
+- 📥 An Inbox you can clear in one tap, with tick boxes for several items at once
+- 🧭 A step-by-step guide to sending NHS pension Forms A and B on PCSE Online
+- ✨ An optional AI assistant from the company you choose, or your own AI server
+- 📱 Your bookings in Apple, Google or Outlook calendars, plus downloads (.ics, .csv)
 - 👨‍👩‍👧 Household profiles, each one private
 - ♻️ A 30-day "Recently deleted"
 - ☁️ Copies of your invoices in Nextcloud

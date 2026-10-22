@@ -11,6 +11,11 @@ No technical knowledge needed.
 
 </div>
 
+> [!TIP]
+> **New to locum work?** Start with [the first-time GP locum's handbook](LOCUM_HANDBOOK.md):
+> what to sort out before your first session, agreeing terms, getting paid, the NHS pension,
+> tax and appraisal, with tips along the way.
+
 > [!NOTE]
 > All names, practices, bank details and figures in this manual are made up.
 > "Dr Alex Example" and "Example Medical Practice" don't exist.

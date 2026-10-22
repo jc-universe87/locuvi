@@ -7,6 +7,7 @@ Start with what you want to do.
 | | |
 | --- | --- |
 | 📘 **[User manual](USER_GUIDE.md)** | Everything in the app, step by step, with pictures |
+| 🩺 **[The first-time GP locum's handbook](LOCUM_HANDBOOK.md)** | New to locum work? The checklist before you start, agreeing terms, invoicing, getting paid, NHS pension, tax and appraisal, and how Locuvi helps with each |
 | 🚀 [Your first five minutes](USER_GUIDE.md#3-your-first-five-minutes) | The three set-up questions |
 | 🗓 [A normal month](USER_GUIDE.md#4-a-normal-month-step-by-step) | Diary → invoice → paid → pension |
 | 📨 **[Connecting your email](EMAIL_SETUP.md)** | Reading booking emails, and sending invoices from your address |
