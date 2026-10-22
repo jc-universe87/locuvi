@@ -1,0 +1,47 @@
+plugins {
+    id "com.android.application"
+}
+
+// Release signing comes from the environment (the release workflow). Without it the APK is
+// signed with a key made for that build, which installs fine but can't update an earlier one.
+def ks = System.getenv("LOCUVI_KEYSTORE")
+
+android {
+    namespace "uk.locuvi.app"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "uk.locuvi.app"
+        minSdk 29          // Android 10 and newer
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv("LOCUVI_VERSION_CODE") ?: "1")
+        versionName System.getenv("LOCUVI_VERSION_NAME") ?: "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("LOCUVI_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("LOCUVI_KEY_ALIAS") ?: "locuvi"
+                keyPassword System.getenv("LOCUVI_KEY_PASSWORD") ?: System.getenv("LOCUVI_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ks ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+    }
+}

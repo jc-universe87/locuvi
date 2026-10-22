@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="steel">#294D63</color>
+    <color name="bg">#F2F5F6</color>
+    <color name="ink">#1B2B36</color>
+    <color name="muted">#5B6B76</color>
+    <color name="err">#9B2335</color>
+</resources>

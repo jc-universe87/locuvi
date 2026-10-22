@@ -13,11 +13,12 @@ from types import SimpleNamespace
 import pytest
 from conftest import make_practice
 
+from locuvi import db
 from locuvi.assistant import providers, rules
 from locuvi.errors import Conflict, DomainError
 from locuvi.models import AuditEvent, Document, Proposal, SessionStatus, WorkSession
 from locuvi.secrets_store import SecretBox
-from locuvi.services import checks, diary, documents, proposals
+from locuvi.services import checks, core, diary, documents, proposals
 
 TODAY = date(2026, 10, 8)
 
@@ -75,6 +76,29 @@ def test_rules_no_dates_asks_question():
 
 
 # -------------------------------------------------------------- documents
+
+
+def test_upload_survives_a_write_while_the_file_is_read(settings, session, ready, monkeypatch):
+    """Reading a file takes time; another write landing meanwhile must not fail the upload."""
+    real = documents.extract_text
+
+    def slow_extract(data, ctype):
+        with db.new_session() as other:  # e.g. the Today page saving its findings
+            core.audit(other, "test.concurrent")
+            other.commit()
+        return real(data, ctype)
+
+    monkeypatch.setattr(documents, "extract_text", slow_extract)
+    doc = documents.add_upload(session, settings, "note.txt", "text/plain", b"Remittance advice")
+    assert doc.id and documents.new_count(session) == 1
+
+
+def test_end_read_keeps_writes_already_sent(session):
+    core.audit(session, "test.kept")
+    session.flush()  # sent to the database, not yet committed (as a mail scan does)
+    db.end_read(session)
+    session.commit()
+    assert session.query(AuditEvent).filter_by(event_type="test.kept").count() == 1
 
 
 def test_upload_paste_dedupe_and_trash(settings, session, ready):

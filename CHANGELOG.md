@@ -6,6 +6,17 @@ releases.
 
 ## Unreleased
 
+- **Apps for Windows, Mac and Android, and the iPhone and iPad Home Screen.** The desktop app
+  runs Locuvi on your PC or Mac, with no server or Docker needed. It opens in its own window
+  and signs you in by itself. The Android app connects to your Locuvi. On an iPhone or iPad,
+  add Locuvi to the Home Screen from Safari. Every version has every feature. Downloads are in
+  the [README](README.md#download), and [docs/APPS.md](docs/APPS.md) explains how to install
+  each one.
+- **Settings › Phones, tablets and computers**: the downloads, the address your phone needs,
+  and, in the desktop app, a switch that lets phones and tablets at home connect.
+- Fixed: adding a file to the Inbox could fail with "database is locked" if something else
+  was saved at the same moment.
+
 - **Pension reminders by email** (Settings › NHS pension, off by default): 5 days before
   Form B is due, 2 weeks before a 10-week deadline, and when a Form A has waited more than 2
   weeks for a signature. Each reminder is sent once; at most one email a day.

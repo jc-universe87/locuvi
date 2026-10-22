@@ -31,3 +31,14 @@ coverage/
 .vscode/
 *.tsbuildinfo
 docker-compose.override.yml
+
+# desktop app build output
+desktop/build/
+desktop/dist/
+# Android build output
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+*.keystore
+*.jks

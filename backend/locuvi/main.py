@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from locuvi import __version__, db, integrity, profiles
+from locuvi.api import desktop as _desktop  # registers routes on `api`; `opener` is public
 from locuvi.api import inbox as _inbox  # registers routes on `api`; `feeds` is public
 from locuvi.api.auth import SessionManager
 from locuvi.api.mcp import router as mcp_router
@@ -108,9 +109,23 @@ def _ensure_admin(settings: Settings) -> None:
     profiles.ensure_first(settings, name, stored, epoch or 0)
 
 
+# File types for the web app's files. Python reads these from the system (on Windows, from the
+# registry, which often maps .js to text/plain), and browsers refuse scripts with a wrong type.
+WEB_TYPES = {
+    ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css",
+    ".svg": "image/svg+xml", ".json": "application/json", ".png": "image/png",
+    ".webmanifest": "application/manifest+json", ".woff2": "font/woff2", ".woff": "font/woff",
+    ".html": "text/html",
+}  # fmt: skip
+
+
 def create_app(
     settings: Settings | None = None, *, archive_ctx: ArchiveContext | None = None
 ) -> FastAPI:
+    import mimetypes
+
+    for ext, kind in WEB_TYPES.items():
+        mimetypes.add_type(kind, ext)
     settings = settings or get_settings()
     settings.validate()
     logging.basicConfig(
@@ -229,6 +244,7 @@ def create_app(
         return response
 
     app.include_router(public)
+    app.include_router(_desktop.opener)
     app.include_router(api)
     app.include_router(mcp_router)  # Bevro / external agents (token auth, not cookies)
     app.include_router(_inbox.feeds)  # calendar feed by secret link

@@ -565,6 +565,8 @@ const fr: Catalogue = {
   "repeat.usual_rate": "Le tarif habituel du cabinet sera utilisé.",
   "settings.s_calendar": "Calendrier mobile",
   "settings.s_calendar_sub": "Afficher vos remplacements dans le calendrier",
+  "settings.s_apps": "Téléphone, tablette et ordinateur",
+  "settings.s_apps_sub": "Les applis Locuvi et la connexion depuis le téléphone",
   "calendar.intro": "Abonnez-vous une seule fois : vos remplacements apparaîtront et se mettront à jour dans votre calendrier.",
   "calendar.feed_name": "Séances de remplacement",
   "calendar.live_title": "Afficher les réservations dans un autre agenda (mise à jour automatique)",

@@ -6,6 +6,7 @@ Start with what you want to do.
 
 | | |
 | --- | --- |
+| 📲 **[Apps for computer, phone and tablet](APPS.md)** | Downloads for Windows, Mac and Android, and adding Locuvi to an iPhone or iPad |
 | 📘 **[User manual](USER_GUIDE.md)** | Everything in the app, step by step, with pictures |
 | 🩺 **[The first-time GP locum's handbook](LOCUM_HANDBOOK.md)** | New to locum work? The checklist before you start, agreeing terms, invoicing, getting paid, NHS pension, tax and appraisal, and how Locuvi helps with each |
 | 🚀 [Your first five minutes](USER_GUIDE.md#3-your-first-five-minutes) | The three set-up questions |

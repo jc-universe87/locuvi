@@ -565,6 +565,8 @@ const pt: Catalogue = {
   "repeat.usual_rate": "Será usada a tarifa habitual do consultório.",
   "settings.s_calendar": "Calendário do telemóvel",
   "settings.s_calendar_sub": "Ver as substituições marcadas no calendário",
+  "settings.s_apps": "Telemóvel, tablet e computador",
+  "settings.s_apps_sub": "As apps Locuvi e a ligação a partir do telemóvel",
   "calendar.intro": "Subscreva uma vez e as substituições aparecem e atualizam-se no calendário.",
   "calendar.feed_name": "Sessões de locum",
   "calendar.live_title": "Mostrar as marcações noutro calendário (atualiza-se sozinho)",

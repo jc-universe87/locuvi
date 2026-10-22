@@ -1,4 +1,5 @@
 // Thin fetch wrapper: same-origin cookies, CSRF header on mutations, typed errors.
+import { nativeApp, nativeSave } from "./native";
 
 export interface ApiErrorBody {
   code: string;
@@ -84,6 +85,10 @@ export const api = {
 };
 
 export function downloadBlob(blob: Blob, filename: string) {
+  if (nativeApp()) {
+    void nativeSave(blob, filename);
+    return;
+  }
   const href = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = href;
@@ -99,6 +104,10 @@ export function downloadBlob(blob: Blob, filename: string) {
  * don't block it as a pop-up; fill it once the content is ready.
  */
 export function openPendingTab(): { show: (blob: Blob) => void; close: () => void } {
+  if (nativeApp()) {
+    // the Android app has no tabs: save the preview and open it in the phone's PDF viewer
+    return { show: (blob: Blob) => void nativeSave(blob, "preview.pdf"), close: () => undefined };
+  }
   const w = window.open("", "_blank");
   if (w) w.opener = null;
   return {

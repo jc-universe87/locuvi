@@ -765,10 +765,16 @@ Everything works on a phone. The menu moves to the bottom of the screen.
 <img src="images/mobile-pension.png" width="190" alt="Pension on a phone">
 </p>
 
-**Add it to your home screen** so it opens like an app:
+**Get the app:**
 
+- **Android**: install the [Locuvi app](APPS.md#android) and type your Locuvi's address. You
+  can also use Chrome: tap ⋮, then **Add to Home screen** or **Install app**.
 - **iPhone or iPad (Safari)**: tap Share, then **Add to Home Screen**.
-- **Android (Chrome)**: tap ⋮, then **Add to Home screen** or **Install app**.
+- **Windows PC or Mac**: the [desktop app](APPS.md) runs Locuvi on the computer itself.
+
+**Settings › Phones, tablets and computers** shows the address to use and the downloads. If
+Locuvi runs in the desktop app, switch on **Let my phone and tablet connect** there first
+([how](APPS.md#using-your-phone-with-the-desktop-app)).
 
 ## 18. Common questions
 
