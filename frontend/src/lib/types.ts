@@ -162,6 +162,7 @@ export interface Profile {
   employee_rate: string | null;
   setup_completed: boolean;
   digest_enabled: boolean;
+  pension_reminders: boolean;
   last_digest_sent_at: string | null;
 }
 

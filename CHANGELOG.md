@@ -6,6 +6,11 @@ releases.
 
 ## Unreleased
 
+- **Pension reminders by email** (Settings › NHS pension, off by default): 5 days before
+  Form B is due, 2 weeks before a 10-week deadline, and when a Form A has waited more than 2
+  weeks for a signature. Each reminder is sent once; at most one email a day.
+- **Pension months link to PCSE Online** and to the official paper Forms A and B for that
+  scheme year.
 - **The first-time GP locum's handbook** (`docs/LOCUM_HANDBOOK.md`): a plain-English guide
   for new locums. It covers the checklist before your first session, agreeing terms, invoicing
   and chasing payment, the NHS pension, tax and Making Tax Digital, and appraisal, with tips

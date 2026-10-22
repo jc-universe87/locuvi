@@ -372,7 +372,11 @@ with payment by **7 November 2026**.
 
 Locuvi works out the figures for both forms, tracks each Form A from **Not sent** to
 **Signed by practice**, and shows the 10-week and 7th-of-the-month deadlines on **Today**
-before they arrive. **Pension › How to send your pension forms** walks through PCSE Online
+before they arrive. Turn on **Settings › NHS pension › Email me before pension deadlines** and
+it emails you too: 5 days before Form B is due and 2 weeks before a 10-week deadline. Each
+month in **Pension** has an **Open PCSE Online** button and links to the official paper forms
+for that scheme year. PCSE Online has no connection other software can use, so Locuvi can't
+see whether PCSE has received or approved a form. Record each step in Locuvi as you take it. **Pension › How to send your pension forms** walks through PCSE Online
 step by step. Locuvi doesn't submit forms or make payments.
 
 > [!WARNING]

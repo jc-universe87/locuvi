@@ -140,6 +140,10 @@ class OwnerProfile(TimestampMixin, Base):
     invoice_footer: Mapped[str | None] = mapped_column(String(300), nullable=True)
     email_signoff: Mapped[str | None] = mapped_column(String(500), nullable=True)
     last_digest_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # Email reminders before NHS pension deadlines (services/pension_reminders.py): opt-in, and
+    # the reminders already sent, so each one goes out once.
+    pension_reminders: Mapped[bool] = mapped_column(Boolean, default=False)
+    pension_reminders_sent: Mapped[list[str]] = mapped_column(JSON, default=list)
 
 
 class InvoiceSequence(TimestampMixin, Base):

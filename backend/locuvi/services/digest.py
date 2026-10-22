@@ -293,6 +293,16 @@ class DigestScheduler:
         except Exception:  # noqa: BLE001
             log.exception("mail folder scan failed")
         try:
+            from locuvi.services import pension_reminders
+
+            with db.new_session() as s:
+                if pension_reminders.send_if_due(s, settings, self.box)["sent"]:
+                    log.info("pension reminder sent")
+        except DomainError as exc:
+            log.warning("pension reminder not sent: %s", exc.code)
+        except Exception:  # noqa: BLE001 — keep the scheduler alive
+            log.exception("pension reminder failed")
+        try:
             with db.new_session() as s:
                 if due(s):
                     send_now(s, settings, self.box)

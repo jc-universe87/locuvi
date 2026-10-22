@@ -354,3 +354,15 @@ before enabling a cloud model.
 - Inbox: next item after **I've dealt with this**, tick boxes and batch actions
   (`POST /documents/batch`), a second tick for deleting several, **I've dealt with all**.
 - Documentation: [the first-time GP locum's handbook](LOCUM_HANDBOOK.md).
+
+## Pension reminders and form links (owner request, 22 Oct 2026) ✅
+
+- Opt-in email reminders before NHS pension deadlines (`services/pension_reminders.py`,
+  migration 0026), built on the Today checks: Form B 5 days before the 7th and when late, the
+  10-week limit 2 weeks before and when passed, Form A waiting more than 2 weeks for a
+  signature. Each sent once; at most one email a day from 08:00.
+- Pension months link to PCSE Online and to the checked NHSBSA paper forms for the scheme year
+  (`lib/pensionForms.ts`), falling back to NHSBSA's forms page.
+- Not done, and why: PCSE Online has no public interface, so Locuvi can't read form status.
+  Recognising PCSE notification emails, and checking the PCSE statement import against PCSE's
+  real CSV, both wait for a real sample.

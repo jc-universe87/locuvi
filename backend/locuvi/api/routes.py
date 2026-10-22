@@ -259,6 +259,7 @@ def _profile_out(p: Any) -> dict[str, Any]:
         employee_rate=str(p.employee_rate) if p.employee_rate is not None else None,
         setup_completed=p.setup_completed,
         digest_enabled=p.digest_enabled,
+        pension_reminders=bool(p.pension_reminders),
         accounting_basis=p.accounting_basis or "cash",
         last_digest_sent_at=p.last_digest_sent_at.isoformat() if p.last_digest_sent_at else None,
     ).model_dump()
@@ -278,7 +279,8 @@ def put_profile(body: S.ProfileIn, s: DB) -> dict[str, Any]:
     acct = data.pop("bank_account_number", None)
     nullable = {"trading_name", "phone", "professional_number", "pension_ref"}
     for k, v in data.items():
-        if k in {"setup_completed", "digest_enabled", "accounting_basis"} and v is None:
+        if k in {"setup_completed", "digest_enabled", "pension_reminders",
+                 "accounting_basis"} and v is None:  # fmt: skip
             continue
         if k == "employee_rate":
             v = Decimal(v) if v not in (None, "") else None
