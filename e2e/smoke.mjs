@@ -81,7 +81,7 @@ await page.getByRole("heading", { name: "Let's set up your invoices" }).waitFor(
 await shot("01-welcome");
 await page.getByLabel("Legal name").fill("Dr Alex Example");
 await page.getByLabel("Address").fill("1 Sample Street\nExampletown");
-await page.getByLabel("Postcode").fill("ex1 1aa");
+await page.getByLabel("Postcode").fill("sf1 1aa");
 await page.getByLabel("Email").fill("alex@example.invalid");
 await page.getByRole("button", { name: "Continue" }).click();
 await page.getByRole("heading", { name: "Where practices should pay you" }).waitFor();
@@ -336,7 +336,7 @@ await page.getByLabel("Account number").waitFor();
 if ((await page.getByLabel("Account number").getAttribute("placeholder")) !== "••••0000") await fail("masked account");
 await page.getByRole("link", { name: "Settings" }).first().click();
 await page.getByRole("link", { name: /^You/ }).click();
-await page.getByLabel("Telephone").fill("01234 567890");
+await page.getByLabel("Telephone").fill("01632 960000");
 await page.getByText("✓ Saved").waitFor(); // autosave
 await shot("11-settings-you");
 await page.getByRole("link", { name: "Settings" }).first().click();

@@ -128,10 +128,10 @@ def test_logo_accent_footer_frozen_into_issued_invoice(settings, session, ready)
 def test_email_signoff(settings, session, ready):
     inv = issue(settings, session, ready, date(2026, 8, 3))
     assert mail.draft_for(session, inv)["body"].endswith("Kind regards,\nDr Alex Example")
-    core.get_profile(session).email_signoff = "Best wishes,\nAlex\nGP Locum · 07000 000000"
+    core.get_profile(session).email_signoff = "Best wishes,\nAlex\nGP Locum · 07700 900000"
     session.commit()
     assert mail.draft_for(session, inv)["body"].endswith(
-        "Best wishes,\nAlex\nGP Locum · 07000 000000"
+        "Best wishes,\nAlex\nGP Locum · 07700 900000"
     )
 
 

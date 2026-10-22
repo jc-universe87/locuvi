@@ -14,7 +14,7 @@ def test_upgrade_from_v01_keeps_data_and_skips_wizard(tmp_path):
                 "INSERT INTO owner_profile (id, legal_name, designation, address_lines, postcode, email,"
                 " bank_account_holder, bank_sort_code, bank_account_number, vat_status,"
                 " payment_terms_days, pension_default_enabled, created_at, updated_at)"
-                " VALUES (1, 'Dr Alex Example', '', '1 Sample Street', 'EX1 1AA', 'a@example.invalid',"
+                " VALUES (1, 'Dr Alex Example', '', '1 Sample Street', 'SF1 1AA', 'a@example.invalid',"
                 " 'Dr Alex Example', '000000', '00000000', 'not_vat_registered', 30, 1,"
                 " '2026-10-01 00:00:00', '2026-10-01 00:00:00')"
             )

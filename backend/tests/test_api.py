@@ -13,7 +13,7 @@ PROFILE = {
     "legal_name": "Dr Alex Example",
     "designation": "General Practitioner (Locum)",
     "address_lines": "1 Sample Street\nExampletown",
-    "postcode": "EX1 1AA",
+    "postcode": "SF1 1AA",
     "email": "alex@example.invalid",
     "bank_account_holder": "Dr Alex Example",
     "bank_sort_code": "00-00-00",
