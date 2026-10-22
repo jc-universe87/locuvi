@@ -323,6 +323,14 @@ await page.getByRole("switch", { name: "Share bookings with my calendar" }).clic
 const icsUrl = (await page.locator("code").first().innerText()).trim();
 const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
 if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
+const google = await page.getByRole("link", { name: "Google Calendar" }).getAttribute("href");
+if (!google?.startsWith("https://calendar.google.com/calendar/render?cid=webcal")) await fail("Google subscribe link");
+const [csv] = await Promise.all([
+  page.waitForEvent("download"),
+  page.getByRole("button", { name: "Spreadsheet (.csv)" }).click(),
+]);
+if (csv.suggestedFilename() !== "locum-sessions.csv") await fail("calendar CSV download");
+await shot("11c-calendar");
 
 step("personalisation: logo, colour, footer line, sample preview");
 await page.getByRole("link", { name: "Settings" }).first().click();

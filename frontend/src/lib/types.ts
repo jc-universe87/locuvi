@@ -371,6 +371,8 @@ export interface ScanResult {
   to_review: number;
   unread: number;
   folder_errors: number;
+  /** earlier kept emails that turned out not to be bookings, moved to Recently deleted */
+  tidied?: number;
   /** accounts that couldn't be checked (the others still were) */
   errors?: { account_id: number; label: string; error: string }[];
 }

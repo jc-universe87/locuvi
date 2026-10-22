@@ -26,6 +26,8 @@ export function scanSummary(t: T, tn: TN, r: ScanResult): string {
   if (r.already_booked) parts.push(tn("mailbox.res_booked", r.already_booked));
   if (r.remittances) parts.push(tn("mailbox.res_remittances", r.remittances));
   if (r.checked && !r.to_review && !r.already_booked && !r.remittances) parts.push(t("mailbox.res_nothing"));
+  if (r.skipped) parts.push(tn("mailbox.res_skipped", r.skipped));
+  if (r.tidied) parts.push(tn("mailbox.res_tidied", r.tidied));
   for (const e of r.errors ?? []) {
     const reason = hasKey(`error.${e.error}`) ? t(`error.${e.error}` as MessageKey) : e.error;
     parts.push(t("mailbox.res_failed", { name: e.label, reason }));

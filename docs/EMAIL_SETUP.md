@@ -17,6 +17,24 @@ download invoice PDFs to send yourself.
 > looks in the folders you choose. It keeps only the messages it recognises as bookings or
 > payment notices.
 
+### Which emails Locuvi keeps
+
+Locuvi doesn't keep an email just because it mentions a "session" or a "clinic". It keeps a
+message only when it is clearly about locum work. For example, it mentions **locum** or comes
+from (or names) **one of your practices**, talks about booking or cover, and gives a **work
+date** in the message itself. Dates in the email's header or in a quoted older reply don't
+count. Newsletters, mailing lists and automatic replies are left out. Payment notices are kept
+when they say *remittance* or *payment advice*, or give an amount paid for an invoice or by one
+of your practices.
+
+Everything else is skipped and never stored. After each check, Locuvi tells you how many
+emails it skipped. Add each practice's email address under **Practices** so their messages are
+recognised even when they don't say "locum".
+
+If an earlier version of Locuvi kept emails that aren't bookings, the next check moves them to
+**Settings › Recently deleted**. You can put any of them back within 30 days. Emails you've
+already dealt with stay where they are.
+
 <img src="images/settings-mailbox.png" alt="Settings › Booking emails, where you add email accounts">
 
 Open **Settings › Booking emails** and tap **Add an email account**. You can add several, for

@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import secrets
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
@@ -97,24 +98,40 @@ def _fold(line: str) -> str:
     return "\r\n ".join(parts)
 
 
-def render(s: Session, feed: CalendarFeed, today: date | None = None) -> str:
+def _sessions(s: Session, start: date | None, end: date | None) -> list[WorkSession]:
+    stmt = select(WorkSession)
+    if start:
+        stmt = stmt.where(WorkSession.date >= start)
+    if end:
+        stmt = stmt.where(WorkSession.date <= end)
+    return list(s.scalars(stmt.order_by(WorkSession.date)))
+
+
+def _label(w: WorkSession) -> str:
+    if w.unit == "hours":
+        return f"{w.quantity.normalize():f} h"
+    return UNIT_LABEL.get(w.unit, "Session")
+
+
+def render(
+    s: Session, feed: CalendarFeed | None = None, today: date | None = None, *,
+    include_fees: bool | None = None, everything: bool = False,
+) -> str:  # fmt: skip
+    """The subscription feed (a window around today), or with ``everything`` a one-off export
+    of all sessions. Fees only if the feed or ``include_fees`` says so."""
     today = today or core.today_london()
-    start, end = today - timedelta(days=90), today + timedelta(days=550)
-    rows = s.scalars(
-        select(WorkSession)
-        .where(WorkSession.date >= start, WorkSession.date <= end)
-        .order_by(WorkSession.date)
-    )
+    fees = include_fees if include_fees is not None else bool(feed and feed.include_fees)
+    if everything:
+        rows = _sessions(s, None, None)
+    else:
+        rows = _sessions(s, today - timedelta(days=90), today + timedelta(days=550))
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Locuvi//Sessions//EN",
              "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Locum sessions",
              "X-PUBLISHED-TTL:PT1H", "REFRESH-INTERVAL;VALUE=DURATION:PT1H"]  # fmt: skip
     for w in rows:
         d = w.date.strftime("%Y%m%d")
-        label = UNIT_LABEL.get(w.unit, "Session")
-        if w.unit == "hours":
-            label = f"{w.quantity.normalize():f} h"
-        summary = f"Locum {label} · {w.practice.name}"
+        summary = f"Locum {_label(w)} · {w.practice.name}"
         ev = ["BEGIN:VEVENT", f"UID:{w.id}@locuvi", f"DTSTAMP:{stamp}",
               f"SUMMARY:{_esc(summary)}"]  # fmt: skip
         if w.unit in TIMES:
@@ -125,7 +142,7 @@ def render(s: Session, feed: CalendarFeed, today: date | None = None) -> str:
             ev += [f"DTSTART;VALUE=DATE:{d}", f"DTEND;VALUE=DATE:{nxt}"]
         if w.practice.billing_address:
             ev.append(f"LOCATION:{_esc(w.practice.billing_address.replace(chr(10), ', '))}")
-        if feed.include_fees:
+        if fees:
             ev.append(f"DESCRIPTION:{_esc(fmt_gbp(w.rate * w.quantity))}")
         ev.append("STATUS:CANCELLED" if w.status == SessionStatus.cancelled else "STATUS:CONFIRMED")
         ev.append("TRANSP:OPAQUE")
@@ -133,3 +150,25 @@ def render(s: Session, feed: CalendarFeed, today: date | None = None) -> str:
         lines += ev
     lines.append("END:VCALENDAR")
     return "\r\n".join(_fold(x) for x in lines) + "\r\n"
+
+
+def render_csv(s: Session, *, include_fees: bool) -> str:
+    """All sessions as a spreadsheet: ISO dates and 24-hour times, one row per session."""
+    import csv
+    import io
+
+    out = io.StringIO()
+    w = csv.writer(out)
+    head = ["Date", "Start", "End", "Session", "Practice", "Address", "Status"]
+    w.writerow(head + (["Fee"] if include_fees else []))
+    for row in _sessions(s, None, None):
+        a, b = TIMES.get(row.unit, ("", ""))
+        start, end = (f"{a[:2]}:{a[2:4]}", f"{b[:2]}:{b[2:4]}") if a else ("", "")
+        address = (row.practice.billing_address or "").replace("\n", ", ")
+        status = "Cancelled" if row.status == SessionStatus.cancelled else "Booked"
+        cells = [row.date.isoformat(), start, end, _label(row), row.practice.name, address, status]
+        if include_fees:
+            cells.append(f"{(row.rate * row.quantity).quantize(Decimal('0.01'))}")
+        # a cell starting with = + - @ would run as a formula in a spreadsheet
+        w.writerow(["'" + c if c[:1] in "=+-@" else c for c in cells])
+    return out.getvalue()

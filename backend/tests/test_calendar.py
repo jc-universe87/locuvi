@@ -56,3 +56,35 @@ def test_feed_link_lifecycle(settings):
         )
         c.put("/api/v1/settings/calendar", headers=h, json={"enabled": False})
         assert anon.get(new).status_code == 404
+
+
+def test_one_off_exports_cover_every_session(session, ready, settings):
+    from datetime import timedelta
+
+    from fastapi.testclient import TestClient
+
+    from locuvi import db
+    from locuvi.main import create_app
+
+    today = core.today_london()
+    old = today - timedelta(days=400)  # outside the subscription window
+    with TestClient(create_app(settings)) as c:
+        s = db.new_session()
+        from conftest import make_practice
+
+        p = make_practice(s, name="=Example Practice")  # a name that looks like a formula
+        diary.add_sessions(s, [diary.SessionInput(p.id, old, "pm"),
+                               diary.SessionInput(p.id, today, "day")])  # fmt: skip
+        s.close()
+        ics = c.get("/api/v1/calendar/export.ics")
+        assert ics.status_code == 200 and ics.headers["content-type"].startswith("text/calendar")
+        assert "attachment" in ics.headers["content-disposition"]
+        assert f"DTSTART:{old:%Y%m%d}T130000" in ics.text and "DESCRIPTION" not in ics.text
+        assert "DESCRIPTION:£600.00" in c.get("/api/v1/calendar/export.ics?fees=true").text
+        rows = c.get("/api/v1/calendar/export.csv?fees=true").content.decode("utf-8-sig")
+        lines = rows.strip().splitlines()
+        assert lines[0] == "Date,Start,End,Session,Practice,Address,Status,Fee"
+        assert lines[1].startswith(f"{old.isoformat()},13:00,18:30,PM,'=Example Practice,")
+        assert lines[1].endswith(",Booked,600.00") and len(lines) == 3
+        assert "Fee" not in c.get("/api/v1/calendar/export.csv").text
+        assert c.get("/api/v1/calendar/export.pdf").status_code == 404

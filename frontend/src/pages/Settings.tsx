@@ -4,7 +4,7 @@ import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useConfi
 import { TrashSection } from "../components/Trash";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
-import { api, openPendingTab, setCsrf } from "../lib/api";
+import { api, downloadBlob, openPendingTab, setCsrf } from "../lib/api";
 import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
 import type { AssistantConfig, Branding, HouseholdProfile, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
@@ -1306,6 +1306,7 @@ function CalendarSection() {
   const [cfg, setCfg] = useState<{ enabled: boolean; include_fees: boolean; path: string | null } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [copied, setCopied] = useState(false);
+  const [exportFees, setExportFees] = useState(false);
   useEffect(() => {
     api.get<typeof cfg>("/settings/calendar").then(setCfg, setError);
   }, []);
@@ -1320,10 +1321,23 @@ function CalendarSection() {
   };
   const url = cfg.path ? `${window.location.origin}${cfg.path}` : "";
   const webcal = url.replace(/^https?:/, "webcal:");
+  // Google and Outlook on the web fetch the feed from their own servers (internet only).
+  const google = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`;
+  const outlook = `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=${encodeURIComponent(t("calendar.feed_name"))}`;
+  const office = `https://outlook.office.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=${encodeURIComponent(t("calendar.feed_name"))}`;
+  const download = async (fmt: "ics" | "csv") => {
+    try {
+      downloadBlob(await api.blob("GET", `/calendar/export.${fmt}?fees=${exportFees}`), `locum-sessions.${fmt}`);
+    } catch (e) {
+      setError(e);
+    }
+  };
   return (
     <>
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("calendar.intro")}</p>
       <ErrorAlert error={error} />
+      <h3>{t("calendar.live_title")}</h3>
+      <p className="hint" style={{ marginTop: 0 }}>{t("calendar.live_hint")}</p>
       <div className="form-list">
         <SwitchRow label={t("calendar.toggle")} checked={cfg.enabled} onChange={(v) => void put({ enabled: v })} />
         {cfg.enabled && (
@@ -1333,12 +1347,18 @@ function CalendarSection() {
       </div>
       {cfg.enabled && url && (
         <>
+          <div className="actions wrap" style={{ marginTop: "0.75rem" }}>
+            <a className="btn" href={webcal}>{t("calendar.apple")}</a>
+            <a className="btn secondary" href={google} target="_blank" rel="noreferrer noopener">{t("calendar.google")}</a>
+            <a className="btn secondary" href={outlook} target="_blank" rel="noreferrer noopener">{t("calendar.outlook")}</a>
+            <a className="btn secondary" href={office} target="_blank" rel="noreferrer noopener">{t("calendar.office")}</a>
+          </div>
+          <p className="hint">{t("calendar.apps_hint")}</p>
           <h3>{t("calendar.link")}</h3>
           <div className="form-list">
             <div className="form-row stacked"><code style={{ wordBreak: "break-all" }}>{url}</code></div>
           </div>
           <div className="actions" style={{ marginTop: "0.5rem" }}>
-            <a className="btn" href={webcal}>{t("calendar.subscribe")}</a>
             <button className="btn secondary" onClick={() => {
               void navigator.clipboard?.writeText(url).then(() => setCopied(true), () => undefined);
             }}>{copied ? t("ask.copied") : t("calendar.copy")}</button>
@@ -1347,6 +1367,15 @@ function CalendarSection() {
           <p className="form-foot">{t("calendar.private")}</p>
         </>
       )}
+      <h3>{t("calendar.export_title")}</h3>
+      <p className="hint" style={{ marginTop: 0 }}>{t("calendar.export_hint")}</p>
+      <div className="form-list">
+        <SwitchRow label={t("calendar.export_fees")} checked={exportFees} onChange={setExportFees} />
+      </div>
+      <div className="actions wrap" style={{ marginTop: "0.5rem" }}>
+        <button className="btn secondary" onClick={() => void download("ics")}><Icon name="download" size={18} /> {t("calendar.export_ics")}</button>
+        <button className="btn secondary" onClick={() => void download("csv")}><Icon name="download" size={18} /> {t("calendar.export_csv")}</button>
+      </div>
     </>
   );
 }
