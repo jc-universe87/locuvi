@@ -613,6 +613,7 @@ const en = {
   "error.email.send_failed": "We couldn't send the email. Check your settings and try again.",
   "error.email.incomplete": "Add your email address, server and password first.",
   "error.email.host_blocked": "That email server address is blocked for security.",
+  "error.email.unknown_host": "Couldn't find that email server. Check the server name, for example smtp.gmail.com.",
   "error.email.bad_host": "Enter your outgoing email server address, such as smtp.example.com.",
   "error.practice.name_required": "Enter the practice name.",
   "error.pension.no_work": "There are no issued NHS pensionable invoices for this month.",
