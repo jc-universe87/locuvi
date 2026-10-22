@@ -6,6 +6,10 @@ releases.
 
 ## Unreleased
 
+- **The first-time GP locum's handbook** (`docs/LOCUM_HANDBOOK.md`): a plain-English guide
+  for new locums. It covers the checklist before your first session, agreeing terms, invoicing
+  and chasing payment, the NHS pension, tax and Making Tax Digital, and appraisal, with tips
+  and how Locuvi helps at each step.
 - More AI companies to choose from: Cohere (Command), Alibaba (Qwen), Moonshot AI (Kimi),
   Z.ai (GLM) and MiniMax, alongside OpenAI, Anthropic, Google, xAI, Mistral, DeepSeek and
   OpenRouter.
