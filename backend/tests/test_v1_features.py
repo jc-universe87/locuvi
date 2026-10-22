@@ -330,7 +330,7 @@ def test_api_new_endpoints(settings):
         assert c.get("/api/v1/overview").json()["setup"]["completed"] is False
         r = c.patch("/api/v1/settings/profile", json={"legal_name": "Dr Alex Example"}, headers=h)
         assert r.json()["legal_name"] == "Dr Alex Example"
-        r = c.patch("/api/v1/settings/profile", json={"postcode": "EX1 1AA"}, headers=h)
+        r = c.patch("/api/v1/settings/profile", json={"postcode": "SF1 1AA"}, headers=h)
         assert r.json()["legal_name"] == "Dr Alex Example"  # partial update kept name
         p = c.post(
             "/api/v1/practices",

@@ -60,6 +60,8 @@ never submit pension forms or send email without an explicit owner tap.
   or git. Test only against disposable WebDAV servers, never the owner's live Nextcloud.
 - All UI text through i18n keys in `frontend/src/i18n/en.ts` (tests enforce this).
 - English UI copy must follow `docs/PLAIN_ENGLISH_UX.md`: short, natural en-GB, action-led labels; keep official NHS and accounting terms accurate and explained. Update smoke assertions if labels change.
-- Fictional data only in fixtures (`example.invalid`, `00-00-00`, `00000000`).
+- Fictional data only in fixtures (`example.invalid`, `00-00-00`, `00000000`; phone numbers from
+  Ofcom's drama ranges such as `01632 960000` or `07700 900000`; postcodes in non-existent areas
+  such as `SF1 1AA`).
 - Tests never call a real AI API (fake provider / fake SDK client). AI output is re-validated
   server-side and only becomes data through `proposals.accept`.

@@ -138,7 +138,7 @@ def test_api_credit_notes(settings):
             json={
                 "legal_name": "Dr Alex Example",
                 "address_lines": "1 Sample Street",
-                "postcode": "EX1 1AA",
+                "postcode": "SF1 1AA",
                 "email": "alex@example.invalid",
                 "bank_account_holder": "Dr Alex Example",
                 "bank_sort_code": "00-00-00",

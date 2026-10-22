@@ -50,7 +50,7 @@ def fill_profile(s) -> None:
     p.legal_name = "Dr Alex Example"
     p.designation = "General Practitioner (Locum)"
     p.address_lines = "1 Sample Street\nExampletown"
-    p.postcode = "EX1 1AA"
+    p.postcode = "SF1 1AA"
     p.email = "alex@example.invalid"
     p.bank_account_holder = "Dr Alex Example"
     p.bank_sort_code = "000000"

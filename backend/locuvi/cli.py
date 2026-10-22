@@ -236,7 +236,7 @@ def example_snapshot() -> dict:
             "trading_name": None,
             "designation": "General Practitioner (Locum) · FICTIONAL EXAMPLE",
             "address_lines": ["1 Sample Street", "Exampletown"],
-            "postcode": "EX1 1AA",
+            "postcode": "SF1 1AA",
             "email": "alex@example.invalid",
             "phone": None,
         },

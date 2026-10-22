@@ -134,11 +134,13 @@ def test_payment_notices():
     assert kind(mail("Your order", "Payment of £12.00 received, thanks.")) is None
 
 
-def test_known_senders_ignore_shared_domains(session, ready):
-    ready.billing_email = "practice.manager@nhs.net"
+def test_known_senders_ignore_shared_domains(session, ready, monkeypatch):
+    # a stand-in for shared domains such as nhs.net, so the fixture stays fictional
+    monkeypatch.setattr(mailbox, "_SHARED_DOMAINS", {"shared.invalid"})
+    ready.billing_email = "practice.manager@shared.invalid"
     session.commit()
     addresses, domains, names = mailbox.known_senders(session)
-    assert addresses == {"practice.manager@nhs.net"} and domains == set()
+    assert addresses == {"practice.manager@shared.invalid"} and domains == set()
     assert names == ["example medical practice"]
 
 
