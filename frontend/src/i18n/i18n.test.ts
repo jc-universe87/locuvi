@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { catalogues, translate } from "./index";
 import en from "./en";
+import { LINKS, SECTIONS } from "../components/PensionGuide";
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
@@ -48,6 +49,7 @@ describe("i18n catalogues", () => {
     for (const k of ["booking", "remittance", "statement", "pension", "other"]) expect(en).toHaveProperty(`inbox.kind_${k}`);
     for (const k of ["number", "amount_practice", "amount", "combined"]) expect(en).toHaveProperty(`bank.kind_${k}`);
     for (const s of ["accepted", "partial", "rejected", "verified"]) expect(en).toHaveProperty(`inbox.proposal_${s}`);
+    for (const k of [...SECTIONS.flatMap((s) => [s.title, ...s.steps]), ...LINKS.map((l) => l.key)]) expect(en).toHaveProperty([k]);
   });
 
   it("other locales only contain known keys with the same placeholders", () => {

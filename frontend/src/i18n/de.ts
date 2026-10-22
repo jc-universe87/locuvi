@@ -416,6 +416,8 @@ const de: Catalogue = {
   "pension.total": "Insgesamt zu zahlen",
   "pension.set_tier": "Geben Sie Ihren Beitragssatz ein, um den vollen Betrag für Formular B zu sehen.",
   "pension.set_tier_link": "Beitragssatz festlegen",
+  "pension.guide": "So reichen Sie Ihre Rentenformulare ein",
+  "pension.guide_month": "Wie reiche ich diese Formulare ein?",
   "pension.disclaimer": "Locuvi bereitet die Zahlen für die offiziellen NHSBSA-Formulare vor, reicht aber nichts ein. Beträge und Fristen bitte anhand der aktuellen NHSBSA-/PCSE-Vorgaben prüfen.",
   "reports.title": "Auswertungen",
   "reports.tax_year": "Steuerjahr",

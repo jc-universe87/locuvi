@@ -416,6 +416,8 @@ const pt: Catalogue = {
   "pension.total": "Total a pagar",
   "pension.set_tier": "Indique a sua taxa de contribuição para ver o total do formulário B.",
   "pension.set_tier_link": "Definir taxa",
+  "pension.guide": "Como enviar os formulários de pensão",
+  "pension.guide_month": "Como envio estes formulários?",
   "pension.disclaimer": "O Locuvi prepara os valores para os formulários oficiais NHSBSA, mas não os submete. Confirme valores e prazos pelas regras atuais NHSBSA/PCSE.",
   "reports.title": "Relatórios",
   "reports.tax_year": "Ano fiscal",

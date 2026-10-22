@@ -378,6 +378,32 @@ The **Pension** page prepares the figures for your monthly GP locum NHS pension 
 
 <img src="images/pension.png" alt="Pension page: a list of months with what's due">
 
+### New to locum pension forms? Start here
+
+Tap **How to send your pension forms** at the top of the Pension page (or **How do I send
+these forms?** inside a month). It explains, step by step and in plain English:
+
+- what to do once before your first month (signing in to PCSE Online, your contribution rate),
+- how to send **Form A** for each practice and get it approved,
+- how to send **Form B** each month and pay the contributions,
+- the deadlines (10 weeks for Form A, the 7th of the month for Form B and payment),
+- what to do if something goes wrong, and where forms go in Wales, Scotland and Northern Ireland,
+- links to the official PCSE pages, including the **PCSE Online** sign-in.
+
+<img src="images/pension-guide.png" alt="The pension guide: step-by-step help with Forms A and B and links to PCSE">
+
+In short, each month you:
+
+1. Send a **Form A** on [PCSE Online](https://pcse.england.nhs.uk/services/gp-pensions/locum-gps)
+   for each practice you worked at, copying the figures from Locuvi. The practice approves it
+   online.
+2. Send **Form B** for the money you received that month, once the practices have approved
+   the matching Forms A.
+3. Pay the contributions (yours and the practice's) by the 7th of the following month. The
+   simplest way is by card with the GOV.UK Pay button on Form B.
+
+### Your months
+
 Each month in the list shows its forms and deadlines. Open a month to see the details:
 
 <img src="images/pension-month.png" alt="A month's pension figures: Form A for a practice and Form B for money received">
@@ -388,7 +414,8 @@ There's one **Form A** per practice for each month you worked. It shows the **da
 worked**, **basic locum fees**, **pensionable pay (90% of eligible fees)**, the **practice's
 pension contribution** and the **10-week pension deadline**.
 
-The practice has to sign Form A. Track it with the three buttons: **Not sent** →
+You send Form A on PCSE Online and the practice approves (signs) it there. Track it with the
+three buttons: **Not sent** →
 **Sent, waiting for signature** → **Signed by practice**. Locuvi reminds you if a signature
 is taking a while.
 

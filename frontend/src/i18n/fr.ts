@@ -416,6 +416,8 @@ const fr: Catalogue = {
   "pension.total": "Total à régler",
   "pension.set_tier": "Renseignez votre taux de cotisation pour afficher le total du formulaire B.",
   "pension.set_tier_link": "Définir le taux",
+  "pension.guide": "Comment envoyer vos formulaires de retraite",
+  "pension.guide_month": "Comment envoyer ces formulaires ?",
   "pension.disclaimer": "Locuvi prépare les chiffres à reporter dans les formulaires officiels NHSBSA, sans les envoyer. Vérifiez les montants et échéances selon les règles NHSBSA/PCSE en vigueur.",
   "reports.title": "Rapports",
   "reports.tax_year": "Année fiscale",

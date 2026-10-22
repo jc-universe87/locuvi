@@ -47,6 +47,7 @@ const ICONS: Record<string, string> = {
   sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z",
   paste: "M9 3h6v4H9zM7 5H5v16h14V5h-2M9 12h6M9 16h4",
   upload: "M12 20V9M7 14l5-5 5 5M5 4h14",
+  info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8v.01",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
 };
 

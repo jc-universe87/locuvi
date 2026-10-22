@@ -416,6 +416,8 @@ const es: Catalogue = {
   "pension.total": "Total a pagar",
   "pension.set_tier": "Indica tu tramo de aportación para ver el total del formulario B.",
   "pension.set_tier_link": "Configurar tramo",
+  "pension.guide": "Cómo enviar tus formularios de pensión",
+  "pension.guide_month": "¿Cómo envío estos formularios?",
   "pension.disclaimer": "Locuvi prepara las cifras para los formularios oficiales de NHSBSA, pero no los envía. Comprueba los importes y plazos según NHSBSA/PCSE.",
   "reports.title": "Informes",
   "reports.tax_year": "Ejercicio fiscal",
