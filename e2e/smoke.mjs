@@ -179,6 +179,10 @@ const [ws] = await Promise.all([
   page.getByRole("dialog").getByRole("button", { name: "Download figures" }).click(),
 ]);
 if (!ws.suggestedFilename().startsWith("nhs-pension-worksheet-")) await fail("worksheet name");
+const pcseLink = await page.getByRole("dialog").getByRole("link", { name: "Open PCSE Online" }).getAttribute("href");
+if (!pcseLink?.startsWith("https://pcse.england.nhs.uk/")) await fail("PCSE Online link");
+const formA = await page.getByRole("dialog").getByRole("link", { name: /^Form A \((PDF|NHSBSA forms page)\)$/ }).getAttribute("href");
+if (!formA?.includes("nhsbsa.nhs.uk")) await fail("paper Form A link");
 await page.getByRole("dialog").getByRole("group", { name: "Has the practice signed Form A?" }).getByRole("button", { name: "Signed by practice" }).click();
 await page.getByRole("dialog").getByText(/^Signed on \d/).waitFor();
 await page.getByRole("dialog").getByText("No payment for NHS pensionable work was recorded this month.").waitFor();
@@ -335,6 +339,11 @@ await page.getByRole("link", { name: /^You/ }).click();
 await page.getByLabel("Telephone").fill("01234 567890");
 await page.getByText("✓ Saved").waitFor(); // autosave
 await shot("11-settings-you");
+await page.getByRole("link", { name: "Settings" }).first().click();
+await page.getByRole("link", { name: /^NHS pension/ }).click();
+await page.getByRole("switch", { name: "Email me before pension deadlines" }).click();
+await page.getByText("✓ Saved").waitFor();
+await shot("11a-pension-reminders");
 await page.getByRole("link", { name: "Settings" }).first().click();
 await page.getByRole("link", { name: /Connect another AI assistant/ }).click();
 await page.getByRole("button", { name: "Create connection key" }).click();

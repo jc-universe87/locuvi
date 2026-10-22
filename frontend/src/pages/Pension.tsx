@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useConfirm, useToast } from "../components/ui";
 import { PensionGuide } from "../components/PensionGuide";
+import { paperForms, PCSE_ONLINE_URL } from "../lib/pensionForms";
 import { restoreFromBin } from "../lib/trash";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
@@ -215,11 +216,25 @@ export default function PensionPage() {
               </>
             );
           })()}>
-          <p style={{ marginTop: 0 }}>
-            <button type="button" className="btn ghost small" onClick={() => { setOpen(null); setGuide(true); }}>
-              <Icon name="info" size={16} /> {t("pension.guide_month")}
-            </button>
-          </p>
+          {(() => {
+            const forms = paperForms(open.month);
+            return (
+              <>
+                <div className="actions wrap" style={{ marginTop: 0 }}>
+                  <a className="btn small" href={PCSE_ONLINE_URL} target="_blank" rel="noreferrer noopener">{t("pension.open_pcse")}</a>
+                  <button type="button" className="btn ghost small" onClick={() => { setOpen(null); setGuide(true); }}>
+                    <Icon name="info" size={16} /> {t("pension.guide_month")}
+                  </button>
+                </div>
+                <p className="hint">
+                  {t("pension.paper_lead", { year: forms.year })}{" "}
+                  <a href={forms.a} target="_blank" rel="noreferrer noopener">{forms.aIsPdf ? t("pension.paper_a_pdf") : t("pension.paper_a_page")}</a>
+                  {" · "}
+                  <a href={forms.b} target="_blank" rel="noreferrer noopener">{forms.bIsPdf ? t("pension.paper_b_pdf") : t("pension.paper_b_page")}</a>
+                </p>
+              </>
+            );
+          })()}
           {open.forms_a.map((a, i) => (
             <div key={i} style={{ marginBottom: "1rem" }}>
               <h3 style={{ marginTop: i ? "0.5rem" : 0 }}>{t("pension.form_a", { n: i + 1 })} · {a.practice_name} · {a.invoices.join(", ")}</h3>

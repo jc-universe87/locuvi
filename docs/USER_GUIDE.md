@@ -413,6 +413,17 @@ Each month in the list shows its forms and deadlines. Open a month to see the de
 
 <img src="images/pension-month.png" alt="A month's pension figures: Form A for a practice and Form B for money received">
 
+At the top of each month, **Open PCSE Online** takes you to PCSE's page for locum GPs, where
+you sign in to send the forms. Underneath are the official paper forms for that month's NHS
+pension scheme year (1 April to 31 March), for when you can't use PCSE Online. Where NHSBSA
+has published that year's form, the link opens the PDF; otherwise it opens NHSBSA's forms
+page so you can pick the right one.
+
+> [!NOTE]
+> Locuvi can't see your PCSE Online account, so it can't tell by itself whether a form was
+> received or approved. Record it in Locuvi as you go (**Sent**, **Signed by practice**,
+> **I've submitted Form B**), and the reminders take care of the rest.
+
 ### Form A: the work you did
 
 There's one **Form A** per practice for each month you worked. It shows the **dates
@@ -603,6 +614,11 @@ and the **person who signs Form A**. You can also hide a practice you no longer 
   NHS Pensions each year.
 - **NHS pension reference (SD number)** and **GMC number**: used on the pension worksheet,
   not your invoices.
+- **Email me before pension deadlines** (off until you turn it on): an email 5 days before
+  Form B is due, 2 weeks before a 10-week deadline, and when a Form A has waited more than 2
+  weeks for the practice's signature. Each reminder is sent once, with at most one email a
+  day, from the address in **Settings › Email invoices**. Recording a form as sent or signed
+  stops its reminder.
 - **NHS pension rates**: the practice contribution rate and the date it applies from. Locuvi
   comes with 14.38% from 1 April 2026. When the rate changes, add the new one with its start
   date; older invoices keep their rate.

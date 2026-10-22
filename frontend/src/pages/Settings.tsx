@@ -376,6 +376,12 @@ function PensionSection() {
         <Row id="pe-gmc" label={t("settings.professional_number")}><input id="pe-gmc" type="text" placeholder={t("common.optional")} value={p.professional_number ?? ""} onChange={(e) => setP({ ...p, professional_number: e.target.value })} /></Row>
       </div>
       <p className="form-foot">{t("settings.pension_forms_help")} <SavedIndicator state={save.state} /></p>
+      <h3>{t("settings.pension_reminders_title")}</h3>
+      <div className="form-list">
+        <SwitchRow label={t("settings.pension_reminders")} hint={t("settings.pension_reminders_hint")}
+          checked={p.pension_reminders} onChange={(v) => setP({ ...p, pension_reminders: v })} />
+      </div>
+      <p className="form-foot">{t("settings.pension_reminders_email")} <Link to="/settings/email">{t("settings.s_email")}</Link></p>
       <h3>{t("settings.policies")}</h3>
       <div className="form-list">
         {policies.map((x) => (
