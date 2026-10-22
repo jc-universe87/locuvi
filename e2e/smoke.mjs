@@ -189,6 +189,14 @@ await row.getByText(/1 signed/).waitFor();
 const thisMonth = new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "Europe/London" });
 const recRow = page.locator(".list-row", { hasText: thisMonth });
 await recRow.getByText(/Received £1,620\.00 · Form B due/).waitFor();
+step("pension guide explains Forms A and B and links to PCSE");
+await page.getByRole("button", { name: "How to send your pension forms" }).click();
+const guide = page.getByRole("dialog", { name: "How to send your NHS pension forms" });
+await guide.getByRole("heading", { name: "Before your first month (once only)" }).waitFor();
+const pcse = await guide.getByRole("link", { name: "Open the PCSE page for locum GPs" }).getAttribute("href");
+if (!pcse?.startsWith("https://pcse.england.nhs.uk/")) await fail("PCSE link");
+await shot("09b-pension-guide");
+await guide.getByRole("button", { name: "Close" }).last().click();
 
 step("reports");
 await page.getByRole("link", { name: "Reports" }).first().click();

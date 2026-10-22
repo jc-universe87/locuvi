@@ -15,6 +15,9 @@ releases.
   to its own model list and prices; the AI guide has the full table.
 - **Check key** also works for companies without a model list (one tiny test request).
 - Reasoning text that some models write into their answer is removed.
+- **Pension guide**: a plain-English, step-by-step guide on the Pension page to sending Forms A
+  and B on PCSE Online and paying the contributions, with the deadlines, what to do if
+  something goes wrong, and links to the official PCSE pages.
 - Invoice emails now carry a date header (some spam filters distrust mail without one), and a
   mistyped email server name gets a clear message instead of a general error.
 

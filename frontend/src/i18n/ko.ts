@@ -416,6 +416,8 @@ const ko: Catalogue = {
   "pension.total": "총 납부액",
   "pension.set_tier": "Form B 총 납부액을 보려면 본인 연금 기여율을 설정하세요.",
   "pension.set_tier_link": "기여율 설정",
+  "pension.guide": "연금 양식 제출 방법",
+  "pension.guide_month": "이 양식은 어떻게 제출하나요?",
   "pension.disclaimer": "Locuvi는 NHSBSA 공식 양식 입력용 금액만 준비하며 제출하지 않습니다. 최신 NHSBSA/PCSE 지침에 따라 금액과 기한을 확인하세요.",
   "reports.title": "보고서",
   "reports.tax_year": "과세연도",

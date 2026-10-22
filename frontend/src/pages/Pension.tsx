@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Dialog, ErrorAlert, Icon, PageHead, Segmented, useConfirm, useToast } from "../components/ui";
+import { PensionGuide } from "../components/PensionGuide";
 import { restoreFromBin } from "../lib/trash";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
@@ -54,6 +55,7 @@ export default function PensionPage() {
   const confirm = useConfirm();
   const [data, setData] = useState<{ months: PensionMonth[]; employee_rate: string | null } | null>(null);
   const [open, setOpen] = useState<MonthFigures | null>(null);
+  const [guide, setGuide] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const pcseFile = useRef<HTMLInputElement>(null);
 
@@ -151,6 +153,11 @@ export default function PensionPage() {
       <input ref={pcseFile} type="file" accept=".csv,text/csv" hidden aria-label={t("pension.pcse_import")}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void importPcse(f); e.target.value = ""; }} />
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("pension.lead")}</p>
+      <p style={{ marginTop: "-0.25rem" }}>
+        <button type="button" className="btn ghost small" onClick={() => setGuide(true)}>
+          <Icon name="info" size={16} /> {t("pension.guide")}
+        </button>
+      </p>
       <ErrorAlert error={error} />
       {data && !data.employee_rate && data.months.length > 0 && (
         <div className="alert info">
@@ -208,6 +215,11 @@ export default function PensionPage() {
               </>
             );
           })()}>
+          <p style={{ marginTop: 0 }}>
+            <button type="button" className="btn ghost small" onClick={() => { setOpen(null); setGuide(true); }}>
+              <Icon name="info" size={16} /> {t("pension.guide_month")}
+            </button>
+          </p>
           {open.forms_a.map((a, i) => (
             <div key={i} style={{ marginBottom: "1rem" }}>
               <h3 style={{ marginTop: i ? "0.5rem" : 0 }}>{t("pension.form_a", { n: i + 1 })} · {a.practice_name} · {a.invoices.join(", ")}</h3>
@@ -266,6 +278,7 @@ export default function PensionPage() {
           <PcseBox key={open.month} fig={open} onSave={(pay, c) => void savePcse(open.month, pay, c)} />
         </Dialog>
       )}
+      <PensionGuide open={guide} onClose={() => setGuide(false)} />
     </>
   );
 }

@@ -72,6 +72,10 @@ await page.locator(".inv-hero").waitFor();
 await shot("invoice");
 
 await visit("/pension", "pension");
+await page.getByRole("button", { name: "How to send your pension forms" }).click();
+await page.getByRole("dialog").getByRole("heading", { name: "Before your first month (once only)" }).waitFor();
+await shot("pension-guide", page, { fullPage: false });
+await page.keyboard.press("Escape");
 const month = page.locator("button, a").filter({ hasText: /September 2026/ }).first();
 if (await month.count()) {
   await month.click();
