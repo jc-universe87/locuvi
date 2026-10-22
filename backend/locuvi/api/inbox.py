@@ -120,6 +120,12 @@ def delete_document(doc_id: str, s: DB) -> Response:
     return Response(status_code=204)
 
 
+@api.post("/documents/batch")
+def batch_documents(body: S.DocumentBatchIn, s: DB) -> dict[str, Any]:
+    changed = documents.batch(s, body.ids, body.action)
+    return {"changed": changed, "new": documents.new_count(s)}
+
+
 @api.post("/documents/{doc_id}/restore")
 def restore_document(doc_id: str, s: DB) -> dict[str, Any]:
     return _doc_out(documents.restore(s, documents.get(s, doc_id, include_deleted=True)))

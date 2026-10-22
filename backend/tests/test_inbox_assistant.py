@@ -499,3 +499,40 @@ def test_scans_need_explicit_approval_before_sending(settings, session, ready):
     assert spy.calls[0][1] == "image/png"
     events = [e.event_type for e in session.query(AuditEvent).all()]
     assert "assistant.attachment_sent" in events
+
+
+def test_batch_done_delete_and_undo(settings):
+    from fastapi.testclient import TestClient
+
+    from locuvi.main import create_app
+
+    with TestClient(create_app(settings)) as c:
+        h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
+        ids = [
+            c.post(
+                "/api/v1/documents/paste", headers=h, json={"text": f"Locum session {n} Oct"}
+            ).json()["id"]
+            for n in (12, 13, 14)
+        ]
+        r = c.post("/api/v1/documents/batch", headers=h, json={"ids": ids[:2], "action": "done"})
+        assert sorted(r.json()["changed"]) == sorted(ids[:2]) and r.json()["new"] == 1
+        # already done: nothing changes, so undo only touches what moved
+        again = c.post("/api/v1/documents/batch", headers=h, json={"ids": ids, "action": "done"})
+        assert again.json()["changed"] == [ids[2]] and again.json()["new"] == 0
+        c.post("/api/v1/documents/batch", headers=h, json={"ids": [ids[2]], "action": "new"})
+        gone = c.post("/api/v1/documents/batch", headers=h, json={"ids": ids, "action": "delete"})
+        assert len(gone.json()["changed"]) == 3
+        assert c.get("/api/v1/documents").json()["documents"] == []
+        # binned items can't be marked done; restore brings them back as they were
+        stuck = c.post("/api/v1/documents/batch", headers=h, json={"ids": ids, "action": "done"})
+        assert stuck.json()["changed"] == []
+        back = c.post("/api/v1/documents/batch", headers=h, json={"ids": ids, "action": "restore"})
+        assert len(back.json()["changed"]) == 3
+        assert {d["status"] for d in c.get("/api/v1/documents").json()["documents"]} == {
+            "done",
+            "new",
+        }
+        bad = c.post("/api/v1/documents/batch", headers=h, json={"ids": [], "action": "done"})
+        assert bad.status_code == 422
+        wrong = c.post("/api/v1/documents/batch", headers=h, json={"ids": ids, "action": "purge"})
+        assert wrong.status_code == 422

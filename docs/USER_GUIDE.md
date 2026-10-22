@@ -477,7 +477,16 @@ advice, bank statements and pension letters.
 - **Bookings**: tap **Find booked sessions** to turn a booking email into diary sessions
   (you check them first).
 - **Payment advice** mentioning an invoice number appears on that invoice's page.
-- When you've dealt with something, tap **I've dealt with this**. It moves to **Done**.
+- When you've dealt with something, tap **I've dealt with this**. It moves to **Done** and
+  Locuvi opens the next item straight away, or goes back to the list when there's nothing
+  left. Tap **Undo** in the message if you tapped it by mistake.
+- **Several at once**: tick the box next to each item, or **Select all**, then tap
+  **Mark as dealt with**, or **Move back to the to-do list** under **Done**. To clear the
+  whole list, tap **I've dealt with all** above it. If you're searching, it says
+  **I've dealt with these** and only covers the matching items.
+- **Deleting several**: tick them and tap **Delete**. To delete more than one, you also tick
+  **Yes, delete all … selected items** before the button works. Deleted items stay in
+  **Settings › Recently deleted** for 30 days.
 
 ### Letting Locuvi read your email (optional)
 

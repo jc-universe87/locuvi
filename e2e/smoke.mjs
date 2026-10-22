@@ -250,9 +250,33 @@ await page.getByRole("button", { name: /remittance\.txt/ }).click();
 await page.getByRole("dialog").getByText("BACS payment").waitFor();
 await shot("10d-inbox-doc");
 await page.getByRole("dialog").getByRole("button", { name: "I've dealt with this" }).click();
-await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+await page.getByRole("status").getByText("Marked as dealt with").waitFor();
+// nothing else to do, so it goes back to the list by itself
+await page.getByRole("dialog").waitFor({ state: "hidden" });
+
+step("inbox: tick several; deleting many needs a second tick; I've dealt with all");
+for (const name of ["note-a.txt", "note-b.txt"]) {
+  await page.locator("input[type=file]").setInputFiles({ name, mimeType: "text/plain", buffer: Buffer.from(`Notes ${name}`) });
+  await page.getByText("Added 1 file").waitFor();
+}
+await page.getByRole("checkbox", { name: "Select note-a.txt" }).check();
+await page.getByRole("checkbox", { name: "Select note-b.txt" }).check();
+await page.getByText("2 selected").waitFor();
+await page.getByRole("toolbar").getByRole("button", { name: "Delete" }).click();
+const askMany = page.getByRole("dialog", { name: "Delete 2 items?" });
+const deleteMany = askMany.getByRole("button", { name: "Delete 2" });
+if (!(await deleteMany.isDisabled())) await fail("deleting several must need the second tick");
+await askMany.getByRole("checkbox", { name: "Yes, delete all 2 selected items" }).check();
+await shot("10d2-inbox-delete-many");
+await deleteMany.click();
+await page.getByRole("status").getByText("2 deleted").waitFor();
+await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+await page.getByRole("button", { name: /note-a\.txt/ }).waitFor();
+await page.getByRole("button", { name: "I've dealt with all 2" }).click();
+await page.getByRole("status").getByText("2 marked as dealt with").waitFor();
 await page.getByRole("button", { name: "Done" }).click();
 await page.getByRole("button", { name: /Locum cover|Hi Dr Example/ }).waitFor();
+await page.getByRole("button", { name: /note-b\.txt/ }).waitFor();
 
 step("invoice shows its correspondence (remittance linked by number)");
 await page.getByRole("link", { name: "Invoices" }).first().click();

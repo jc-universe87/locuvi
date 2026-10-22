@@ -15,6 +15,10 @@ releases.
   to its own model list and prices; the AI guide has the full table.
 - **Check key** also works for companies without a model list (one tiny test request).
 - Reasoning text that some models write into their answer is removed.
+- **Inbox:** **I've dealt with this** opens the next item, or goes back to the list when
+  there's nothing left. Tick several items to mark them dealt with, move them back or delete
+  them; deleting more than one needs a second tick. **I've dealt with all** clears the list
+  in one tap. Every one of these can be undone.
 - **Booking emails: only the relevant ones.** Locuvi now scores each email instead of
   matching single words. It needs signs of locum work (the word "locum", one of your practices,
   booking and session words, a fee) and a work date in the message itself, not in the header
