@@ -10,7 +10,7 @@ import re
 import smtplib
 import ssl
 from email.message import EmailMessage
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr, formatdate, make_msgid
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -131,6 +131,7 @@ def send_invoice(
         raise DomainError("invoice.pdf_integrity", "The stored PDF is missing or altered.")
 
     msg = EmailMessage()
+    msg["Date"] = formatdate(localtime=True)  # some mail filters distrust mail without one
     msg["From"] = formataddr((cfg.from_name or "", cfg.from_address))
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject.strip()[:200]
@@ -174,6 +175,7 @@ def send_to_self(
     if not cfg.enabled:
         raise DomainError("email.not_configured", "Set up email in Settings first.")
     msg = EmailMessage()
+    msg["Date"] = formatdate(localtime=True)  # some mail filters distrust mail without one
     msg["From"] = formataddr((cfg.from_name or "Locuvi", cfg.from_address))
     msg["To"] = cfg.from_address
     msg["Subject"] = subject[:200]
@@ -187,6 +189,7 @@ def send_test(s: Session, settings: Settings, box: SecretBox, smtp_factory: Any 
     if not (cfg.host and cfg.from_address and cfg.password_ciphertext):
         raise DomainError("email.incomplete", "Fill in server, address and password first.")
     msg = EmailMessage()
+    msg["Date"] = formatdate(localtime=True)  # some mail filters distrust mail without one
     msg["From"] = formataddr((cfg.from_name or "", cfg.from_address))
     msg["To"] = cfg.from_address
     msg["Subject"] = "Locuvi test email"
@@ -208,7 +211,11 @@ def _deliver(
         raise DomainError("email.password_unreadable", "Re-enter the email password.") from None
     try:
         resolve_and_check(cfg.host, cfg.port, settings)
-    except UrlBlocked:
+    except UrlBlocked as exc:
+        if exc.reason == "dns":  # usually a typo in the server name
+            raise DomainError(
+                "email.unknown_host", "Couldn't find that mail server. Check the server name."
+            ) from None
         raise DomainError(
             "email.host_blocked", "That mail server address is not allowed."
         ) from None

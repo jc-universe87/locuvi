@@ -15,6 +15,8 @@ releases.
   to its own model list and prices; the AI guide has the full table.
 - **Check key** also works for companies without a model list (one tiny test request).
 - Reasoning text that some models write into their answer is removed.
+- Invoice emails now carry a date header (some spam filters distrust mail without one), and a
+  mistyped email server name gets a clear message instead of a general error.
 
 ## 1.0.0 (October 2026): first public release
 
