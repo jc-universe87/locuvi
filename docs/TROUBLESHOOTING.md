@@ -324,6 +324,55 @@ AI companies retire model names. Tap **Check key**, pick a model from the list, 
 Leaving **Model** empty uses Locuvi's default for that company.
 </details>
 
+## Apps
+
+<details>
+<summary><b>Windows says "Windows protected your PC"</b></summary>
+
+Click **More info**, then **Run anyway**. Windows shows this for apps that aren't registered
+with Microsoft. Locuvi is a free project, so it isn't. See [Why the warnings?](APPS.md#why-the-warnings)
+</details>
+
+<details>
+<summary><b>My Mac says Locuvi can't be opened</b></summary>
+
+Open **System Settings › Privacy & Security**, scroll down to "Locuvi was blocked…" and click
+**Open Anyway**. You only need to do this once. If your Mac says Locuvi isn't supported on
+this type of Mac, it's an older Intel Mac. The Mac app needs Apple silicon (M1 or newer), so
+run Locuvi on a server instead ([Setting up Locuvi](SETUP.md)).
+</details>
+
+<details>
+<summary><b>The Android app says it can't reach my Locuvi</b></summary>
+
+- Check that the phone is on the same Wi-Fi as the computer, and that Tailscale is on if you
+  use it.
+- If Locuvi runs in the desktop app, check that it's open on the computer and that **Let my
+  phone and tablet connect** is on (**Settings › Phones, tablets and computers**). After
+  switching it on, quit Locuvi and open it again.
+- Check the address on that same settings page. Routers sometimes give a computer a new one.
+- On Windows, if you clicked **Cancel** when Windows Security asked about Locuvi, open
+  **Windows Security › Firewall & network protection › Allow an app through firewall**, and
+  tick **Private** next to Locuvi.
+</details>
+
+<details>
+<summary><b>Android says "App not installed" when I update</b></summary>
+
+The new version was signed differently from the one on your phone. Uninstall Locuvi from the
+phone, then install the new one. Nothing is lost: your records are on your computer or
+server, not on the phone.
+</details>
+
+<details>
+<summary><b>The desktop app doesn't open, or opens and closes</b></summary>
+
+Look in the `logs` folder inside your Locuvi folder (`%LOCALAPPDATA%\Locuvi` on Windows,
+`~/Library/Application Support/Locuvi` on a Mac). The last lines of `locuvi.log` usually
+say why. If Locuvi is already open, opening it again just shows the window that's already
+running.
+</details>
+
 ## Still stuck?
 
 - 🛠 The server log usually says why: `docker compose logs --tail 100 locuvi`. It never contains

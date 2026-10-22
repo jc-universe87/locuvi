@@ -366,3 +366,23 @@ before enabling a cloud model.
 - Not done, and why: PCSE Online has no public interface, so Locuvi can't read form status.
   Recognising PCSE notification emails, and checking the PCSE statement import against PCSE's
   real CSV, both wait for a real sample.
+
+## Apps for computer, phone and tablet (owner request, 22 Oct 2026) ✅
+
+- Windows and macOS desktop app (`desktop/`): the whole Locuvi on the computer, own window,
+  automatic sign-in, optional phone access over home Wi-Fi. Android WebView app
+  (`mobile/android/`). iPhone and iPad through Add to Home Screen. Same features everywhere.
+- `release.yml` builds, installs and tests each app on its own system, then publishes a
+  release; the README links to `releases/latest/download/…`.
+- Not done, and why: no App Store or Play Store listing, and no Apple or Microsoft code
+  signing (each needs a paid developer account). No Intel Mac build: GitHub's Intel Mac
+  runners are being retired.
+
+## Sync and one-file export (owner request, 22 Oct 2026) 🔜
+
+- One file holding everything (database, settings, PDFs, documents), encrypted, to export
+  and import by hand.
+- Automatic sync of that file between computers: Nextcloud directly (WebDAV), and Google
+  Drive, OneDrive, Dropbox or iCloud Drive through the folder their own app keeps in step.
+  When two computers both changed something, ask the owner which to keep, and back up the
+  other first.

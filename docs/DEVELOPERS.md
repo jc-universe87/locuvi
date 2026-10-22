@@ -50,6 +50,44 @@ reduced to 160 colours to keep the repository small. It also walks the second ho
 profile that `smoke.mjs` creates (`Sam`, password from `SAM_PASSWORD`, default the smoke
 test's) through the welcome steps and a first month, so run it on a fresh instance.
 
+## Desktop and mobile apps
+
+All the apps show the same web app; nothing is reimplemented per platform.
+
+- **Desktop** (`desktop/`): `locuvi_desktop.py` starts the FastAPI app in a thread on
+  `127.0.0.1` (port 8765 if free), with records in the user's app-data folder. It opens an
+  Edge or Chrome app window (falling back to the default browser) on
+  `/desktop/open?token=…`, which signs in the single profile with a per-launch token. Phone
+  access (`/api/v1/desktop`) binds `0.0.0.0` after a restart and needs the owner's own
+  password. PyInstaller recipe: `locuvi.spec`; Windows installer: `windows/locuvi.iss`
+  (Inno Setup).
+- **Android** (`mobile/android/`): one Java activity with a WebView, no AndroidX. It adds
+  `window.LocuviNative` (`frontend/src/lib/native.ts`) for downloads, plus file choosing,
+  outside links and `locuvi://connect?server=…`.
+- **iPhone/iPad**: the web app's manifest and icons (`frontend/public/`).
+
+Build and test locally:
+
+```bash
+(cd frontend && npm ci && npm run build)
+cd desktop && pip install ../backend pyinstaller && pyinstaller --noconfirm locuvi.spec
+./ci-test.sh dist/Locuvi/Locuvi "$PWD/build/test"   # selftest.py + the full e2e smoke test
+gradle -p mobile/android assembleRelease            # needs the Android SDK
+```
+
+`.github/workflows/release.yml` builds each app, installs and tests it on Windows, macOS
+(arm64) and an Android emulator, and publishes a GitHub release with
+`Locuvi-Windows-Setup.exe`, `Locuvi-macOS.dmg` and `Locuvi-Android.apk` when run by hand or
+for a `v*` tag. Pull requests touching `desktop/` or `mobile/` only build and test.
+
+To make every Android release installable over the previous one, add the repository
+secrets `ANDROID_KEYSTORE_BASE64` (a base64-encoded keystore), `ANDROID_KEYSTORE_PASSWORD`,
+and optionally `ANDROID_KEY_ALIAS` (default `locuvi`) and `ANDROID_KEY_PASSWORD`. Without
+them each build is signed with a fresh debug key. Never commit a keystore.
+
+The apps aren't signed with Apple or Microsoft certificates, so macOS and Windows warn on
+first run (see `docs/APPS.md`).
+
 ## Database changes
 
 Edit `backend/locuvi/models.py`, then `uv run python -m locuvi.migrate "message"`, rename the

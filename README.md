@@ -14,7 +14,7 @@ and tax-year reports in one place, running on your own computer.
 ![Self-hosted](https://img.shields.io/badge/self--hosted-your%20data%20stays%20yours-294d63)
 ![Made for](https://img.shields.io/badge/made%20for-UK%20GP%20locums-294d63)
 
-[**User manual**](docs/USER_GUIDE.md) · [**New to locum work?**](docs/LOCUM_HANDBOOK.md) · [**Install**](docs/SETUP.md) ·
+[**Download**](#download) · [**User manual**](docs/USER_GUIDE.md) · [**New to locum work?**](docs/LOCUM_HANDBOOK.md) · [**Install on a server**](docs/SETUP.md) ·
 [Email](docs/EMAIL_SETUP.md) · [AI assistant](docs/AI_SETUP.md) · [Privacy](docs/PRIVACY.md) ·
 [Help](docs/TROUBLESHOOTING.md)
 
@@ -115,19 +115,36 @@ downloads for your accountant.
 
 ## Your data stays yours
 
-Locuvi runs on **a computer you control**: a home PC, mini PC, Raspberry Pi, NAS or private
-server. There's no Locuvi account and no company holding your records. No tracking and no
+Locuvi runs on **a computer you control**: your own Windows PC or Mac, a mini PC, Raspberry
+Pi, NAS or private server. There's no Locuvi account and no company holding your records. No tracking and no
 analytics. Nothing leaves your server unless you switch on a feature such as email or AI.
 It backs itself up every night, checks each backup can be restored, and can keep an encrypted
 copy elsewhere. [Read more about privacy](docs/PRIVACY.md).
 
+## Download
+
+Every version has the same features and shows the same Locuvi.
+
+| | Download | |
+| --- | --- | --- |
+| 🪟 **Windows** 10 and 11 | [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Runs Locuvi on your PC. Nothing else to install. |
+| 🍎 **Mac** with Apple silicon (M1 or newer) | [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Runs Locuvi on your Mac. Nothing else to install. |
+| 🤖 **Android** phones and tablets | [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk) | Connects to your Locuvi on your computer or server. |
+| 📱 **iPhone and iPad** | [Add to Home Screen](docs/APPS.md#iphone-and-ipad) | From Safari, no download needed. |
+| 🖥 **Server** (home PC, Raspberry Pi, NAS) | [Docker](docs/SETUP.md) | Always on, so you can reach it from anywhere. |
+
+Windows, macOS and Android show a warning the first time, because Locuvi is a free project
+that isn't registered with Microsoft, Apple or Google.
+👉 [How to install each one](docs/APPS.md) · [All releases](https://github.com/jc-universe87/locuvi/releases)
+
 ## Get started
 
-**1. Install it** on a computer that stays on. It takes about 15 minutes with Docker; a
-friend or IT helper can do it for you once.
-👉 [Setting up Locuvi](docs/SETUP.md)
+**1. Install it.** The quickest way is the [desktop app](#download) for Windows or Mac. To
+reach Locuvi from anywhere, install it on a computer that stays on instead. That takes about
+15 minutes with Docker, and a friend or IT helper can do it for you once.
+👉 [Apps for computer, phone and tablet](docs/APPS.md) · [Setting up a server](docs/SETUP.md)
 
-**2. Open it** in your browser, on your computer or phone, and answer three questions.
+**2. Open it** on your computer or phone and answer three questions.
 👉 [Your first five minutes](docs/USER_GUIDE.md#3-your-first-five-minutes)
 
 **3. Tap the days you work.** Locuvi tells you when it's time to invoice.
@@ -136,7 +153,8 @@ friend or IT helper can do it for you once.
 | I want to… | Read |
 | --- | --- |
 | Learn how to use Locuvi | 📘 [User manual](docs/USER_GUIDE.md) |
-| Install it, update it, or back up and restore | 🛠 [Setting up Locuvi](docs/SETUP.md) |
+| Install the Windows, Mac, Android or iPhone app | 📲 [Apps](docs/APPS.md) |
+| Install it on a server, update it, or back up and restore | 🛠 [Setting up Locuvi](docs/SETUP.md) |
 | Read booking emails, or send invoices by email | 📨 [Connecting your email](docs/EMAIL_SETUP.md) |
 | Turn on the AI assistant | ✨ [Setting up the AI assistant](docs/AI_SETUP.md) |
 | Know what's stored and where | 🔒 [Privacy and your data](docs/PRIVACY.md) |
@@ -144,7 +162,8 @@ friend or IT helper can do it for you once.
 | See what's new | 📝 [Changelog](CHANGELOG.md) |
 | Help, or change the code | 🤝 [Contributing](CONTRIBUTING.md) · 💻 [Developer notes](docs/DEVELOPERS.md) |
 
-Already running it? Update with `./update.sh` in the Locuvi folder. It backs up first.
+Already running it? On a server, update with `./update.sh` in the Locuvi folder. With the
+desktop app, install the newest download over the old one. Both back up first.
 
 ## Good to know
 
