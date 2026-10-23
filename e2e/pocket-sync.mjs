@@ -47,7 +47,8 @@ if (process.env.ANDROID) {
   // the Android app's own WebView (a test build on the emulator, through adb)
   const { _android } = createRequire(import.meta.url)("playwright");
   [device] = await _android.devices();
-  const webview = await device.webView({ pkg: "uk.locuvi.app" });
+  // the app's WebView can take a while to show up for debugging on a slow emulator
+  const webview = await device.webView({ pkg: "uk.locuvi.app" }, { timeout: 120000 });
   page = await webview.page();
   await page.evaluate(() => (location.hash = "#/settings/sync"));
 } else {
