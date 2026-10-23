@@ -488,6 +488,11 @@ class SyncWhereIn(Strict):
     kind: Literal["folder", "nextcloud"]
     path: Annotated[str, StringConstraints(max_length=1000)] | None = None
     device_name: Annotated[str, StringConstraints(max_length=60)] = ""
+    # Nextcloud: its address, an optional home network address, user and app password
+    url: Annotated[str, StringConstraints(max_length=500)] | None = None
+    home_url: Annotated[str, StringConstraints(max_length=500)] | None = None
+    username: Annotated[str, StringConstraints(max_length=200)] | None = None
+    password: Annotated[str, StringConstraints(max_length=500)] | None = None
 
 
 class SyncJoinIn(SyncWhereIn):

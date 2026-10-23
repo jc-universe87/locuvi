@@ -85,7 +85,8 @@ downloads for your accountant.
 - 👨‍👩‍👧 Household profiles, each one private
 - ♻️ A 30-day "Recently deleted"
 - 🔄 [Sync](docs/SYNC.md) between your devices through Google Drive, OneDrive, Dropbox, iCloud
-  Drive or Nextcloud, encrypted, plus everything in one backup file
+  Drive or Nextcloud (on phones and tablets: Nextcloud), encrypted, plus everything in one
+  backup file
 - ☁️ Copies of your invoices in Nextcloud
 - 🔒 Nightly, checked, encrypted backups
 

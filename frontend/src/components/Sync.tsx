@@ -6,6 +6,7 @@ import { dateTime, todayLondon } from "../lib/format";
 import { POCKET } from "../lib/pocket";
 
 type Where = { kind: "folder" | "nextcloud"; path?: string };
+type Nextcloud = { url: string; home_url: string; username: string; password: string };
 type SyncState = {
   enabled: boolean;
   kind: "folder" | "nextcloud" | null;
@@ -14,9 +15,14 @@ type SyncState = {
   last_ok: string | null;
   last_error: { code: string; message: string; at: string } | null;
   last_changes: number;
+  nextcloud: { url: string; home_url: string | null; username: string; reached: "url" | "home_url" | null } | null;
+  nextcloud_saved: { url: string; username: string } | null;
   cloud_folders: { name: string; path: string }[];
   can_choose_folder: boolean;
 };
+
+/** The Android app connects to Nextcloud itself; on iPhone and iPad the browser does. */
+const appConnects = () => !!(window as unknown as { LocuviNative?: { netStash?: unknown } }).LocuviNative?.netStash;
 
 function folderName(st: SyncState): string {
   const known = st.cloud_folders.find((f) => f.path === st.folder);
@@ -33,11 +39,19 @@ export function SyncSection() {
   const [path, setPath] = useState("");
   const [device, setDevice] = useState("");
   const [code, setCode] = useState("");
+  const [nc, setNc] = useState<Nextcloud>({ url: "", home_url: "", username: "", password: "" });
   const [shownCode, setShownCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api.get<SyncState>("/sync").then(setSt, setError);
+    api.get<SyncState>("/sync").then((s) => {
+      setSt(s);
+      if (s.nextcloud_saved) setNc((n) => ({ ...n, url: s.nextcloud_saved!.url, username: s.nextcloud_saved!.username }));
+    }, setError);
   }, []);
+  const onlyNextcloud = !!st && st.cloud_folders.length === 0 && !st.can_choose_folder;
+  useEffect(() => {
+    if (mode && onlyNextcloud) setWhere({ kind: "nextcloud" });
+  }, [mode, onlyNextcloud]);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -49,7 +63,11 @@ export function SyncSection() {
       setBusy(false);
     }
   };
-  const target = (): Where | null => (where?.kind === "folder" && where.path === "" ? { kind: "folder", path } : where);
+  const target = (): (Where & Partial<Nextcloud>) | null => {
+    if (where?.kind === "folder" && where.path === "") return { kind: "folder", path };
+    if (where?.kind === "nextcloud") return nc.url.trim() && nc.username.trim() ? { ...where, ...nc } : null;
+    return where;
+  };
   const begin = () =>
     run(async () => {
       const w = target();
@@ -83,6 +101,12 @@ export function SyncSection() {
               <span>{t("sync.syncing_with")}</span>
               <strong>{st.kind === "nextcloud" ? t("sync.nextcloud") : folderName(st)}</strong>
               {st.kind === "folder" && <span className="hint" style={{ wordBreak: "break-all" }}>{st.folder}</span>}
+              {st.nextcloud && (
+                <span className="hint" style={{ wordBreak: "break-all" }}>
+                  {st.nextcloud.reached === "home_url" ? st.nextcloud.home_url : st.nextcloud.url}
+                  {st.nextcloud.home_url && ` · ${st.nextcloud.reached === "home_url" ? t("sync.nc_via_home") : t("sync.nc_via_usual")}`}
+                </span>
+              )}
             </div>
             <div className="form-row">
               <span>{t("sync.last")}</span>
@@ -103,13 +127,14 @@ export function SyncSection() {
           </div>
           <p className="form-foot">{t("sync.issue_note")}</p>
         </>
-      ) : POCKET ? (
-        <div className="alert info">{t("pocket.sync_note")}</div>
       ) : mode === null ? (
+        <>
+        {POCKET && <p className="hint">{t("pocket.sync_note")}</p>}
         <div className="actions">
           <button className="btn" onClick={() => setMode("start")}>{t("sync.start")}</button>
           <button className="btn secondary" onClick={() => setMode("join")}>{t("sync.join")}</button>
         </div>
+        </>
       ) : (
         <>
           <h3>{mode === "start" ? t("sync.where_start") : t("sync.where_join")}</h3>
@@ -142,6 +167,7 @@ export function SyncSection() {
             </div>
           )}
           {st.cloud_folders.length === 0 && st.can_choose_folder && <p className="form-foot">{t("sync.no_cloud_app")}</p>}
+          {where?.kind === "nextcloud" && <NextcloudFields nc={nc} saved={st.nextcloud_saved} onChange={setNc} />}
           <div className="form-list" style={{ marginTop: "0.5rem" }}>
             <div className="form-row stacked">
               <label htmlFor="sync-device">{t("sync.device_name")}</label>
@@ -164,6 +190,39 @@ export function SyncSection() {
         </>
       )}
       <EverythingFile />
+    </>
+  );
+}
+
+function NextcloudFields({ nc, saved, onChange }: { nc: Nextcloud; saved: SyncState["nextcloud_saved"]; onChange: (n: Nextcloud) => void }) {
+  const { t } = useT();
+  const set = (k: keyof Nextcloud) => (e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...nc, [k]: e.target.value });
+  const savedPassword = !!saved && saved.username === nc.username.trim();
+  return (
+    <>
+      {POCKET && !appConnects() && <div className="alert info" style={{ marginTop: "0.5rem" }}>{t("sync.nc_iphone")}</div>}
+      <div className="form-list" style={{ marginTop: "0.5rem" }}>
+        <div className="form-row stacked">
+          <label htmlFor="nc-url">{t("sync.nc_url")}</label>
+          <input id="nc-url" value={nc.url} onChange={set("url")} inputMode="url" autoCapitalize="off" autoComplete="url" spellCheck={false} placeholder="cloud.example.uk" />
+          <span className="hint">{t("sync.nc_url_hint")}</span>
+        </div>
+        <div className="form-row stacked">
+          <label htmlFor="nc-home">{t("sync.nc_home_url")}</label>
+          <input id="nc-home" value={nc.home_url} onChange={set("home_url")} inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="http://192.168.1.20" />
+          <span className="hint">{t("sync.nc_home_url_hint")}</span>
+        </div>
+        <div className="form-row stacked">
+          <label htmlFor="nc-user">{t("sync.nc_user")}</label>
+          <input id="nc-user" value={nc.username} onChange={set("username")} autoCapitalize="off" autoComplete="username" spellCheck={false} />
+        </div>
+        <div className="form-row stacked">
+          <label htmlFor="nc-pass">{t("sync.nc_password")}</label>
+          <input id="nc-pass" type="password" value={nc.password} onChange={set("password")} autoComplete="off"
+            placeholder={savedPassword ? t("sync.nc_password_saved") : ""} />
+          <span className="hint">{t("sync.nc_password_hint")}</span>
+        </div>
+      </div>
     </>
   );
 }

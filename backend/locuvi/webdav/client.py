@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
@@ -99,6 +100,11 @@ class WebDavClient:
         self.base = base
         self._settings = settings
         self._check_dns = check_dns
+        if transport is None and os.environ.get("LOCUVI_POCKET") == "1":
+            from locuvi.webdav.browser import BrowserTransport
+
+            # the phone app: the app or browser connects, and does its own name lookup
+            transport, self._check_dns = BrowserTransport(), False
         hooks = {"request": [self._guard]}
         self._http = httpx.Client(
             auth=httpx.BasicAuth(username, password),
@@ -123,7 +129,9 @@ class WebDavClient:
         if request.url.host.lower().rstrip(".") != self.base.host:
             raise UrlBlocked("host_changed", "request host differs from configured host")
         if self._check_dns and not self.base.allowlisted:
-            resolve_and_check(request.url.host, request.url.port, self._settings)
+            resolve_and_check(
+                request.url.host, request.url.port, self._settings, home=self.base.home
+            )
 
     def url(self, encoded_rel: str) -> str:
         return self.base.url + encoded_rel.lstrip("/")
@@ -161,6 +169,16 @@ class WebDavClient:
         if resp.status_code != 207:
             raise classify_status(resp, "PROPFIND")
         return _parse_propfind(resp.content)
+
+    def reachable(self, timeout: float = 6.0) -> bool:
+        """Whether the server answers at all, quickly (choosing between two addresses).
+
+        Any HTTP answer counts, even a refusal: the real request then reports what's wrong."""
+        try:
+            self._http.request("OPTIONS", self.base.url, timeout=timeout)
+        except (UrlBlocked, httpx.TransportError):
+            return False
+        return True
 
     def mkcol(self, encoded_rel: str) -> str:
         """Returns 'created' or 'exists'."""
@@ -226,7 +244,19 @@ class WebDavClient:
             raise classify_status(resp, "GET")
         if len(resp.content) > max_bytes:
             raise WebDavError("too_large", "remote file is too large")
-        return resp.content, resp.headers.get("ETag", "")
+        etag = resp.headers.get("ETag", "")
+        if not etag:
+            # A browser hides ETag unless the server lists it (CORS Expose-Headers). Ask for it
+            # in a listing, then read the file again: if it changed in between, the version is
+            # the older one, so the next put_if is refused and nothing is overwritten.
+            st = self.stat(encoded_rel)
+            if not st.exists or not st.etag:
+                return resp.content, ""
+            again = self._send("GET", encoded_rel)
+            if again.status_code != 200:
+                raise classify_status(again, "GET")
+            return again.content, f'"{st.etag}"'
+        return resp.content, etag
 
     def put_if(self, encoded_rel: str, data: bytes, etag: str | None) -> bool:
         """PUT only if the file is still the version read (``etag``), or still absent (None).

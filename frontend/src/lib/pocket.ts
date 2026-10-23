@@ -9,6 +9,12 @@ export const POCKET = import.meta.env.VITE_POCKET === "1";
 type Reply = { id: number; status: number; headers: [string, string][]; body: ArrayBuffer | null; error?: string };
 type Progress = { type: "progress"; step: string };
 
+type NativeNet = { netStash: (id: string, request: string) => void };
+const nativeNet = (): NativeNet | null => {
+  const n = (window as unknown as { LocuviNative?: Partial<NativeNet> }).LocuviNative;
+  return n?.netStash ? (n as NativeNet) : null;
+};
+
 let worker: Worker | null = null;
 let ready: Promise<void> | null = null;
 let next = 1;
@@ -26,6 +32,7 @@ function boot(): Promise<void> {
   ready = new Promise((resolve, reject) => {
     try {
       worker = new Worker(new URL("../pocket/engine.worker.ts", import.meta.url), { type: "module" });
+      worker.postMessage({ type: "config", nativeNet: !!nativeNet() });
     } catch (err) {
       progressListeners.forEach((fn) => fn("failed"));
       return reject(err);
@@ -47,6 +54,11 @@ function boot(): Promise<void> {
         return reject(new Error((e.data as { error: string }).error));
       }
       if (m.type === "progress") return progressListeners.forEach((fn) => fn((e.data as Progress).step));
+      if (m.type === "net") {
+        // the Android app makes this connection for the engine (see engine.worker.ts)
+        const n = e.data as unknown as { id: string; request: string };
+        return nativeNet()?.netStash(n.id, n.request);
+      }
       const r = e.data as Reply;
       waiting.get(r.id)?.(r);
       waiting.delete(r.id);

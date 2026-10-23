@@ -352,6 +352,9 @@ def _adopt_household_key(settings: Settings, secrets: SecretBox, new_key: bytes)
         cfg = load_config(settings)
         if cfg.code_ciphertext:
             cfg.code_ciphertext = new.encrypt(old.decrypt(cfg.code_ciphertext.encode())).decode()
+        saved = (cfg.target or {}).get("password_ciphertext")
+        if saved:
+            cfg.target["password_ciphertext"] = new.encrypt(old.decrypt(saved.encode())).decode()  # type: ignore[index]
         key_path = settings.key_dir / "locuvi.key"
         tmp = key_path.with_suffix(".sync")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -371,30 +374,113 @@ def _adopt_household_key(settings: Settings, secrets: SecretBox, new_key: bytes)
 # ------------------------------------------------------------------ targets
 
 
+def nextcloud_spec(
+    settings: Settings,
+    secrets: SecretBox,
+    *,
+    url: str,
+    home_url: str | None,
+    username: str,
+    password: str | None,
+) -> dict[str, Any]:
+    """The Nextcloud to sync with, checked and with the app password encrypted.
+
+    ``url`` is its usual address (from anywhere); ``home_url`` an optional second address that
+    works at home or in the office. Each sync uses whichever answers. Without a password, the
+    one saved in Settings › Nextcloud copies is used (same Nextcloud and user)."""
+    from locuvi.webdav.urlguard import UrlBlocked, validate_base_url
+
+    spec: dict[str, Any] = {"kind": "nextcloud", "username": username.strip()}
+    for key, raw, home in (("url", url, False), ("home_url", home_url, True)):
+        if key == "home_url" and not (raw or "").strip():
+            continue
+        try:
+            spec[key] = validate_base_url(
+                _webdav_address(raw, spec["username"]), settings, home=home
+            ).url
+        except UrlBlocked as exc:
+            raise DomainError(f"sync.nextcloud_{key}", str(exc), reason=exc.reason) from None
+    if not spec["username"]:
+        raise DomainError("sync.nextcloud_username", "Type your Nextcloud user name.")
+    if not password:
+        saved = _saved_nextcloud(settings, secrets)
+        if saved is None or saved[1] != spec["username"]:
+            raise DomainError("sync.nextcloud_password", "Type an app password for Nextcloud.")
+        password = saved[2]
+    spec["password_ciphertext"] = secrets.encrypt(password)
+    return spec
+
+
+def _webdav_address(raw: str, username: str) -> str:
+    """ "cloud.example.uk" → "https://cloud.example.uk/remote.php/dav/files/<user>/".
+
+    A full WebDAV address (from Nextcloud's Files settings) is kept as it is."""
+    from urllib.parse import quote, urlsplit
+
+    raw = (raw or "").strip()
+    if raw and "://" not in raw:
+        raw = "https://" + raw
+    parts = urlsplit(raw)
+    if parts.netloc and parts.path in ("", "/") and username:
+        return f"{parts.scheme}://{parts.netloc}/remote.php/dav/files/{quote(username, safe='')}/"
+    return raw
+
+
+def _saved_nextcloud(settings: Settings, secrets: SecretBox) -> tuple[str, str, str] | None:
+    """The Nextcloud connection from Settings › Nextcloud copies: address, user, password."""
+    from locuvi import db
+    from locuvi.models import StorageConfig
+    from locuvi.webdav import archive
+
+    with db.new_session() as s:
+        sc = s.get(StorageConfig, 1)
+        if sc is None or not sc.target_url or not sc.username:
+            return None
+        try:
+            password = archive.get_password(archive.ArchiveContext(settings, secrets), sc)
+        except Exception:  # no password saved, or it can't be read
+            return None
+        return sc.target_url, sc.username, password
+
+
+def saved_nextcloud_hint(settings: Settings, secrets: SecretBox) -> dict[str, str] | None:
+    """Address and user of the saved Nextcloud connection, to fill in the sync form."""
+    saved = _saved_nextcloud(settings, secrets)
+    return {"url": saved[0], "username": saved[1]} if saved else None
+
+
+_reached: dict[str, str] = {}  # data dir -> which address answered last ("url"/"home_url")
+
+
 def build_target(settings: Settings, secrets: SecretBox, cfg: Config) -> Target:
     t = cfg.target or {}
     if t.get("kind") == "folder":
         return FolderTarget(Path(t["path"]))
     if t.get("kind") == "nextcloud":
-        from locuvi import db
-        from locuvi.models import StorageConfig
-        from locuvi.webdav import archive
         from locuvi.webdav.client import WebDavClient
         from locuvi.webdav.urlguard import validate_base_path, validate_base_url
 
-        with db.new_session() as s:
-            sc = s.get(StorageConfig, 1)
-            if sc is None or not sc.target_url or not sc.username:
+        if t.get("url"):
+            user, password = t["username"], secrets.decrypt(t["password_ciphertext"])
+            addresses = [(k, t[k]) for k in ("url", "home_url") if t.get(k)]
+        else:  # set up before sync had its own Nextcloud details
+            saved = _saved_nextcloud(settings, secrets)
+            if saved is None:
                 raise DomainError(
                     "sync.nextcloud_missing",
                     "Set up Nextcloud first (Settings › Nextcloud copies).",
                 )
-            ctx = archive.ArchiveContext(settings, secrets)
-            password = archive.get_password(ctx, sc)
-            url, user = sc.target_url, sc.username
-        vurl = validate_base_url(url, settings)
-        client = WebDavClient(vurl, user, password, settings)
-        return WebDavTarget(client, validate_base_path("Locuvi"), vurl.host)
+            addresses, user, password = [("url", saved[0])], saved[1], saved[2]
+        key = str(Path(settings.data_dir).resolve())
+        last = _reached.get(key)
+        addresses.sort(key=lambda a: a[0] != last)  # the one that answered last time first
+        for i, (which, url) in enumerate(addresses):
+            vurl = validate_base_url(url, settings, home=which == "home_url")
+            client = WebDavClient(vurl, user, password, settings)
+            if i == len(addresses) - 1 or client.reachable():
+                _reached[key] = which
+                return WebDavTarget(client, validate_base_path("Locuvi"), vurl.host)
+            client.close()
     raise DomainError("sync.not_set_up", "Sync isn't set up on this device.")
 
 
@@ -624,10 +710,19 @@ def stop(settings: Settings) -> None:
 def status(settings: Settings) -> dict[str, Any]:
     cfg = load_config(settings)
     t = cfg.target or {}
+    nextcloud = None
+    if t.get("kind") == "nextcloud" and t.get("url"):
+        nextcloud = {
+            "url": t["url"],
+            "home_url": t.get("home_url"),
+            "username": t.get("username"),
+            "reached": _reached.get(str(Path(settings.data_dir).resolve())),
+        }
     return {
         "enabled": cfg.enabled,
         "kind": t.get("kind"),
         "folder": t.get("path") if t.get("kind") == "folder" else None,
+        "nextcloud": nextcloud,
         "device_name": cfg.device_name,
         "last_ok": cfg.last_ok,
         "last_error": cfg.last_error,

@@ -42,6 +42,7 @@ Only these features send anything outside, and only once you've set them up:
 | **Reading booking emails** (Settings › Booking emails) | Locuvi signs in and *reads* the folders you chose | Your own email provider |
 | **AI assistant** (Settings › Assistant) | Booking text with personal details removed, practice names and today's date. A photo or scan only after you approve that file. For **Ask Locuvi**, the records needed to answer your question | The AI company you chose ([details](AI_SETUP.md#what-is-sent-to-the-ai-company)), or nobody else if you [use your own server](AI_SETUP.md#use-your-own-server) |
 | **Nextcloud copies** and **encrypted backups** | Invoice PDFs; backups are encrypted first with your backup password | Your own Nextcloud |
+| **Sync** (Settings › Sync and backup file) | All your records and files, encrypted first with your sync code | The cloud folder or Nextcloud you chose |
 | **Phone calendar** | Your bookings (fees only if you choose), when your calendar app asks | Your calendar app, through your private link |
 | **Connect another AI assistant** | The records it asks for; never passwords, bank details or AI keys | The AI tool you connected |
 | **Updates** | Nothing about you: the server downloads the new version | GitHub |

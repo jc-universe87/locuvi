@@ -7,7 +7,8 @@ devices know.
 
 **Contents**
 [What you need](#what-you-need) · [Start syncing](#start-syncing) ·
-[Add another device](#add-another-device) · [Day to day](#day-to-day) ·
+[Add another device](#add-another-device) · [Nextcloud](#nextcloud) ·
+[Phones and tablets](#phones-and-tablets) · [Day to day](#day-to-day) ·
 [Invoice numbers](#invoice-numbers) · [Everything in one file](#everything-in-one-file) ·
 [What stays on one device](#what-stays-on-one-device) · [Questions](#questions)
 
@@ -19,7 +20,8 @@ One of these:
 
 - **Google Drive, OneDrive, Dropbox or iCloud Drive**, with its app installed and signed in
   on your computer. Locuvi keeps its sync folder inside the folder that app looks after.
-- **Nextcloud**, set up in **Settings › Nextcloud copies**.
+- **Nextcloud**: your own, or one from work. This is also how phones and tablets sync for
+  now ([Phones and tablets](#phones-and-tablets)).
 
 ## Start syncing
 
@@ -47,6 +49,117 @@ On the new device:
 
 Your records, invoice PDFs and documents arrive on the new device. Saved passwords (email,
 Nextcloud, the AI assistant) come too, so you don't type them again.
+
+## Nextcloud
+
+Choose **Nextcloud** when you start or join, then fill in:
+
+- **Nextcloud address**: the address you use from anywhere, for example `cloud.example.uk`.
+  You can also paste the full WebDAV address from Nextcloud (**Files › Files settings ›
+  WebDAV**).
+- **Address at home or work** (optional): if your Nextcloud also has an address on your home
+  or office network, such as `http://192.168.1.20` or `http://nas.local`, add it too. Each
+  sync uses whichever address answers, so it works both at home and when you're out. This
+  address may start with `http://` because it stays on your own network.
+- **Nextcloud user name** and an **app password**. Make the app password in Nextcloud:
+  **Settings › Security › Devices & sessions › Create new app password**. Don't use your
+  normal password; you can withdraw an app password at any time.
+
+Locuvi keeps everything in a folder called `Locuvi/Locuvi Sync` in your Nextcloud, encrypted
+with your sync code, so even the Nextcloud's owner can't read your records.
+
+## Phones and tablets
+
+On a phone or tablet, Locuvi syncs through Nextcloud for now. Syncing through Google Drive,
+OneDrive or Dropbox from a phone is coming in a future update. Until then, move records with
+[Everything in one file](#everything-in-one-file).
+
+- **Android:** works with any Nextcloud, including one from work, at its usual address or
+  its home network address. The Android app connects to Nextcloud itself, so nothing needs
+  changing on the server.
+- **iPhone and iPad:** Locuvi runs in Safari, and Safari only lets a website use another
+  site, such as your Nextcloud, if that site allows it. So the Nextcloud must allow Locuvi's
+  address, `https://locuvi.pistio.co.uk`, and the iPhone must reach it by an `https://`
+  address. If you run your own Nextcloud, follow
+  [Let iPhones and iPads connect](#let-iphones-and-ipads-connect) below. With a Nextcloud
+  from work, ask its IT team.
+
+If Nextcloud doesn't allow Locuvi yet, joining stops with *"Nextcloud can't be reached from
+this phone… your Nextcloud must also allow Locuvi"*, and nothing changes on the phone.
+
+### Let iPhones and iPads connect
+
+This is for people who run their own Nextcloud. It lets one website,
+`https://locuvi.pistio.co.uk`, use your Nextcloud's WebDAV address (`/remote.php/dav/`).
+Your app password is still needed for everything, as before. In web terms, it's a CORS rule
+for that one origin: answer the preflight `OPTIONS` request, allow the WebDAV methods and
+headers Locuvi uses, and expose `ETag`.
+
+**nginx in front of Nextcloud** (a reverse proxy). In the `http` block:
+
+```nginx
+map $http_origin $locuvi_origin {
+    default "";
+    "https://locuvi.pistio.co.uk" $http_origin;
+}
+map "$request_method $http_origin" $locuvi_preflight {
+    default 0;
+    "OPTIONS https://locuvi.pistio.co.uk" 1;
+}
+```
+
+and in your Nextcloud's `server` block, next to its `location /`:
+
+```nginx
+location /remote.php/dav/ {
+    if ($locuvi_preflight) {
+        add_header Access-Control-Allow-Origin "https://locuvi.pistio.co.uk" always;
+        add_header Access-Control-Allow-Methods "GET, PUT, DELETE, MKCOL, MOVE, PROPFIND, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type, Depth, Destination, Overwrite, If-Match, If-None-Match" always;
+        add_header Access-Control-Max-Age 600 always;
+        return 204;
+    }
+    add_header Access-Control-Allow-Origin $locuvi_origin always;
+    add_header Access-Control-Expose-Headers "ETag" always;
+    add_header Vary "Origin" always;
+    # …then the same proxy_pass and proxy_set_header lines as your "location /"
+}
+```
+
+**Apache** (for example the `nextcloud:apache` Docker image), in the Nextcloud site's
+configuration, with `mod_headers` and `mod_rewrite` on:
+
+```apache
+SetEnvIf Origin "^https://locuvi\.pistio\.co\.uk$" LOCUVI_ORIGIN
+<LocationMatch "^/remote\.php/dav/">
+    Header always set Access-Control-Allow-Origin "https://locuvi.pistio.co.uk" env=LOCUVI_ORIGIN
+    Header always set Access-Control-Allow-Methods "GET, PUT, DELETE, MKCOL, MOVE, PROPFIND, OPTIONS" env=LOCUVI_ORIGIN
+    Header always set Access-Control-Allow-Headers "Authorization, Content-Type, Depth, Destination, Overwrite, If-Match, If-None-Match" env=LOCUVI_ORIGIN
+    Header always set Access-Control-Expose-Headers "ETag" env=LOCUVI_ORIGIN
+    Header always merge Vary "Origin"
+</LocationMatch>
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteCond %{HTTP:Origin} "^https://locuvi\.pistio\.co\.uk$"
+RewriteRule "^/remote\.php/dav/" - [R=204,L]
+```
+
+If you'd rather not edit the web server, the Nextcloud app **WebAppPassword** can add CORS
+rules for WebDAV from Nextcloud's own settings: add `https://locuvi.pistio.co.uk` to its
+allowed origins.
+
+To check, run this from any computer (with your address). The answer should be
+`HTTP/… 204` and include `access-control-allow-origin: https://locuvi.pistio.co.uk`:
+
+```bash
+curl -si -X OPTIONS https://cloud.example.uk/remote.php/dav/files/USER/ \
+  -H "Origin: https://locuvi.pistio.co.uk" -H "Access-Control-Request-Method: PROPFIND" \
+  -H "Access-Control-Request-Headers: authorization,depth"
+```
+
+Locuvi's own tests check the phone app against a stand-in Nextcloud that follows exactly
+these rules ([`e2e/fake_nextcloud.py`](../e2e/fake_nextcloud.py)), and against one that
+doesn't.
 
 ## Day to day
 
@@ -96,6 +209,13 @@ These stay on the device where you set them up:
 
 No. Everything in the sync folder is encrypted with your sync code before it leaves your
 device. They only see files with meaningless names.
+</details>
+
+<details>
+<summary><b>Can my Nextcloud's owner, or my company, read my records?</b></summary>
+
+No. They can see that a `Locuvi Sync` folder exists and how big it is, but everything in it is
+encrypted with your sync code.
 </details>
 
 <details>

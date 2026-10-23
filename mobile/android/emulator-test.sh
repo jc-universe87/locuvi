@@ -8,6 +8,9 @@
 # 2. A Locuvi is also running on the host at :8000 with its access log in server-access.log
 #    (the emulator reaches the host as 10.0.2.2). Opened with a connect link, the app loads
 #    that Locuvi instead, and opened again from the launcher, still remembers the address.
+# 3. With TEST_APK (the same app as a test build, whose screens can be driven): the phone
+#    joins sync through a stand-in Nextcloud on the host (:8791, no CORS, plain http:// as a
+#    home network address) and a Locuvi on the "computer" (:8793), by e2e/pocket-sync.mjs.
 set -euo pipefail
 APK=$1
 LOG=$2
@@ -63,6 +66,26 @@ wait_for 'GET /api/v1/auth/session' $((before + 1))
 sleep 3
 adb exec-out screencap -p > "$OUT/android-reopened.png"
 echo "PASS reopening remembers the address"
+
+if [ -n "${TEST_APK:-}" ]; then
+  adb uninstall uk.locuvi.app >/dev/null
+  adb install "$TEST_APK"
+  adb shell monkey -p uk.locuvi.app -c android.intent.category.LAUNCHER 1 >/dev/null
+  for _ in $(seq 120); do
+    if adb logcat -d -s Locuvi | grep -q "Locuvi is ready on this device"; then break; fi
+    sleep 2
+  done
+  HERE=$(cd "$(dirname "$0")" && pwd)
+  # the usual address doesn't answer from here, so sync uses the home network one
+  NODE_PATH=$(npm root -g) ANDROID=1 DESKTOP_URL=http://127.0.0.1:8793 NC_DESKTOP=http://127.0.0.1:8791 \
+    NC_PHONE=https://nextcloud.example.invalid NC_PHONE_HOME=http://10.0.2.2:8791 SHOTS="$OUT" \
+    node "$HERE/../../e2e/pocket-sync.mjs" || {
+      adb exec-out screencap -p > "$OUT/android-sync-failed.png" || true
+      adb logcat -d -s Locuvi | tail -40
+      exit 1
+    }
+  echo "PASS the phone syncs through Nextcloud"
+fi
 
 if adb logcat -d | grep -E "FATAL EXCEPTION|AndroidRuntime: .*uk.locuvi" ; then
   echo "FAIL the app crashed"; exit 1
