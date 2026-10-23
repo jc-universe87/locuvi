@@ -30,7 +30,9 @@ def test_window_keeps_it_alive_and_quit_stops_it(settings, tmp_path):
     desktop.reset()
     st = replace(settings, auth_mode="password", password="random-bootstrap-0000", desktop=True,
                  desktop_token="t-0000", desktop_config=tmp_path / "desktop.json")  # fmt: skip
-    with TestClient(create_app(st)) as c:
+    with TestClient(create_app(st), client=("127.0.0.1", 50000)) as c:
+        # the window says "still here" even while nobody is signed in (switching profiles)
+        assert c.post("/api/v1/desktop/alive").json() == {"ok": True}
         c.get("/desktop/open?token=t-0000")
         h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
         assert c.post("/api/v1/desktop/alive", headers=h).json() == {"ok": True}
@@ -48,3 +50,9 @@ def test_not_on_a_server(settings):
         h = {"X-CSRF-Token": c.get("/api/v1/auth/session").json()["csrf_token"]}
         assert c.post("/api/v1/desktop/quit", headers=h).status_code == 404
     assert not desktop._state["quit"]
+
+
+def test_heartbeat_only_from_this_computer(settings, tmp_path):
+    st = replace(settings, desktop=True, desktop_config=tmp_path / "desktop.json")
+    with TestClient(create_app(st), client=("192.0.2.7", 50000)) as c:
+        assert c.post("/api/v1/desktop/alive").status_code == 404

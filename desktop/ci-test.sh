@@ -18,7 +18,7 @@ printf "e2e-pass" > "$WORK/pw"
 PID=$!
 MORE=()
 stop() {
-  kill "$PID" "${MORE[@]}" 2>/dev/null || true
+  kill "$PID" ${MORE[@]+"${MORE[@]}"} 2>/dev/null || true  # empty array: fine on the Mac's old bash too
   if command -v taskkill >/dev/null; then taskkill //F //IM Locuvi.exe >/dev/null 2>&1 || true; fi
 }
 trap stop EXIT
