@@ -74,7 +74,14 @@ jobs:
           path: ${{ runner.temp }}/pocket/pyodide
           key: pyodide-${{ hashFiles('frontend/pocket/deps.py') }}
       - name: Gather Pyodide and Locuvi's packages
-        run: python frontend/pocket/deps.py "$RUNNER_TEMP/pocket"
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          # Google sign-in for sync: its client "secret" goes into the built app, not git
+          if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "GOOGLE_CLIENT_SECRET = \"$GOOGLE_CLIENT_SECRET\"" > backend/locuvi/_cloud_secret.py
+          fi
+          python frontend/pocket/deps.py "$RUNNER_TEMP/pocket"
       - name: Build the phone app
         working-directory: frontend
         run: |

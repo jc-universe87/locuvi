@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from dataclasses import replace
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -106,6 +107,7 @@ def test_a_write_onto_a_newer_copy_is_refused(tmp_path, fake):
 
 def test_google_two_devices_writing_at_once(tmp_path, monkeypatch):
     monkeypatch.setenv("LOCUVI_GOOGLE_CLIENT_ID", "google-test-app")
+    monkeypatch.setenv("LOCUVI_GOOGLE_CLIENT_SECRET", "google-test-secret")
     fc = FakeCloud("google")
     monkeypatch.setattr(cloud, "_http", fc.client)
     d = Device(tmp_path, "laptop")
@@ -156,9 +158,11 @@ def test_phone_joining_keeps_the_sign_in_readable(tmp_path, fake):
 
 def test_api_offers_only_set_up_accounts(settings, monkeypatch):
     for p in PROVIDERS:
-        monkeypatch.delenv(f"LOCUVI_{p.upper()}_CLIENT_ID", raising=False)
+        monkeypatch.setenv(f"LOCUVI_{p.upper()}_CLIENT_ID", "")
     monkeypatch.setenv("LOCUVI_DROPBOX_CLIENT_ID", "dropbox-test-app")
-    with client_for(settings) as c:
+    with client_for(settings) as c:  # a self-hosted server: accounts are for the apps
+        assert Api(c).get("/api/v1/sync").json()["cloud_accounts"] == []
+    with client_for(replace(settings, desktop=True)) as c:
         api = Api(c)
         assert api.get("/api/v1/sync").json()["cloud_accounts"] == ["dropbox"]
         r = api.post("/api/v1/sync/cloud/begin", {"provider": "google", "return_to": "web"})

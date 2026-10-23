@@ -65,8 +65,10 @@ code. You stay signed in; if the company ever signs Locuvi out, sync says so and
 again.
 
 > [!NOTE]
-> These options appear once Locuvi's publisher has registered it with each company
-> ([how](CLOUD_APPS.md)). OneDrive on an iPhone or iPad asks you to sign in again once a day.
+> Dropbox and Google Drive accounts work in the Locuvi apps for Windows, Mac and Android and
+> on iPhone and iPad. OneDrive accounts are coming: Locuvi still has to be registered with
+> Microsoft ([how](CLOUD_APPS.md)). Once it is, OneDrive on an iPhone or iPad will ask you to
+> sign in again once a day.
 
 ## Nextcloud
 
@@ -88,8 +90,8 @@ with your sync code, so even the Nextcloud's owner can't read your records.
 
 ## Phones and tablets
 
-On a phone or tablet, Locuvi syncs through a [cloud account](#cloud-accounts) (Dropbox,
-Google Drive or OneDrive) or Nextcloud. A cloud *folder* on a computer (from the Dropbox or
+On a phone or tablet, Locuvi syncs through a [cloud account](#cloud-accounts) (Dropbox or
+Google Drive; OneDrive is coming) or Nextcloud. A cloud *folder* on a computer (from the Dropbox or
 Google Drive app) is the same sync folder, so a computer using the Dropbox app and a phone
 signed in to the same Dropbox account don't meet: use the account on both, or Nextcloud.
 

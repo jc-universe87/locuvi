@@ -6,10 +6,10 @@ releases.
 
 ## Unreleased
 
-- **Sync through a Dropbox, Google Drive or OneDrive account** (Settings › Sync and backup
-  file): sign in once on each device, no app needed, so it works on phones and tablets too.
-  Locuvi only gets its own folder, and everything in it stays encrypted with your sync code.
-  The options appear once Locuvi is registered with each company
+- **Sync through a Dropbox or Google Drive account** (Settings › Sync and backup file): sign
+  in once on each device, no app needed, so it works on phones and tablets too. Locuvi only
+  gets its own folder, and everything in it stays encrypted with your sync code. OneDrive
+  accounts follow once Locuvi is registered with Microsoft
   ([docs/CLOUD_APPS.md](docs/CLOUD_APPS.md)).
 
 - **Locuvi updates itself.** The Windows and Mac app checks for a new version every few

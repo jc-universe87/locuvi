@@ -61,7 +61,13 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
       - name: Install Locuvi and PyInstaller
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
+          # Google sign-in for sync: its client "secret" goes into the built app, not git
+          if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "GOOGLE_CLIENT_SECRET = \"$GOOGLE_CLIENT_SECRET\"" > backend/locuvi/_cloud_secret.py
+          fi
           # the version this app is released as: it compares it with newer releases (updates.py)
           echo "VERSION = \"${LOCUVI_VERSION#v}\"" > backend/locuvi/_release.py
           python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
@@ -117,7 +123,13 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
       - name: Install Locuvi and PyInstaller
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
+          # Google sign-in for sync: its client "secret" goes into the built app, not git
+          if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "GOOGLE_CLIENT_SECRET = \"$GOOGLE_CLIENT_SECRET\"" > backend/locuvi/_cloud_secret.py
+          fi
           # the version this app is released as: it compares it with newer releases (updates.py)
           echo "VERSION = \"${LOCUVI_VERSION#v}\"" > backend/locuvi/_release.py
           python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
@@ -188,7 +200,13 @@ jobs:
           key: pyodide-${{ hashFiles('frontend/pocket/deps.py') }}
       # The whole of Locuvi, to run on the phone itself (records kept on the phone)
       - name: Build the phone app into the APK
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
+          # Google sign-in for sync: its client "secret" goes into the built app, not git
+          if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "GOOGLE_CLIENT_SECRET = \"$GOOGLE_CLIENT_SECRET\"" > backend/locuvi/_cloud_secret.py
+          fi
           python frontend/pocket/deps.py "$RUNNER_TEMP/pocket"
           (cd frontend && npm ci && VITE_LOCUVI_VERSION="${LOCUVI_VERSION#v}" PYODIDE_DIR="$RUNNER_TEMP/pocket/pyodide" POCKET_WHEELS="$RUNNER_TEMP/pocket/wheels" npm run build:pocket)
           rm -rf mobile/android/app/src/main/assets/www

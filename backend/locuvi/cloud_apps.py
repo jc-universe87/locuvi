@@ -10,12 +10,18 @@ from __future__ import annotations
 
 import os
 
-DROPBOX_APP_KEY = ""
-GOOGLE_CLIENT_ID = ""
-# Google's "Web application" clients need this to redeem a sign-in; it identifies the app
-# only (Locuvi has no server to keep it on), see docs/CLOUD_APPS.md.
-GOOGLE_CLIENT_SECRET = ""
+DROPBOX_APP_KEY = "xn87zdu7r3pu03w"
+GOOGLE_CLIENT_ID = "645552268873-bqfqglhsm96r34gafkjenk6s81elj95u.apps.googleusercontent.com"
 ONEDRIVE_CLIENT_ID = ""
+
+# Google's "Web application" clients need a secret to redeem a sign-in. It only identifies
+# the app (Locuvi has no server to keep it on, so every built copy carries it), but it isn't
+# kept in git: GitHub would flag it. The builds write it into locuvi/_cloud_secret.py from
+# the GOOGLE_CLIENT_SECRET repository secret (docs/CLOUD_APPS.md).
+try:
+    from locuvi._cloud_secret import GOOGLE_CLIENT_SECRET  # type: ignore[import-not-found]
+except ImportError:
+    GOOGLE_CLIENT_SECRET = ""
 
 # Where each company sends the person back after signing in (the iPhone/iPad site); that
 # page passes the result on to the Locuvi that asked (computer, Android app or this site).
@@ -32,4 +38,6 @@ def client(provider: str) -> tuple[str, str]:
     cid = os.environ.get(f"LOCUVI_{key}_CLIENT_ID", ids.get(key, ""))
     default_secret = GOOGLE_CLIENT_SECRET if key == "GOOGLE" else ""
     secret = os.environ.get(f"LOCUVI_{key}_CLIENT_SECRET", default_secret)
+    if key == "GOOGLE" and not secret:
+        return "", ""  # a build without the secret can't finish a Google sign-in
     return cid, secret
