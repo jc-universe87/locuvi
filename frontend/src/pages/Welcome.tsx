@@ -25,8 +25,11 @@ export default function WelcomePage() {
 
   useEffect(() => {
     api.get<Profile>("/settings/profile").then((p) => {
-      setMe({ legal_name: p.legal_name, address_lines: p.address_lines, postcode: p.postcode, email: p.email });
-      setBank({ bank_account_holder: p.bank_account_holder, bank_sort_code: p.bank_sort_code, bank_account_number: "" });
+      // fill in what's saved, but never over what was typed while it loaded
+      setMe((m) => ({ legal_name: m.legal_name || p.legal_name, address_lines: m.address_lines || p.address_lines,
+        postcode: m.postcode || p.postcode, email: m.email || p.email }));
+      setBank((b) => ({ bank_account_holder: b.bank_account_holder || p.bank_account_holder,
+        bank_sort_code: b.bank_sort_code || p.bank_sort_code, bank_account_number: b.bank_account_number }));
       setHasAccount(p.bank_account_number_set);
     }, setError);
     api.get<Practice[]>("/practices").then((ps) => setHasPractice(ps.length > 0), () => undefined);

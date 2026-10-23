@@ -27,6 +27,8 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, a
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
+// which request failed: the console only says "Failed to load resource"
+page.on("response", (r) => { if (r.status() >= 400) errors.push(`  ↳ ${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`); });
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); if (process.env.SHOW_CONSOLE) console.log("console:", m.text().slice(0, 300)); });
 const shot = async (name, p = page) => SHOTS && p.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 const step = (s) => console.log(`• ${s}`);
@@ -215,9 +217,12 @@ await shot("10-reports");
 step("today shows findings (backup reminder after first invoice)");
 await page.getByRole("link", { name: "Today" }).first().click();
 await page.getByRole("heading", { name: "Things to check" }).waitFor();
-await page.getByText(/Your records haven't been backed up yet/).waitFor();
+// A fresh Locuvi makes its first nightly backup within minutes of starting (after 02:00),
+// so by now it may already have one; then the reminder is rightly gone.
+const remind = await page.getByText(/Your records haven't been backed up yet/).waitFor({ timeout: 15000 }).then(() => true, () => false);
+if (!remind) console.log("  (Locuvi had already backed up by itself)");
 await shot("10b-today-findings");
-if (await page.getByRole("button", { name: "Back up now" }).isVisible()) {
+if (remind && (await page.getByRole("button", { name: "Back up now" }).isVisible())) {
   await page.getByRole("button", { name: "Back up now" }).click();
   await page.getByText("Backup saved").waitFor();
   await page.getByText(/Your records haven't been backed up yet/).waitFor({ state: "detached" });

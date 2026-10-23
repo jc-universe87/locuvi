@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 
 from locuvi import desktop
 from locuvi.api import schemas as S
-from locuvi.api.routes import _admin, _set_cookie, api
+from locuvi.api.routes import _admin, _set_cookie, api, public
 from locuvi.errors import DomainError, NotFound
 
 opener = APIRouter()
@@ -94,12 +94,17 @@ def _desktop_only(request: Request) -> Any:
     return settings
 
 
-@api.post("/desktop/alive")
+@public.post("/desktop/alive")
 def desktop_alive(request: Request) -> dict[str, bool]:
-    """The app's window is still open (see ``desktop.should_stop``)."""
+    """The app's window is still open (see ``desktop.should_stop``).
+
+    No sign-in needed: it only keeps Locuvi running, and a beat sent just as someone signs
+    out (or in as another household profile) must not fail. Only from this computer."""
     import time
 
     _desktop_only(request)
+    if request.client is None or request.client.host not in ("127.0.0.1", "::1"):
+        raise NotFound("desktop.not_available", "Only on the computer Locuvi runs on.")
     desktop.seen(time.monotonic())
     return {"ok": True}
 

@@ -18,7 +18,7 @@ printf "e2e-pass" > "$WORK/pw"
 PID=$!
 MORE=()
 stop() {
-  kill "$PID" "${MORE[@]}" 2>/dev/null || true
+  kill "$PID" ${MORE[@]+"${MORE[@]}"} 2>/dev/null || true  # empty array: fine on the Mac's old bash too
   if command -v taskkill >/dev/null; then taskkill //F //IM Locuvi.exe >/dev/null 2>&1 || true; fi
 }
 trap stop EXIT
@@ -51,7 +51,8 @@ open_link() { python -c "import json,sys; print(json.load(open(sys.argv[1]))['op
 NODE_PATH=$(npm root -g) OPEN_A=$(open_link "$WORK/laptop.json") OPEN_B=$(open_link "$WORK/phone.json") \
   SHOTS="$WORK/shots" node "$HERE/../e2e/sync.mjs"
 
-if grep -i traceback "$WORK"/*/logs/*.log; then
+if grep -qi traceback "$WORK"/*/logs/*.log; then
+  grep -h -i -B3 -A30 traceback "$WORK"/*/logs/*.log
   echo "FAIL errors in the log"; exit 1
 fi
 echo "PASS desktop app"
