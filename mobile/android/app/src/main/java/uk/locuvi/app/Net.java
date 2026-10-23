@@ -10,7 +10,6 @@ import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
@@ -149,7 +148,7 @@ final class Net {
             meta.put("status", res.code());
             meta.put("headers", out);
             return bytes;
-        } catch (SocketTimeoutException | InterruptedIOException e) {
+        } catch (InterruptedIOException e) { // includes SocketTimeoutException
             meta.put("error", "timeout");
         } catch (SSLException e) {
             meta.put("error", "tls");
