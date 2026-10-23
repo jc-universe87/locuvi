@@ -76,9 +76,10 @@ async function join(address, home = "") {
   await page.getByRole("button", { name: "Join and sync" }).click();
 }
 
-step("phone: Join, with Nextcloud already chosen (the only way on a phone)");
+step("phone: Join through Nextcloud (chosen already when no cloud account is offered)");
 await page.getByRole("button", { name: "Join from another device" }).click();
-await page.getByRole("radio", { name: /Nextcloud/, checked: true }).waitFor({ timeout: 5000 });
+await page.getByRole("radio", { name: /^Nextcloud/ }).check({ timeout: 5000 });
+await page.getByRole("radio", { name: /^Nextcloud/, checked: true }).waitFor({ timeout: 5000 });
 if (process.env.NC_NO_CORS) {
   step("a Nextcloud that doesn't allow Locuvi: a clear message, nothing changes");
   await join(process.env.NC_NO_CORS);
