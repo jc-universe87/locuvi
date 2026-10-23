@@ -51,6 +51,7 @@ def _state(request: Request) -> dict[str, Any]:
     return {
         "available": True,
         "phone_access": cfg["phone_access"],
+        "update_check": cfg["update_check"],
         "keeps_running": listening,  # after its window closes, so phones can connect
         "listening": listening,
         "restart_needed": cfg["phone_access"] != listening,
@@ -78,7 +79,10 @@ def put_desktop(body: S.DesktopIn, request: Request) -> dict[str, Any]:
             "Choose your own password first (Settings › Password); phones sign in with it.",
         )
     cfg = desktop.read_config(settings.desktop_config)
-    cfg["phone_access"] = body.phone_access
+    if body.phone_access is not None:
+        cfg["phone_access"] = body.phone_access
+    if body.update_check is not None:
+        cfg["update_check"] = body.update_check
     desktop.write_config(settings.desktop_config, cfg)
     return _state(request)
 
@@ -125,4 +129,35 @@ def desktop_open_folder(request: Request) -> dict[str, bool]:
         subprocess.Popen(["open", str(folder)])  # noqa: S603, S607
     else:
         subprocess.Popen(["xdg-open", str(folder)])  # noqa: S603, S607
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ new versions
+
+
+@api.get("/updates")
+def get_updates(request: Request, check: bool = False) -> dict[str, Any]:
+    """Is there a newer Locuvi? On its own at most every few hours (if allowed), or now."""
+    from locuvi import updates
+
+    settings = request.app.state.settings
+    if not settings.desktop:
+        return {"supported": False}
+    if not check and not desktop.read_config(settings.desktop_config)["update_check"]:
+        return {**updates.check(offline=True), "automatic": False}
+    return {**updates.check(force=check), "automatic": True}
+
+
+@api.post("/updates/install")
+def install_update(request: Request) -> dict[str, bool]:
+    """Download the new version, check it, install it and open Locuvi again."""
+    from pathlib import Path
+
+    from locuvi import updates
+
+    settings = _desktop_only(request)
+    _admin(request)
+    if request.client is None or request.client.host not in ("127.0.0.1", "::1"):
+        raise NotFound("desktop.not_available", "Only on the computer Locuvi runs on.")
+    updates.start_install(Path(settings.data_dir).parent / "updates")
     return {"ok": True}

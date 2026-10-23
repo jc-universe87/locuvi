@@ -45,7 +45,7 @@ Only these features send anything outside, and only once you've set them up:
 | **Sync** (Settings › Sync and backup file) | All your records and files, encrypted first with your sync code | The cloud folder or Nextcloud you chose |
 | **Phone calendar** | Your bookings (fees only if you choose), when your calendar app asks | Your calendar app, through your private link |
 | **Connect another AI assistant** | The records it asks for; never passwords, bank details or AI keys | The AI tool you connected |
-| **Updates** | Nothing about you: the server downloads the new version | GitHub |
+| **Updates** | Nothing about you: the app asks GitHub for the latest version every few hours (you can switch this off) and downloads it when you tap **Update now** | GitHub |
 
 Switching a feature off stops it. Removing a saved password or key deletes it.
 

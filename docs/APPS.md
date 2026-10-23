@@ -192,10 +192,29 @@ somewhere else: now and then, copy the `backups` folder to a USB stick, or to a 
 Google Drive, OneDrive, Dropbox or iCloud Drive keeps in step. A computer can be lost, stolen
 or broken.
 
-**Updates.** Download and install the newest version over the old one. Your records stay
-where they are, and Locuvi makes a backup before it changes anything. On Android, install the
-new APK over the old one. If Android says **App not installed**, uninstall Locuvi from the
-phone and install the new one. Nothing is lost, because your records are on the computer.
+**Updates.** Locuvi looks for a new version by itself and tells you when one is ready:
+
+- **Windows and Mac:** a note at the top says *"Locuvi 1.2.3 is ready to install"*. Tap
+  **Update now**: Locuvi closes, installs the new version and opens again in about a minute.
+  It checks every few hours; **Settings › Phones, tablets and computers › Updates** has
+  **Check for updates**, and a switch if you'd rather it didn't check by itself. On a Mac,
+  Locuvi must be in your **Applications** folder to update itself.
+- **Android:** once a day the app asks whether you'd like the new version. Tap **Update**,
+  then **Install**. The first time, Android asks you to allow installs from Locuvi: switch on
+  **Allow from this source** and go back.
+- **iPhone and iPad:** nothing to do. The new version downloads in the background; Locuvi
+  then shows **Restart Locuvi**.
+
+Each update is the exact file published on the [releases page](https://github.com/jc-universe87/locuvi/releases),
+checked before it's installed. Your records stay where they are, and Locuvi makes a backup
+before it changes anything. You can still download and install a new version by hand, over
+the old one.
+
+> [!NOTE]
+> **Android, once only:** versions up to 1.1.16 were each signed with a different key, so
+> Android can't update them in place and says **App not installed**. Sync first (or save
+> [Everything in one file](SYNC.md#everything-in-one-file)), uninstall Locuvi, install the
+> new version, and join sync again. From then on, updates install with one tap.
 
 **Uninstalling** the desktop app leaves your Locuvi folder in place. Delete that folder too
 only if you really want your records gone.

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useConfirm, useToast } from "../components/ui";
+import { Dialog, ErrorAlert, Icon, SavedIndicator, SwitchRow, useAutosave, useConfirm, useToast } from "../components/ui";
+import { UpdatesSection } from "../components/Updates";
 import { PhoneLimits } from "../components/PhoneLimits";
 import { SyncSection } from "../components/Sync";
 import { TrashSection } from "../components/Trash";
@@ -123,14 +124,6 @@ function Row({ id, label, children, stacked, hint }: { id?: string; label: strin
   );
 }
 
-function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>
-      <span><span style={{ fontWeight: 500 }}>{label}</span>{hint && <span className="hint" style={{ display: "block" }}>{hint}</span>}</span>
-      <Toggle checked={checked} onChange={onChange} label={label} />
-    </div>
-  );
-}
 
 type ProfileEdit = Omit<Profile, "bank_account_number_masked" | "bank_account_number_set"> & { bank_account_number?: string };
 
@@ -1423,7 +1416,7 @@ function CalendarSection() {
   );
 }
 
-interface DesktopState { available: boolean; phone_access?: boolean; keeps_running?: boolean; listening?: boolean; restart_needed?: boolean; own_password?: boolean; addresses?: string[] }
+interface DesktopState { available: boolean; phone_access?: boolean; update_check?: boolean; keeps_running?: boolean; listening?: boolean; restart_needed?: boolean; own_password?: boolean; addresses?: string[] }
 
 function AppsSection() {
   const { t } = useT();
@@ -1502,6 +1495,7 @@ function AppsSection() {
           )}
         </>
       )}
+      {(desk?.available || POCKET || native) && <UpdatesSection computer={desk?.available ? desk : null} />}
       {!desk?.available && !native && !POCKET && (
         <>
           <h3>{t("apps.address_title")}</h3>

@@ -344,7 +344,8 @@ class PasteIn(Strict):
 
 
 class DesktopIn(Strict):
-    phone_access: bool
+    phone_access: bool | None = None
+    update_check: bool | None = None  # look for new versions by itself
 
 
 class DocumentBatchIn(Strict):

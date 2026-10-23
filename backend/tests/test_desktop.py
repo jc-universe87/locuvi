@@ -61,12 +61,12 @@ def test_phone_access_needs_own_password_and_a_restart(settings, tmp_path, monke
 
 
 def test_config_file_defaults_and_bad_values(tmp_path):
-    assert desktop.read_config(None) == {"phone_access": False, "port": 8765}
+    assert desktop.read_config(None) == {"phone_access": False, "update_check": True, "port": 8765}
     p = tmp_path / "d.json"
     p.write_text("not json")
     assert desktop.read_config(p)["phone_access"] is False
-    desktop.write_config(p, {"phone_access": True, "port": 80})
-    assert desktop.read_config(p) == {"phone_access": True, "port": 8765}
+    desktop.write_config(p, {"phone_access": True, "update_check": False, "port": 80})
+    assert desktop.read_config(p) == {"phone_access": True, "update_check": False, "port": 8765}
 
 
 def test_web_files_get_the_right_type_even_when_the_system_list_is_wrong(settings, tmp_path):

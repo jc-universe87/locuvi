@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
     private TextView message;
     private ValueCallback<Uri[]> pendingFiles;
     private final Net net = new Net(); // Nextcloud sync from the phone (Net.java)
+    private Updates updates; // new versions of this app (Updates.java)
     private volatile String server; // e.g. http://192.168.1.20:8765, no trailing slash
     private volatile String pageUrl; // the page showing now; the bridge answers only our own
 
@@ -87,6 +88,8 @@ public class MainActivity extends Activity {
             return false;
         });
         configureWebView();
+        updates = new Updates(this, getSharedPreferences(PREFS, MODE_PRIVATE));
+        updates.maybeCheck();
 
         if (!handleLink(getIntent())) {
             String saved = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_SERVER, null);
@@ -376,6 +379,14 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (updates != null) {
+            updates.resumed();
+        }
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         CookieManager.getInstance().flush();
@@ -462,6 +473,19 @@ public class MainActivity extends Activity {
                 return;
             }
             net.stash(id, request);
+        }
+
+        /** Settings › Check for updates (the app also checks by itself once a day). */
+        @JavascriptInterface
+        public void checkUpdate(boolean manual) {
+            if (fromOurs()) {
+                updates.check(manual);
+            }
+        }
+
+        @JavascriptInterface
+        public String appVersion() {
+            return updates.version();
         }
 
         @JavascriptInterface
