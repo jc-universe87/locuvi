@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from locuvi import __version__, db, integrity, profiles
 from locuvi.api import desktop as _desktop  # registers routes on `api`; `opener` is public
 from locuvi.api import inbox as _inbox  # registers routes on `api`; `feeds` is public
+from locuvi.api import sync as _sync  # noqa: F401 - registers the /api/v1/sync routes
 from locuvi.api.auth import SessionManager
 from locuvi.api.mcp import router as mcp_router
 from locuvi.api.routes import api, public
@@ -78,6 +79,11 @@ def open_profile(
     ctx = archive_ctx or ArchiveContext(st, app.state.secrets)
     app.state.archive_ctxs[profile_id] = ctx
     if settings.worker_enabled:
+        from locuvi.sync.service import SyncWorker
+
+        syncer = SyncWorker(st, app.state.secrets, profile_id)
+        syncer.start()
+        app.state.sync_workers[profile_id] = syncer
         worker = ArchiveWorker(ctx, profile_id)
         worker.start()
         app.state.workers[profile_id] = worker
@@ -144,6 +150,7 @@ def create_app(
         app.state.archive_ctxs = {}
         app.state.integrities = {}
         app.state.workers = {}
+        app.state.sync_workers = {}
         app.state.worker = None
         app.state.digest = None
         app.state.open_profile = lambda pid: open_profile(app, settings, pid, archive_ctx)
@@ -170,7 +177,7 @@ def create_app(
         try:
             yield
         finally:
-            for worker in app.state.workers.values():
+            for worker in [*app.state.workers.values(), *app.state.sync_workers.values()]:
                 worker.stop()
             if app.state.digest is not None:
                 app.state.digest.stop()
@@ -232,7 +239,17 @@ def create_app(
         request.state.profile = profile
         request.state.view = ProfileView(app.state, pid)
         db.set_profile(pid)
-        return await call_next(request)
+        response = await call_next(request)
+        if (
+            request.method not in ("GET", "HEAD", "OPTIONS")
+            and request.url.path.startswith("/api/v1/")
+            and not request.url.path.startswith("/api/v1/sync")
+            and response.status_code < 400
+        ):
+            syncer = getattr(app.state, "sync_workers", {}).get(pid)
+            if syncer is not None:
+                syncer.nudge()  # something changed: sync it to the other devices soon
+        return response
 
     @app.middleware("http")
     async def headers(request: Request, call_next):  # type: ignore[no-untyped-def]

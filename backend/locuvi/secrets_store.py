@@ -60,6 +60,11 @@ class SecretBox:
             self._fernet = Fernet(self._key)
         return self._fernet
 
+    def reset(self) -> None:
+        """Forget the cached key (sync switched this device to the household key)."""
+        self._key = None
+        self._fernet = None
+
     def encrypt(self, plaintext: str) -> str:
         return self._f().encrypt(plaintext.encode("utf-8")).decode("ascii")
 
