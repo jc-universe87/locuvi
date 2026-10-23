@@ -451,10 +451,17 @@ if (POCKET) {
   await mp.getByText("On a phone or tablet, Locuvi has everything except:").waitFor();
   await mp.getByText(/The AI assistant\./).waitFor();
   if (await mp.getByRole("link", { name: /^Assistant|AI assistant/ }).count()) await fail("assistant settings shown on a phone");
-  step("sync on a phone: through Nextcloud, and what to use for the other clouds");
+  step("sync on a phone: through a cloud account or Nextcloud");
   await mp.goto(at("/settings/sync"));
-  await mp.getByText(/On a phone or tablet, Locuvi syncs through Nextcloud/).waitFor();
+  // the phone build offers the accounts whose sign-in is built in (cloud_apps.py)
+  await mp.getByText(/On a phone or tablet, Locuvi syncs through/).waitFor();
+  const accounts = await mp.getByText(/syncs through a Dropbox/).count();
   await mp.getByRole("button", { name: "Join from another device" }).click();
+  if (accounts) {
+    await mp.getByRole("radio", { name: /Dropbox account/ }).check();
+    await mp.getByRole("button", { name: "Sign in to Dropbox account and join" }).waitFor();
+    await mp.getByRole("radio", { name: /^Nextcloud/ }).check();
+  }
   await mp.getByLabel("Nextcloud address").waitFor();
   await mp.getByText(/your Nextcloud must allow Locuvi to connect/).waitFor(); // iPhone and iPad
   await mp.getByRole("button", { name: "Cancel" }).click();

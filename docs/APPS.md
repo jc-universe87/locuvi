@@ -122,9 +122,9 @@ statements, pension forms, reports, the Inbox, Recently deleted) **except**:
 - **connecting another AI assistant** to Locuvi;
 - **copies of your invoices in Nextcloud**;
 - **a calendar subscription**: you can still download your sessions as a calendar file;
-- **sync through Google Drive, OneDrive or Dropbox**: sync through Nextcloud works
-  ([how](SYNC.md#phones-and-tablets)); for the others, move records with
-  [Everything in one file](SYNC.md#everything-in-one-file).
+- **sync through iCloud Drive or a OneDrive account** (OneDrive is coming): a Dropbox or
+  Google Drive account, or Nextcloud, works ([how](SYNC.md#phones-and-tablets)); otherwise,
+  move records with [Everything in one file](SYNC.md#everything-in-one-file).
 
 A phone app can't open these connections the way a computer can, so they work in the Locuvi
 app for Windows and Mac. Some of them may come to phones and tablets in a future update.

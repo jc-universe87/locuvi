@@ -10,6 +10,7 @@ build/
 
 # written by the release build (locuvi/updates.py)
 backend/locuvi/_release.py
+backend/locuvi/_cloud_secret.py
 
 # Node
 node_modules/

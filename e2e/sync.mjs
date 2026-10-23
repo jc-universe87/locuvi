@@ -37,7 +37,7 @@ async function setUp(dev, mode, name, code) {
   await page.goto(new URL("/settings/sync", page.url()).href);
   await page.getByRole("heading", { name: "Sync and backup file" }).waitFor();
   await page.getByRole("button", { name: mode === "start" ? "Start syncing from this device" : "Join from another device" }).click();
-  await page.getByRole("radio", { name: /Dropbox/ }).check();
+  await page.getByRole("radio", { name: /^Dropbox(?! account)/ }).check();
   await page.getByLabel("Name for this device").fill(name);
   if (code) await page.getByLabel("Sync code from your other device").fill(code);
   await page.getByRole("button", { name: mode === "start" ? "Start syncing" : "Join and sync" }).click();

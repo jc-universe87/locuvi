@@ -48,9 +48,19 @@ if (process.env.ANDROID) {
   const { _android } = createRequire(import.meta.url)("playwright");
   [device] = await _android.devices();
   // the app's WebView can take a while to show up for debugging on a slow emulator
-  const webview = await device.webView({ pkg: "uk.locuvi.app" }, { timeout: 120000 });
-  page = await webview.page();
-  await page.evaluate(() => (location.hash = "#/settings/sync"));
+  // the app can swap its first page for a new one just after starting: attach to the one left
+  for (let tries = 1; ; tries++) {
+    const webview = await device.webView({ pkg: "uk.locuvi.app" }, { timeout: 120000 });
+    page = await webview.page();
+    try {
+      await page.evaluate(() => (location.hash = "#/settings/sync"));
+      await page.getByRole("heading", { name: "Sync and backup file" }).waitFor({ timeout: 60000 });
+      break;
+    } catch (e) {
+      if (tries >= 3 || !/closed/.test(String(e))) throw e;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
 } else {
   browser = await chromium.launch({
     args: ["--host-resolver-rules=MAP nextcloud.example.invalid 127.0.0.1"],
@@ -76,9 +86,10 @@ async function join(address, home = "") {
   await page.getByRole("button", { name: "Join and sync" }).click();
 }
 
-step("phone: Join, with Nextcloud already chosen (the only way on a phone)");
+step("phone: Join through Nextcloud (chosen already when no cloud account is offered)");
 await page.getByRole("button", { name: "Join from another device" }).click();
-await page.getByRole("radio", { name: /Nextcloud/, checked: true }).waitFor({ timeout: 5000 });
+await page.getByRole("radio", { name: /^Nextcloud/ }).check({ timeout: 5000 });
+await page.getByRole("radio", { name: /^Nextcloud/, checked: true }).waitFor({ timeout: 5000 });
 if (process.env.NC_NO_CORS) {
   step("a Nextcloud that doesn't allow Locuvi: a clear message, nothing changes");
   await join(process.env.NC_NO_CORS);

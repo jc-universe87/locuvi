@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any
@@ -48,7 +49,10 @@ def sync_status(request: Request) -> dict[str, Any]:
     settings, secrets = _ctx(request)
     out = engine.status(settings)
     out["nextcloud_saved"] = engine.saved_nextcloud_hint(settings, secrets)
-    out["cloud_accounts"] = cloud.available()
+    # signing in can only come back to the Windows/Mac app, the Android app or the iPhone
+    # site (cloud._check_return), not to a Locuvi on a server
+    on_device = request.app.state.settings.desktop or os.environ.get("LOCUVI_POCKET") == "1"
+    out["cloud_accounts"] = cloud.available() if on_device else []
     out["cloud_folders"] = service.cloud_folders() if request.app.state.settings.desktop else []
     out["can_choose_folder"] = bool(request.app.state.settings.desktop)
     return out
