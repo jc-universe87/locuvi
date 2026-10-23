@@ -567,6 +567,8 @@ const de: Catalogue = {
   "settings.s_calendar_sub": "Gebuchte Einsätze in Ihrem Kalender anzeigen",
   "settings.s_apps": "Smartphone, Tablet und Computer",
   "settings.s_apps_sub": "Die Locuvi-Apps und Zugriff vom Smartphone",
+  "settings.s_sync": "Sync und Sicherungsdatei",
+  "settings.s_sync_sub": "Smartphone und Computer abgleichen oder alles in einer Datei sichern",
   "calendar.intro": "Einmal abonnieren: Gebuchte Einsätze erscheinen automatisch im Kalender auf Smartphone oder Computer.",
   "calendar.feed_name": "Locum-Einsätze",
   "calendar.live_title": "Einsätze in einem anderen Kalender anzeigen (aktualisiert sich selbst)",

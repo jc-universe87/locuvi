@@ -482,3 +482,17 @@ class RefundIn(Strict):
 
 class ReadDocumentIn(Strict):
     send_attachment: bool = False
+
+
+class SyncWhereIn(Strict):
+    kind: Literal["folder", "nextcloud"]
+    path: Annotated[str, StringConstraints(max_length=1000)] | None = None
+    device_name: Annotated[str, StringConstraints(max_length=60)] = ""
+
+
+class SyncJoinIn(SyncWhereIn):
+    code: Annotated[str, StringConstraints(max_length=60)]
+
+
+class SyncExportIn(Strict):
+    passphrase: Annotated[str, StringConstraints(min_length=12, max_length=200)]

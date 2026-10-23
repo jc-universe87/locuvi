@@ -32,7 +32,7 @@ describe("i18n catalogues", () => {
     for (const s of ["draft", "issued", "voided"]) expect(en).toHaveProperty(`status.${s}`);
     for (const s of ["pending", "uploading", "synced", "failed", "conflict", "not_configured"])
       expect(en).toHaveProperty(`archive.${s}`);
-    for (const s of ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "apps", "mailbox", "assistant", "agents", "password", "trash"]) {
+    for (const s of ["you", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "apps", "sync", "mailbox", "assistant", "agents", "password", "trash"]) {
       expect(en).toHaveProperty(`settings.s_${s}`);
       expect(en).toHaveProperty(`settings.s_${s}_sub`);
     }

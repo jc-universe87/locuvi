@@ -217,6 +217,63 @@ class WebDavClient:
         except httpx.TransportError:
             raise WebDavError("network_error", "GET failed in transit") from None
 
+    def get(self, encoded_rel: str, max_bytes: int = MAX_DOWNLOAD) -> tuple[bytes, str] | None:
+        """The file and its ETag, or None if it does not exist (sync)."""
+        resp = self._send("GET", encoded_rel)
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            raise classify_status(resp, "GET")
+        if len(resp.content) > max_bytes:
+            raise WebDavError("too_large", "remote file is too large")
+        return resp.content, resp.headers.get("ETag", "")
+
+    def put_if(self, encoded_rel: str, data: bytes, etag: str | None) -> bool:
+        """PUT only if the file is still the version read (``etag``), or still absent (None).
+
+        Returns False when another device changed it first (412), so nothing is overwritten.
+        """
+        headers = {"Content-Type": "application/octet-stream"}
+        if etag:
+            headers["If-Match"] = etag
+        else:
+            headers["If-None-Match"] = "*"
+        resp = self._send("PUT", encoded_rel, content=data, headers=headers)
+        if resp.status_code in (200, 201, 204):
+            return True
+        if resp.status_code == 412:
+            return False
+        if resp.status_code == 409:
+            raise WebDavError("base_not_found", "target folder does not exist")
+        raise classify_status(resp, "PUT")
+
+    def list_names(self, encoded_rel: str) -> list[str]:
+        """Names of the files directly inside a folder (PROPFIND, Depth 1)."""
+        resp = self._send(
+            "PROPFIND",
+            encoded_rel.rstrip("/") + "/",
+            headers={"Depth": "1", "Content-Type": "application/xml; charset=utf-8"},
+            content=b'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop>'
+            b"<d:resourcetype/></d:prop></d:propfind>",
+        )
+        if resp.status_code == 404:
+            return []
+        if resp.status_code != 207:
+            raise classify_status(resp, "PROPFIND")
+        try:
+            root = ET.fromstring(resp.content)
+        except ET.ParseError as exc:
+            raise WebDavError("protocol_error", "invalid PROPFIND response") from exc
+        from urllib.parse import unquote
+
+        names = []
+        for r in root.iter(f"{DAV_NS}response"):
+            href = (r.findtext(f"{DAV_NS}href") or "").rstrip("/")
+            name = unquote(href.rsplit("/", 1)[-1])
+            if r.find(f".//{DAV_NS}collection") is None and name:
+                names.append(name)
+        return names
+
     def delete_quietly(self, encoded_rel: str) -> None:
         try:
             self._send("DELETE", encoded_rel)

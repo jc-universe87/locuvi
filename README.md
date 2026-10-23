@@ -84,6 +84,8 @@ downloads for your accountant.
 - 📱 Your bookings in Apple, Google or Outlook calendars, plus downloads (.ics, .csv)
 - 👨‍👩‍👧 Household profiles, each one private
 - ♻️ A 30-day "Recently deleted"
+- 🔄 [Sync](docs/SYNC.md) between your devices through Google Drive, OneDrive, Dropbox, iCloud
+  Drive or Nextcloud, encrypted, plus everything in one backup file
 - ☁️ Copies of your invoices in Nextcloud
 - 🔒 Nightly, checked, encrypted backups
 

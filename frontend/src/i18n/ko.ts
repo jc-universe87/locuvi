@@ -567,6 +567,8 @@ const ko: Catalogue = {
   "settings.s_calendar_sub": "예약된 근무를 캘린더 앱에서 확인",
   "settings.s_apps": "휴대폰, 태블릿, 컴퓨터",
   "settings.s_apps_sub": "Locuvi 앱과 휴대폰 연결",
+  "settings.s_sync": "동기화 및 백업 파일",
+  "settings.s_sync_sub": "휴대폰과 컴퓨터를 맞추거나 모든 것을 한 파일로 저장",
   "calendar.intro": "한 번 구독하면 예약된 근무가 휴대전화나 컴퓨터 캘린더에 자동으로 표시·갱신됩니다.",
   "calendar.feed_name": "로컴 근무",
   "calendar.live_title": "다른 캘린더에 예약 표시 (자동 업데이트)",

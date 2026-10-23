@@ -849,10 +849,13 @@ def issue(
     s: DB,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, Any]:
+    from locuvi.sync.service import numbering
+
     app = state(request)
-    result = svc.issue(
-        app.settings, invoice_id, idempotency_key or "", after_issue=archive.enqueue_on_issue
-    )
+    with numbering(app.settings, request.app.state.secrets):
+        result = svc.issue(
+            app.settings, invoice_id, idempotency_key or "", after_issue=archive.enqueue_on_issue
+        )
     if app.worker is not None:
         app.worker.wake()
     s.expire_all()
@@ -903,15 +906,18 @@ def credit_issue(
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")] = "",
 ) -> dict[str, Any]:
     from locuvi.services import credit_notes
+    from locuvi.sync.service import numbering
 
-    cn = credit_notes.issue(
-        state(request).settings,
-        invoice_id,
-        body.line_ids,
-        body.reason,
-        idempotency_key,
-        after_issue=archive.enqueue_credit_note,
-    )
+    settings = state(request).settings
+    with numbering(settings, request.app.state.secrets):
+        cn = credit_notes.issue(
+            settings,
+            invoice_id,
+            body.line_ids,
+            body.reason,
+            idempotency_key,
+            after_issue=archive.enqueue_credit_note,
+        )
     return credit_notes.as_dict(cn)
 
 

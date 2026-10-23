@@ -772,6 +772,9 @@ Everything works on a phone. The menu moves to the bottom of the screen.
 - **iPhone or iPad (Safari)**: tap Share, then **Add to Home Screen**.
 - **Windows PC or Mac**: the [desktop app](APPS.md) runs Locuvi on the computer itself.
 
+To keep the same records on your phone and your computer, turn on [sync](SYNC.md)
+(**Settings › Sync and backup file**).
+
 **Settings › Phones, tablets and computers** shows the address to use and the downloads. If
 Locuvi runs in the desktop app, switch on **Let my phone and tablet connect** there first
 ([how](APPS.md#using-your-phone-with-the-desktop-app)).

@@ -567,6 +567,8 @@ const es: Catalogue = {
   "settings.s_calendar_sub": "Ver sustituciones reservadas en tu calendario",
   "settings.s_apps": "Móvil, tableta y ordenador",
   "settings.s_apps_sub": "Las apps de Locuvi y la conexión desde el móvil",
+  "settings.s_sync": "Sincronización y archivo de copia",
+  "settings.s_sync_sub": "Mantén móvil y ordenadores al día, o guarda todo en un archivo",
   "calendar.intro": "Suscríbete una vez y tus sustituciones aparecerán y se actualizarán en el calendario.",
   "calendar.feed_name": "Sesiones de locum",
   "calendar.live_title": "Ver las reservas en otro calendario (se actualiza solo)",
