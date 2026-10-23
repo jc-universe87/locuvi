@@ -198,11 +198,13 @@ jobs:
         run: |
           (cd frontend && npm run build)
           (cd backend && uv sync --locked)
+          # started directly, not through `uv run`, which would hold uv's cache lock until the
+          # end of the job and make setup-uv's cache step time out
           S="$RUNNER_TEMP/srv"; mkdir -p "$S"; printf "e2e-pass" > "$S/pw"
           cd backend
           APP_ENV=production DATA_DIR="$S/data" KEY_DIR="$S/keys" LOCUVI_PASSWORD_FILE="$S/pw" \
             COOKIE_SECURE=false STATIC_DIR=../frontend/dist ARCHIVE_WORKER_ENABLED=false \
-            nohup uv run uvicorn locuvi.main:create_app --factory --host 127.0.0.1 --port 8000 \
+            nohup .venv/bin/uvicorn locuvi.main:create_app --factory --host 127.0.0.1 --port 8000 \
             > "$S/access.log" 2>&1 &
           for _ in $(seq 60); do curl -fs http://127.0.0.1:8000/api/v1/health/ready && break; sleep 1; done
       - name: Enable KVM for the emulator
