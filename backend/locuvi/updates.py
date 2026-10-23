@@ -173,21 +173,33 @@ def app_bundle() -> Path | None:
     return exe.parent
 
 
+def _ps(path: Path) -> str:
+    """A path as a PowerShell single-quoted string (spaces and apostrophes are fine)."""
+    return "'" + str(path).replace("'", "''") + "'"
+
+
 def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
     """The detached command that installs once Locuvi (process ``pid``) has stopped, then
-    opens it again."""
+    opens it again. On Windows it's a small PowerShell script next to the installer, which
+    logs what it did to update.log (and the installer to setup.log)."""
     if sys.platform == "win32":
-        exe = bundle / "Locuvi.exe"
-        log = installer.with_name("update.log")
-        script = (
-            f"Start-Transcript -Path '{log}' -Force | Out-Null; "
-            f"Wait-Process -Id {pid} -Timeout 120 -ErrorAction SilentlyContinue; "
-            f"Start-Process -Wait -FilePath '{installer}' -ArgumentList "
-            "'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',"
-            f"'/LOG=\"{installer.with_name('setup.log')}\"'; "
-            f"Start-Process -FilePath '{exe}'; Stop-Transcript | Out-Null"
-        )
-        return ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script]
+        script = installer.with_name("update.ps1")
+        script.write_text(
+            "\r\n".join([
+                f"Start-Transcript -Path {_ps(installer.with_name('update.log'))} -Force",
+                f"Wait-Process -Id {pid} -Timeout 120 -ErrorAction SilentlyContinue",
+                f"$setupLog = {_ps(installer.with_name('setup.log'))}",
+                f"$p = Start-Process -Wait -PassThru -FilePath {_ps(installer)} -ArgumentList "
+                "@('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "
+                "('/LOG=\"' + $setupLog + '\"'))",
+                '"installer finished: $($p.ExitCode)"',
+                f"Start-Process -FilePath {_ps(bundle / 'Locuvi.exe')}",
+                "Stop-Transcript",
+            ]),
+            encoding="utf-8-sig",
+        )  # fmt: skip
+        return ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-WindowStyle", "Hidden", "-File", str(script)]  # fmt: skip
     mnt = installer.with_suffix(".mnt")
     script = (
         f"for i in $(seq 120); do kill -0 {pid} 2>/dev/null || break; sleep 1; done; "
@@ -230,14 +242,15 @@ def start_install(folder: Path) -> None:
         )
     installer = download(folder)
     cmd = install_command(installer, bundle, os.getpid())
-    kw: dict[str, Any] = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
-                          "stderr": subprocess.DEVNULL, "close_fds": True}  # fmt: skip
+    out = (folder / "update-start.log").open("wb")  # what the command said, if it failed
+    kw: dict[str, Any] = {"stdin": subprocess.DEVNULL, "stdout": out, "stderr": out,
+                          "close_fds": True, "env": clean_environment()}  # fmt: skip
     if sys.platform == "win32":
-        kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+        kw["creationflags"] = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW | NEW_PROCESS_GROUP
     else:
         kw["start_new_session"] = True
-    kw["env"] = clean_environment()
     subprocess.Popen(cmd, **kw)  # noqa: S603 - fixed command, our own verified installer
+    out.close()
     log.info("installing Locuvi %s", _cache["info"].version)
 
     from locuvi import desktop

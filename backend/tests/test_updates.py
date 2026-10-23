@@ -92,8 +92,14 @@ def test_download_is_checked_against_the_release(released, tmp_path):
 
 
 def test_install_waits_for_locuvi_then_reopens_it(released, tmp_path):
-    cmd = " ".join(updates.install_command(tmp_path / "setup.exe", tmp_path / "app", 4242))
-    assert "Wait-Process -Id 4242" in cmd and "/VERYSILENT" in cmd and "Locuvi.exe" in cmd
+    folder = tmp_path / "Jo O'Brien" / "updates"  # spaces and an apostrophe in the path
+    folder.mkdir(parents=True)
+    cmd = updates.install_command(folder / "setup.exe", tmp_path / "app", 4242)
+    assert cmd[0] == "powershell" and cmd[-1] == str(folder / "update.ps1")
+    script = (folder / "update.ps1").read_text(encoding="utf-8-sig")
+    assert "Wait-Process -Id 4242" in script and "/VERYSILENT" in script
+    assert "Jo O''Brien" in script  # quoted for PowerShell
+    assert script.index("Start-Process -Wait") < script.index("Locuvi.exe")
 
 
 def test_mac_install_replaces_the_app_and_keeps_the_old_one_on_failure(monkeypatch, tmp_path):
