@@ -779,6 +779,7 @@ def config_public(cfg: AssistantConfig, settings: Settings) -> dict[str, Any]:
         "key_from_server": server,
         "base_url": cfg.base_url or "",
         "ready": cfg.enabled
+        and not on_phone()
         and (
             bool(cfg.base_url and cfg.model)
             if cfg.provider == CUSTOM
@@ -863,10 +864,19 @@ def build(provider: str, key: str, model: str, base_url: str | None = None) -> A
     return CompatibleProvider(provider, key, model, base_url=base_url)
 
 
+def on_phone() -> bool:
+    """The phone app (locuvi/pocket.py) can't reach AI companies yet: the assistant stays off
+    there, even when a computer synced its settings across (the rules engine still reads
+    bookings)."""
+    import os
+
+    return os.environ.get("LOCUVI_POCKET") == "1"
+
+
 def provider_for(s: Session, settings: Settings, secrets: SecretBox) -> Provider | None:
     """The configured AI provider, or None when the assistant is off (rules engine is used)."""
     cfg = get_config(s)
-    if not cfg.enabled or cfg.provider not in PROVIDERS:
+    if not cfg.enabled or cfg.provider not in PROVIDERS or on_phone():
         return None
     key = _key(cfg, settings, secrets)
     if cfg.provider == CUSTOM:  # own server: the address and model matter, a key is optional

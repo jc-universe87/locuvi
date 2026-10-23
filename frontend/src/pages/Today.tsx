@@ -6,6 +6,7 @@ import type { MessageKey } from "../i18n/en";
 import { api } from "../lib/api";
 import { gbp, gbpRound, monthLabel, period, ukDate, weekdayDate } from "../lib/format";
 import type { Finding, InvoiceDetail, Overview } from "../lib/types";
+import { PhoneLimits } from "../components/PhoneLimits";
 
 function greetingKey(): MessageKey {
   const h = new Date().getHours();
@@ -92,6 +93,7 @@ export default function TodayPage() {
       <p className="hero-date">{weekdayDate(ov.today)}</p>
       <h1>{name ? t(greetingKey(), { name }) : t("today.hello")}</h1>
       <ErrorAlert error={error} />
+      <PhoneLimits dismissible />
 
       {!ov.setup.completed && (
         <Link to="/welcome" className="card list-row" style={{ textDecoration: "none" }}>

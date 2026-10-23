@@ -6,6 +6,12 @@ releases.
 
 ## Unreleased
 
+- **Phones and tablets say plainly what they can't do yet** (AI assistant, email, Nextcloud
+  copies, calendar subscription, connecting other assistants, automatic sync), in Settings and
+  once on Today, with what to use instead. The AI assistant stays off on phones.
+- **The iPhone and iPad site is locked down**: its page may only load and contact its own
+  address (Content Security Policy) and sends no referrer.
+
 - **No more extra "Locuvi is running" window** on Windows and Mac: close Locuvi's window
   when you've finished, and Locuvi syncs and stops by itself a few minutes later. Quit
   Locuvi and Show my Locuvi folder are in Settings › Phones, tablets and computers.

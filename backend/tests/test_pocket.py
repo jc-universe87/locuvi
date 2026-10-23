@@ -52,3 +52,8 @@ def test_encoded_addresses_reach_the_right_route(pocket):
     status, body = _call(pocket, "POST", "/api/v1/trash/document%3Anope/restore", {},
                          {"x-csrf-token": session["csrf_token"]})  # fmt: skip
     assert status == 404 and body["error"]["code"] == "document.not_found"
+
+
+def test_ai_assistant_is_off_on_the_phone(pocket):
+    status, cfg = _call(pocket, "GET", "/api/v1/settings/assistant")
+    assert status == 200 and cfg["ready"] is False
