@@ -108,3 +108,13 @@ def test_server_has_no_updates(settings):
 
     with client_for(settings) as c:
         assert c.get("/api/v1/updates").json() == {"supported": False}
+
+
+def test_reopened_locuvi_starts_with_a_clean_environment(monkeypatch):
+    monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", "C:/old")
+    monkeypatch.setenv("LOCUVI_DESKTOP_TOKEN", "secret-launch-token")
+    monkeypatch.setenv("DATA_DIR", "/tmp/old")
+    env = updates.clean_environment()
+    assert "_PYI_APPLICATION_HOME_DIR" not in env and "DATA_DIR" not in env
+    assert "LOCUVI_DESKTOP_TOKEN" not in env and env["PYINSTALLER_RESET_ENVIRONMENT"] == "1"
+    assert env.get("PATH") == __import__("os").environ.get("PATH")

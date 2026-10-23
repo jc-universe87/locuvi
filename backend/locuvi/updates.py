@@ -178,11 +178,14 @@ def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
     opens it again."""
     if sys.platform == "win32":
         exe = bundle / "Locuvi.exe"
+        log = installer.with_name("update.log")
         script = (
+            f"Start-Transcript -Path '{log}' -Force | Out-Null; "
             f"Wait-Process -Id {pid} -Timeout 120 -ErrorAction SilentlyContinue; "
             f"Start-Process -Wait -FilePath '{installer}' -ArgumentList "
-            "'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER'; "
-            f"Start-Process -FilePath '{exe}'"
+            "'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',"
+            f"'/LOG=\"{installer.with_name('setup.log')}\"'; "
+            f"Start-Process -FilePath '{exe}'; Stop-Transcript | Out-Null"
         )
         return ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script]
     mnt = installer.with_suffix(".mnt")
@@ -196,6 +199,18 @@ def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
         f'open "{bundle}"'
     )
     return ["/bin/sh", "-c", script]
+
+
+def clean_environment() -> dict[str, str]:
+    """The environment for the installer and the reopened Locuvi: without what this running
+    app set for itself (its folders, its one-time token) or what PyInstaller set for this
+    copy, which would make the new copy think it is part of the old one."""
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("_PYI_", "_MEI", "LOCUVI_"))
+           and k not in {"APP_ENV", "DATA_DIR", "KEY_DIR", "BACKUP_DIR", "STATIC_DIR",
+                         "COOKIE_SECURE", "TCL_LIBRARY", "TK_LIBRARY"}}  # fmt: skip
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
 
 
 def start_install(folder: Path) -> None:
@@ -221,6 +236,7 @@ def start_install(folder: Path) -> None:
         kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | NEW_PROCESS_GROUP
     else:
         kw["start_new_session"] = True
+    kw["env"] = clean_environment()
     subprocess.Popen(cmd, **kw)  # noqa: S603 - fixed command, our own verified installer
     log.info("installing Locuvi %s", _cache["info"].version)
 

@@ -93,6 +93,10 @@ def main(app: str, installer: str, work: str) -> int:
         time.sleep(1)
     else:
         print("FAIL the updated app didn't open again")
+        for f in [w / "root" / "updates" / "update.log", w / "root" / "updates" / "setup.log",
+                  usual / "logs" / "locuvi.log"]:  # fmt: skip
+            if f.is_file():
+                print(f"--- {f}\n" + f.read_text(errors="replace")[-4000:])
         return 1
     again = json.loads((usual / "instance.json").read_text())
     print("PASS the updated app opened again by itself")
