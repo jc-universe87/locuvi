@@ -31,6 +31,7 @@ Start with what you want to do.
 | | |
 | --- | --- |
 | 💻 [Developer notes](DEVELOPERS.md) | Stack, running locally, tests, screenshots |
+| ☁️ [Dropbox, Google Drive and OneDrive sign-in](CLOUD_APPS.md) | Registering Locuvi with each company (for the publisher) |
 | 🤝 [Contributing](../CONTRIBUTING.md) | How to help, and the rules that keep Locuvi trustworthy |
 | 🗺 [Roadmap](ROADMAP.md) · [Decisions](decisions/) · [AI spec](specs/AI_AND_AGENTS.md) | Background and design choices |
 

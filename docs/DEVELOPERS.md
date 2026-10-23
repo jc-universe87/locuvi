@@ -154,6 +154,18 @@ cd .. && PHONE_URL=http://127.0.0.1:8790 DESKTOP_URL=http://127.0.0.1:8793 NC_DE
 The release workflow runs the same script inside the Android app (a debug build, whose
 WebView can be driven; `ANDROID=1`, see `mobile/android/emulator-test.sh`).
 
+## Cloud accounts
+
+`locuvi/sync/cloud.py`: `begin` builds the company's sign-in address (PKCE, `state` ends with
+where to come back to: `local:<port>`, `app` or `web`), `finish` swaps the code for a refresh
+token, `Session` renews access tokens (and keeps a replaced refresh token), and
+`DropboxTarget` / `OneDriveTarget` / `GoogleDriveTarget` implement the sync target protocol
+(versions: Dropbox revisions, OneDrive eTags with `If-Match`, numbered `state-<n>.lcv` copies on
+Google Drive). The app IDs live in `locuvi/cloud_apps.py` (or `LOCUVI_<PROVIDER>_CLIENT_ID`);
+`tests/fake_clouds.py` stands in for all three services in `tests/test_sync_cloud.py`. The
+return page is `frontend/public/oauth.html` (and `oauth-native.html` for OneDrive outside a
+browser); the web app finishes in `pages/CloudReturn.tsx`.
+
 ## Updates
 
 The release workflow writes `backend/locuvi/_release.py` (`VERSION = "1.1.N"`, not in git)

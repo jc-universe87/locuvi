@@ -31,6 +31,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="locuvi" android:host="connect" />
             </intent-filter>
+            <!-- locuvi://oauth?code=…&state=… back from signing in to Dropbox, Google Drive
+                 or OneDrive for sync (through https://locuvi.pistio.co.uk/oauth.html) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="locuvi" android:host="oauth" />
+            </intent-filter>
         </activity>
 
         <provider

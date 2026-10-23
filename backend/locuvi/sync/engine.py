@@ -32,6 +32,7 @@ import shutil
 import sqlite3
 import tempfile
 import threading
+import time
 import uuid
 import zipfile
 from dataclasses import dataclass, field
@@ -352,9 +353,9 @@ def _adopt_household_key(settings: Settings, secrets: SecretBox, new_key: bytes)
         cfg = load_config(settings)
         if cfg.code_ciphertext:
             cfg.code_ciphertext = new.encrypt(old.decrypt(cfg.code_ciphertext.encode())).decode()
-        saved = (cfg.target or {}).get("password_ciphertext")
-        if saved:
-            cfg.target["password_ciphertext"] = new.encrypt(old.decrypt(saved.encode())).decode()  # type: ignore[index]
+        for k, saved in list((cfg.target or {}).items()):  # Nextcloud password, cloud sign-in
+            if k.endswith("_ciphertext") and saved:
+                cfg.target[k] = new.encrypt(old.decrypt(saved.encode())).decode()  # type: ignore[index]
         key_path = settings.key_dir / "locuvi.key"
         tmp = key_path.with_suffix(".sync")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -452,10 +453,77 @@ def saved_nextcloud_hint(settings: Settings, secrets: SecretBox) -> dict[str, st
 _reached: dict[str, str] = {}  # data dir -> which address answered last ("url"/"home_url")
 
 
+# ------------------------------------------------------------------ cloud accounts
+
+
+def _pending_file(settings: Settings) -> Path:
+    return sync_dir(settings) / "signins.json"
+
+
+def cloud_connected(settings: Settings, secrets: SecretBox, result: dict[str, Any]) -> str:
+    """Keep a finished sign-in (``cloud.finish``) until Start or Join uses it; returns its id.
+
+    Only this device keeps it, encrypted, for an hour at most."""
+    f = _pending_file(settings)
+    try:
+        pending = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pending = {}
+    now = time.time()
+    pending = {k: v for k, v in pending.items() if v.get("at", 0) > now - 3600}
+    cid = pysecrets.token_urlsafe(12)
+    pending[cid] = {
+        "provider": result["provider"],
+        "account": result.get("account", ""),
+        "return_to": result["return_to"],
+        "refresh_ciphertext": secrets.encrypt(result["refresh"]),
+        "at": now,
+    }
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(pending), encoding="utf-8")
+    from locuvi.sync import cloud
+
+    cloud.Session._cache[hashlib.sha256(result["refresh"].encode()).hexdigest()] = (
+        result["access"], result["expires"])  # fmt: skip
+    return cid
+
+
+def cloud_spec(settings: Settings, connection: str) -> dict[str, Any]:
+    """The sync target for a sign-in kept by ``cloud_connected``."""
+    try:
+        pending = json.loads(_pending_file(settings).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pending = {}
+    got = pending.get(connection)
+    if not got or got.get("at", 0) < time.time() - 3600:
+        raise DomainError("sync.cloud_signin", "Please sign in again.")
+    return {"kind": "cloud", **{k: got[k] for k in
+            ("provider", "account", "return_to", "refresh_ciphertext")}}  # fmt: skip
+
+
+def _cloud_target(settings: Settings, secrets: SecretBox, t: dict[str, Any]) -> Target:
+    from locuvi.sync import cloud
+
+    def keep(new_refresh: str) -> None:  # the company replaced it (Microsoft does each time)
+        enc = secrets.encrypt(new_refresh)
+        t["refresh_ciphertext"] = enc
+        c = load_config(settings)
+        if c.target and c.target.get("kind") == "cloud":
+            c.target["refresh_ciphertext"] = enc
+            save_config(settings, c)
+
+    session = cloud.Session(t["provider"], secrets.decrypt(t["refresh_ciphertext"]),
+                            t["return_to"], on_refresh=keep)  # fmt: skip
+    label = cloud.NAMES[t["provider"]] + (f" ({t['account']})" if t.get("account") else "")
+    return cloud.TARGETS[t["provider"]](session, label)
+
+
 def build_target(settings: Settings, secrets: SecretBox, cfg: Config) -> Target:
     t = cfg.target or {}
     if t.get("kind") == "folder":
         return FolderTarget(Path(t["path"]))
+    if t.get("kind") == "cloud":
+        return _cloud_target(settings, secrets, t)
     if t.get("kind") == "nextcloud":
         from locuvi.webdav.client import WebDavClient
         from locuvi.webdav.urlguard import validate_base_path, validate_base_url
@@ -718,11 +786,15 @@ def status(settings: Settings) -> dict[str, Any]:
             "username": t.get("username"),
             "reached": _reached.get(str(Path(settings.data_dir).resolve())),
         }
+    cloud = None
+    if t.get("kind") == "cloud":
+        cloud = {"provider": t.get("provider"), "account": t.get("account")}
     return {
         "enabled": cfg.enabled,
         "kind": t.get("kind"),
         "folder": t.get("path") if t.get("kind") == "folder" else None,
         "nextcloud": nextcloud,
+        "cloud": cloud,
         "device_name": cfg.device_name,
         "last_ok": cfg.last_ok,
         "last_error": cfg.last_error,

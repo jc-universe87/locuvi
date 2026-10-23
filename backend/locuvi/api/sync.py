@@ -11,7 +11,7 @@ from fastapi import File, Form, Request, Response, UploadFile
 from locuvi.api import schemas as S
 from locuvi.api.routes import api, state
 from locuvi.errors import DomainError
-from locuvi.sync import engine, service
+from locuvi.sync import cloud, engine, service
 
 MAX_IMPORT = 2 * 1024 * 1024 * 1024  # 2 GB
 
@@ -22,6 +22,9 @@ def _ctx(request: Request) -> tuple[Any, Any]:
 
 
 def _where(request: Request, body: S.SyncWhereIn) -> dict[str, Any]:
+    if body.kind == "cloud":
+        settings, _ = _ctx(request)
+        return engine.cloud_spec(settings, body.connection or "")
     if body.kind == "nextcloud":
         settings, secrets = _ctx(request)
         if not body.url:
@@ -45,6 +48,7 @@ def sync_status(request: Request) -> dict[str, Any]:
     settings, secrets = _ctx(request)
     out = engine.status(settings)
     out["nextcloud_saved"] = engine.saved_nextcloud_hint(settings, secrets)
+    out["cloud_accounts"] = cloud.available()
     out["cloud_folders"] = service.cloud_folders() if request.app.state.settings.desktop else []
     out["can_choose_folder"] = bool(request.app.state.settings.desktop)
     return out
@@ -107,3 +111,18 @@ async def sync_import(
     if len(data) > MAX_IMPORT:
         raise DomainError("sync.import_too_large", "That file is too large.")
     return {"brought": engine.import_everything(settings, data, passphrase)}
+
+
+@api.post("/sync/cloud/begin")
+def cloud_begin(body: S.CloudBeginIn) -> dict[str, str]:
+    """Where to sign in to Dropbox, Google Drive or OneDrive (see ``locuvi.sync.cloud``)."""
+    return cloud.begin(body.provider, body.return_to)
+
+
+@api.post("/sync/cloud/finish")
+def cloud_finish(body: S.CloudFinishIn, request: Request) -> dict[str, str]:
+    """Back from signing in: keep the sign-in for Start or Join (``connection``)."""
+    settings, secrets = _ctx(request)
+    result = cloud.finish(body.provider, body.code, body.verifier, body.return_to)
+    connection = engine.cloud_connected(settings, secrets, result)
+    return {"connection": connection, "provider": body.provider, "account": result["account"]}
