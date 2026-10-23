@@ -10,8 +10,11 @@ import pytest
 
 @pytest.fixture
 def pocket(tmp_path, monkeypatch):
-    for k in ("DATA_DIR", "KEY_DIR", "LOCUVI_AUTH_MODE", "LOCUVI_POCKET"):
-        monkeypatch.delenv(k, raising=False)
+    # pocket.start sets these for the whole process; set them through monkeypatch so they are
+    # put back afterwards (LOCUVI_POCKET would otherwise change every later test's database)
+    for k in ("APP_ENV", "DATA_DIR", "KEY_DIR", "LOCUVI_AUTH_MODE", "COOKIE_SECURE",
+              "ARCHIVE_WORKER_ENABLED", "LOCUVI_POCKET"):  # fmt: skip
+        monkeypatch.setenv(k, "")
     from locuvi import pocket as p
 
     monkeypatch.setattr(p, "_app", None)
