@@ -378,11 +378,14 @@ before enabling a cloud model.
   signing (each needs a paid developer account). No Intel Mac build: GitHub's Intel Mac
   runners are being retired.
 
-## Sync and one-file export (owner request, 22 Oct 2026) 🔜
+## Sync, one-file export and full Locuvi on phones (owner requests, 22 Oct 2026)
 
-- One file holding everything (database, settings, PDFs, documents), encrypted, to export
-  and import by hand.
-- Automatic sync of that file between computers: Nextcloud directly (WebDAV), and Google
-  Drive, OneDrive, Dropbox or iCloud Drive through the folder their own app keeps in step.
-  When two computers both changed something, ask the owner which to keep, and back up the
-  other first.
+- ✅ Sync core (`locuvi/sync/`): each device keeps its own copy; three-way merge row by row
+  (issued invoices never go back, numbering only forwards, natural keys folded); encrypted
+  sync folder (state + write-once files) in a cloud app's folder or Nextcloud; a write only
+  lands on the copy it read; numbering lease before issuing ("sync before issuing", owner's
+  choice); saved passwords travel with the household key; one-file export/import.
+- 🔜 Full Locuvi on phones and tablets, offline, syncing through the same folder (owner's
+  choice): the backend in Pyodide inside the Android app and the iPhone/iPad Home Screen app.
+- 🔜 Dropbox, OneDrive and Google Drive accounts directly (needed on phones, which have no
+  synced folder), with step-by-step app registration for the owner.

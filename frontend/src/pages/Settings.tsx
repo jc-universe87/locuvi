@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useConfirm, useToast } from "../components/ui";
+import { SyncSection } from "../components/Sync";
 import { TrashSection } from "../components/Trash";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
 import type { MessageKey } from "../i18n/en";
@@ -13,10 +14,10 @@ import type { AssistantConfig, Branding, HouseholdProfile, EmailConfig, MailboxC
 import { PracticeSheet } from "./Diary";
 import { scanSummary } from "./Inbox";
 
-const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "apps", "mailbox", "assistant", "agents", "trash", "password", "profiles"] as const;
+const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "apps", "sync", "mailbox", "assistant", "agents", "trash", "password", "profiles"] as const;
 type Section = (typeof SECTIONS)[number];
 const ICON: Record<Section, string> = {
-  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", apps: "today", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
+  you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", apps: "today", sync: "cloud", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
 };
 
 export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?: () => void; profile?: HouseholdProfile | null }) {
@@ -41,6 +42,7 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
         {section === "storage" && <StorageSection />}
         {section === "calendar" && <CalendarSection />}
         {section === "apps" && <AppsSection />}
+        {section === "sync" && <SyncSection />}
         {section === "mailbox" && <MailboxSection />}
         {section === "assistant" && <AssistantSection />}
         {section === "agents" && <AgentsSection />}

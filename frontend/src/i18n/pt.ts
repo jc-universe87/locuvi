@@ -567,6 +567,8 @@ const pt: Catalogue = {
   "settings.s_calendar_sub": "Ver as substituições marcadas no calendário",
   "settings.s_apps": "Telemóvel, tablet e computador",
   "settings.s_apps_sub": "As apps Locuvi e a ligação a partir do telemóvel",
+  "settings.s_sync": "Sincronização e ficheiro de cópia",
+  "settings.s_sync_sub": "Mantenha telemóvel e computadores em dia, ou tudo num ficheiro",
   "calendar.intro": "Subscreva uma vez e as substituições aparecem e atualizam-se no calendário.",
   "calendar.feed_name": "Sessões de locum",
   "calendar.live_title": "Mostrar as marcações noutro calendário (atualiza-se sozinho)",

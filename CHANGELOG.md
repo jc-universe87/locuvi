@@ -6,6 +6,13 @@ releases.
 
 ## Unreleased
 
+- **Sync between your devices** (Settings › Sync and backup file): each device keeps its own
+  copy and works offline; the copies meet in an encrypted folder in Google Drive, OneDrive,
+  Dropbox, iCloud Drive or Nextcloud. Invoice numbers are checked with your other devices
+  before issuing, so they never repeat. [docs/SYNC.md](docs/SYNC.md)
+- **Everything in one file**: download all records, invoices and documents as one locked
+  file, and add records from such a file.
+
 - **Apps for Windows, Mac and Android, and the iPhone and iPad Home Screen.** The desktop app
   runs Locuvi on your PC or Mac, with no server or Docker needed. It opens in its own window
   and signs you in by itself. The Android app connects to your Locuvi. On an iPhone or iPad,

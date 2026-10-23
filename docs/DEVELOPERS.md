@@ -88,6 +88,21 @@ them each build is signed with a fresh debug key. Never commit a keystore.
 The apps aren't signed with Apple or Microsoft certificates, so macOS and Windows warn on
 first run (see `docs/APPS.md`).
 
+## Sync
+
+`locuvi/sync/merge.py` merges two SQLite databases row by row against the last agreed copy
+(three-way); `engine.py` reads and writes the encrypted sync folder (`state.lcv` +
+`blobs/`), takes the numbering lease before issuing, and does the one-file export.
+Every table is either synced or listed in `merge.LOCAL_TABLES`; a test fails when a new
+table is neither, so decide which when you add one. Two devices end to end:
+
+```bash
+# two fresh desktop apps whose HOME has a Dropbox folder
+HOME=/tmp/s/home python desktop/locuvi_desktop.py --headless --data-dir /tmp/s/a --port 8781 --info-file /tmp/s/a.json &
+HOME=/tmp/s/home python desktop/locuvi_desktop.py --headless --data-dir /tmp/s/b --port 8782 --info-file /tmp/s/b.json &
+OPEN_A=… OPEN_B=… node e2e/sync.mjs    # the "open" links from the two info files
+```
+
 ## Database changes
 
 Edit `backend/locuvi/models.py`, then `uv run python -m locuvi.migrate "message"`, rename the

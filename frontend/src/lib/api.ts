@@ -79,8 +79,8 @@ export const api = {
   async upload<T>(url: string, form: FormData): Promise<T> {
     return (await request("POST", url, form)).json();
   },
-  async blob(method: "GET" | "POST", url: string): Promise<Blob> {
-    return (await request(method, url, method === "POST" ? {} : undefined)).blob();
+  async blob(method: "GET" | "POST", url: string, body?: unknown): Promise<Blob> {
+    return (await request(method, url, method === "POST" ? body ?? {} : undefined)).blob();
   },
 };
 
