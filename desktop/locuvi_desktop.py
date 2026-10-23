@@ -8,7 +8,9 @@ What it does when you open it:
    switched on "Let my phone and tablet connect" (Settings › Phones, tablets and computers).
 3. Opens Locuvi in its own window (Microsoft Edge or Google Chrome app window, else your
    browser), already signed in for this launch.
-4. Shows a small "Locuvi is running" window. Closing it stops Locuvi.
+4. Stops by itself a few minutes after you close that window, after a last sync (unless
+   phone access is on: then it keeps running so your phone can connect). Settings › Phones,
+   tablets and computers has Quit Locuvi and Show my Locuvi folder.
 
 Opening it again while it's running just opens another Locuvi window.
 
@@ -254,48 +256,37 @@ class Locuvi:
         return [f"http://{ip}:{self.port}" for ip in desktop.local_addresses()]
 
 
-# ------------------------------------------------------------- control window
+# ---------------------------------------------------------------- staying open
 
 
-def control_window(app: Locuvi) -> None:
-    import tkinter as tk
-    from tkinter import ttk
+def run_until_done(app: Locuvi) -> None:
+    """Keep Locuvi running while its window is open (or phone access is on), then stop.
 
-    root = tk.Tk()
-    root.title(APP)
-    root.resizable(False, False)
+    There's no extra window to keep open: see ``locuvi.desktop.should_stop``. Opening Locuvi
+    again while it runs just opens another window (``running_instance``).
+    """
+    from locuvi import desktop
+
+    started = time.monotonic()
+    while app.thread and app.thread.is_alive():
+        if desktop.should_stop(time.monotonic(), started, app.phone_access):
+            log.info("Locuvi's window was closed (or Quit chosen): stopping")
+            return
+        time.sleep(2)
+
+
+def last_sync() -> None:
+    """Before stopping, send the latest changes to the sync folder (if sync is on)."""
     try:
-        icon = bundle_dir() / "desktop" / "assets" / "locuvi.png"
-        if icon.is_file():
-            root.iconphoto(True, tk.PhotoImage(file=str(icon)))
-    except tk.TclError:
-        pass
-    frame = ttk.Frame(root, padding=18)
-    frame.grid()
-    ttk.Label(frame, text="Locuvi is running on this computer.", font=("", 13, "bold")).grid(
-        sticky="w"
-    )
-    ttk.Label(frame, text="Keep this window open while you use Locuvi.\nClosing it stops Locuvi.",
-              justify="left").grid(sticky="w", pady=(4, 10))  # fmt: skip
-    ttk.Button(frame, text="Open Locuvi", command=lambda: open_window(app.open_url)).grid(
-        sticky="we"
-    )
-    addrs = app.addresses()
-    if addrs:
-        ttk.Label(frame, text="Phones and tablets on your network can use:",
-                  justify="left").grid(sticky="w", pady=(12, 2))  # fmt: skip
-        for a in addrs:
-            ttk.Label(frame, text=a, font=("Courier", 11)).grid(sticky="w")
-    ttk.Button(frame, text="Show my Locuvi folder", command=lambda: open_folder(app.root)).grid(
-        sticky="we", pady=(12, 0)
-    )
+        from locuvi.config import Settings
+        from locuvi.secrets_store import SecretBox
+        from locuvi.sync import engine
 
-    def quit_app() -> None:
-        root.destroy()
-
-    ttk.Button(frame, text="Quit Locuvi", command=quit_app).grid(sticky="we", pady=(6, 0))
-    root.protocol("WM_DELETE_WINDOW", quit_app)
-    root.mainloop()
+        st = Settings.from_env()
+        if engine.load_config(st).enabled:
+            engine.sync_now(st, SecretBox(st))
+    except Exception as exc:  # noqa: BLE001 - next start syncs again
+        log.info("last sync before stopping didn't finish: %s", type(exc).__name__)
 
 
 def error_box(message: str) -> None:
@@ -355,7 +346,8 @@ def main(argv: list[str] | None = None) -> int:
                 time.sleep(0.5)
         else:
             open_window(app.open_url)
-            control_window(app)
+            run_until_done(app)
+            last_sync()
     except KeyboardInterrupt:
         pass
     finally:

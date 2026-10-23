@@ -441,6 +441,10 @@ for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diar
 }
 
 if (POCKET) {
+  step("sync on a phone: explains what to use until cloud accounts arrive");
+  await mp.goto(at("/settings/sync"));
+  await mp.getByText(/On a phone or tablet, sync needs a Dropbox, OneDrive or Google Drive account/).waitFor();
+  await mp.getByRole("button", { name: "Download everything" }).waitFor();
   await browser.close();
   if (errors.length) {
     console.error("Browser errors:\n" + errors.join("\n"));
