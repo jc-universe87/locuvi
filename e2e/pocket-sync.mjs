@@ -77,7 +77,7 @@ async function join(address, home = "") {
 
 step("phone: Join, with Nextcloud already chosen (the only way on a phone)");
 await page.getByRole("button", { name: "Join from another device" }).click();
-if (!(await page.getByRole("radio", { name: /Nextcloud/ }).isChecked())) throw new Error("Nextcloud not chosen");
+await page.getByRole("radio", { name: /Nextcloud/, checked: true }).waitFor({ timeout: 5000 });
 if (process.env.NC_NO_CORS) {
   step("a Nextcloud that doesn't allow Locuvi: a clear message, nothing changes");
   await join(process.env.NC_NO_CORS);
