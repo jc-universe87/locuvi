@@ -17,7 +17,7 @@ use it in three ways:
 | 🪟 Windows PC | [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Windows 10 or 11 (64-bit) |
 | 🍎 Mac | [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Apple silicon (M1 or newer), macOS 12 or newer |
 | 🤖 Android phone or tablet | [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk) | Android 10 or newer |
-| 📱 iPhone or iPad | [**Open in Safari**](https://locuvi.pistio.com/), then [Add to Home Screen](#iphone-and-ipad) | iOS or iPadOS 16.4 or newer |
+| 📱 iPhone or iPad | [**Open in Safari**](https://locuvi.pistio.co.uk/), then [Add to Home Screen](#iphone-and-ipad) | iOS or iPadOS 16.4 or newer |
 
 All the versions are listed on the [releases page](https://github.com/jc-universe87/locuvi/releases).
 Each one was built and tested automatically on its own system before it was published.
@@ -92,7 +92,7 @@ instead** switches back.
 Apple only lets you install apps from the App Store, and putting an app there needs a paid
 Apple developer account. Locuvi works just as well from your Home Screen instead:
 
-1. On your iPhone or iPad, open <https://locuvi.pistio.com/> in **Safari**.
+1. On your iPhone or iPad, open <https://locuvi.pistio.co.uk/> in **Safari**.
 2. Tap the **Share** button (the square with an arrow), then **Add to Home Screen**, then
    **Add**.
 3. Open Locuvi from its new icon. The first start downloads Locuvi once (about 30 MB, so use

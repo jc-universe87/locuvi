@@ -132,7 +132,7 @@ Every version has the same features and shows the same Locuvi.
 | 🪟 **Windows** 10 and 11 | [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Runs Locuvi on your PC. Nothing else to install. |
 | 🍎 **Mac** with Apple silicon (M1 or newer) | [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Runs Locuvi on your Mac. Nothing else to install. |
 | 🤖 **Android** phones and tablets | [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk) | The whole of Locuvi on the phone, works offline. |
-| 📱 **iPhone and iPad** | [**Open in Safari**](https://locuvi.pistio.com/) | Then Share › Add to Home Screen. Works offline. |
+| 📱 **iPhone and iPad** | [**Open in Safari**](https://locuvi.pistio.co.uk/) | Then Share › Add to Home Screen. Works offline. |
 | 🖥 **Server** (home PC, Raspberry Pi, NAS) | [Docker](docs/SETUP.md) | Always on, so you can reach it from anywhere. |
 
 Windows, macOS and Android show a warning the first time, because Locuvi is a free project
