@@ -7,16 +7,17 @@ use it in three ways:
   records are kept there. You don't need a server, Docker or any typing in a terminal.
 - **On a server.** Locuvi runs on a computer that stays switched on, such as a mini PC,
   Raspberry Pi or NAS ([Setting up Locuvi](SETUP.md)).
-- **On a phone or tablet.** Your phone connects to your Locuvi, either the desktop app or a
-  server. The records stay on that computer, not on the phone, so losing a phone doesn't lose
-  anything.
+- **On a phone or tablet.** The whole of Locuvi runs on the phone itself, with its records
+  kept on the phone, and it works without the internet. [Sync](SYNC.md) keeps the same records
+  on your phone and computer. If you prefer, the phone can connect to the Locuvi on your
+  computer or server instead.
 
 | Device | Download | Needs |
 | --- | --- | --- |
 | 🪟 Windows PC | [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Windows 10 or 11 (64-bit) |
 | 🍎 Mac | [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Apple silicon (M1 or newer), macOS 12 or newer |
 | 🤖 Android phone or tablet | [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk) | Android 10 or newer |
-| 📱 iPhone or iPad | No download: [add it to your Home Screen](#iphone-and-ipad) | Safari |
+| 📱 iPhone or iPad | [**Open in Safari**](https://jc-universe87.github.io/locuvi/), then [Add to Home Screen](#iphone-and-ipad) | iOS or iPadOS 16.4 or newer |
 
 All the versions are listed on the [releases page](https://github.com/jc-universe87/locuvi/releases).
 Each one was built and tested automatically on its own system before it was published.
@@ -66,7 +67,7 @@ The small **Locuvi** window works as on Windows: keep it open while you use Locu
 
 ## Android
 
-The Android app connects to your Locuvi, either the desktop app or a server.
+The Android app has the whole of Locuvi inside it. Your records are kept on the phone.
 
 1. On your phone or tablet, download [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk)
    and open it from your notifications or the **Files** app.
@@ -74,27 +75,54 @@ The Android app connects to your Locuvi, either the desktop app or a server.
    **Settings**, switch on **Allow from this source**, and go back.
 3. Tap **Install**. If Google Play Protect warns that it doesn't recognise the app, tap
    **More details**, then **Install anyway**. ([Why?](#why-the-warnings))
-4. Open Locuvi and type your Locuvi's address, for example `192.168.1.20:8765`, then tap
-   **Connect**. The next section says where to find the address.
+4. Open Locuvi. The first start takes a few seconds while it sets itself up, then you see the
+   three welcome questions.
 
 Downloads, such as invoice PDFs and pension figures, are saved in **Downloads › Locuvi** on
 your phone, and open straight away. Links to PCSE Online, GOV.UK and calendar subscriptions
 open in your browser or calendar app.
 
-To connect to a different Locuvi later, go to **Settings › Phones, tablets and computers** in
-the app and tap **Connect to a different Locuvi**.
+To use the Locuvi on your computer or server instead, go to **Settings › Phones, tablets and
+computers** and tap **Connect to a computer or server instead**, then type its address
+([where to find it](#using-your-phone-with-the-desktop-app)). **Use Locuvi on this phone
+instead** switches back.
 
 ## iPhone and iPad
 
 Apple only lets you install apps from the App Store, and putting an app there needs a paid
 Apple developer account. Locuvi works just as well from your Home Screen instead:
 
-1. Open your Locuvi's address in **Safari**, for example `http://192.168.1.20:8765`.
+1. On your iPhone or iPad, open <https://jc-universe87.github.io/locuvi/> in **Safari**.
 2. Tap the **Share** button (the square with an arrow), then **Add to Home Screen**, then
    **Add**.
+3. Open Locuvi from its new icon. The first start downloads Locuvi once (about 30 MB, so use
+   Wi-Fi) and takes a few seconds; after that it opens without the internet.
 
-Locuvi now has its own icon and opens full screen, like an app. It has every feature,
-including downloads, which go to the **Files** app.
+Locuvi now has its own icon and opens full screen, like an app. The whole of Locuvi runs on
+the iPhone or iPad, and your records are kept there. Downloads go to the **Files** app.
+
+> [!IMPORTANT]
+> Always open Locuvi from the Home Screen icon. Safari in a normal tab keeps a separate copy,
+> and Apple may clear what a Safari tab stores if you don't visit for a few weeks; the Home
+> Screen app is kept. Turn on [sync](SYNC.md), or save [everything in one
+> file](SYNC.md#everything-in-one-file) now and then, so a lost phone never loses records.
+
+If you'd rather use the Locuvi on your computer or server, open its address in Safari instead
+and add that to your Home Screen.
+
+## What the phone leaves to your computer
+
+A phone app can't open email or Nextcloud connections of its own, and other apps can't reach
+it. So these are set up on your computer (or server), and what they do syncs to the phone:
+
+- reading booking emails, and sending invoices by email (on the phone, download the PDF and
+  share it from the Files app or your email app);
+- copies of your invoices in Nextcloud;
+- a calendar subscription (the phone can still download your sessions as a calendar file);
+- connecting another AI assistant.
+
+Everything else (diary, invoices, payments, bank statements, pension forms, reports, the
+Inbox, Recently deleted) works the same on the phone.
 
 ## Using your phone with the desktop app
 

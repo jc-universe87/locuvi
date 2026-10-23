@@ -385,7 +385,9 @@ before enabling a cloud model.
   sync folder (state + write-once files) in a cloud app's folder or Nextcloud; a write only
   lands on the copy it read; numbering lease before issuing ("sync before issuing", owner's
   choice); saved passwords travel with the household key; one-file export/import.
-- 🔜 Full Locuvi on phones and tablets, offline, syncing through the same folder (owner's
-  choice): the backend in Pyodide inside the Android app and the iPhone/iPad Home Screen app.
+- ✅ Full Locuvi on phones and tablets, offline (owner's choice): the backend in Pyodide
+  (`locuvi/pocket.py`, `frontend/src/pocket/`), bundled in the Android app and published for
+  the iPhone/iPad Home Screen on GitHub Pages; CI runs the full UI smoke test on it. Email,
+  Nextcloud copies, calendar subscriptions and agent connections stay on a computer.
 - 🔜 Dropbox, OneDrive and Google Drive accounts directly (needed on phones, which have no
   synced folder), with step-by-step app registration for the owner.

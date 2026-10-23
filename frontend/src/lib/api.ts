@@ -1,4 +1,5 @@
 // Thin fetch wrapper: same-origin cookies, CSRF header on mutations, typed errors.
+import { POCKET, pocketFetch } from "./pocket";
 import { nativeApp, nativeSave } from "./native";
 
 export interface ApiErrorBody {
@@ -33,7 +34,7 @@ async function request(method: string, url: string, body?: unknown, headers?: Re
   if (method !== "GET" && csrfToken) h["X-CSRF-Token"] = csrfToken;
   let res: Response;
   try {
-    res = await fetch(`/api/v1${url}`, {
+    res = await (POCKET ? pocketFetch : fetch)(`/api/v1${url}`, {
       method,
       headers: h,
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),

@@ -14,6 +14,10 @@ const { chromium } = createRequire(import.meta.url)("playwright");
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:8000";
 const PASSWORD = process.env.LOCUVI_PASSWORD;
 const SHOTS = process.env.SHOTS;
+// POCKET=1: the phone app build (frontend: npm run build:pocket) served as plain files. It uses
+// #/ addresses, keeps records in this browser's storage, and belongs to one person.
+const POCKET = process.env.POCKET === "1";
+const at = (path) => (POCKET ? `${BASE}/#${path}` : `${BASE}${path}`);
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 const browser = await chromium.launch(
@@ -23,7 +27,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, a
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
-page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); if (process.env.SHOW_CONSOLE) console.log("console:", m.text().slice(0, 300)); });
 const shot = async (name, p = page) => SHOTS && p.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 const step = (s) => console.log(`• ${s}`);
 
@@ -327,7 +331,7 @@ await binRow.getByRole("button", { name: "Restore" }).click();
 await page.getByRole("status").getByText("Restored").waitFor();
 await binRow.waitFor({ state: "detached" });
 await page.getByRole("link", { name: "Today" }).first().click();
-await page.waitForURL(`${BASE}/`);
+await page.waitForURL(at("/"));
 
 step("settings hub and sections");
 await page.getByRole("link", { name: "Settings" }).first().click();
@@ -344,20 +348,26 @@ await page.getByRole("link", { name: /^NHS pension/ }).click();
 await page.getByRole("switch", { name: "Email me before pension deadlines" }).click();
 await page.getByText("✓ Saved").waitFor();
 await shot("11a-pension-reminders");
-await page.getByRole("link", { name: "Settings" }).first().click();
-await page.getByRole("link", { name: /Connect another AI assistant/ }).click();
-await page.getByRole("button", { name: "Create connection key" }).click();
-await page.getByText("Copy this connection key now").waitFor();
-await page.getByText(/Bevro · …/).waitFor();
-await shot("11b-agents");
+if (!POCKET) { // the phone app can't be reached by other apps: set up on a computer
+  await page.getByRole("link", { name: "Settings" }).first().click();
+  await page.getByRole("link", { name: /Connect another AI assistant/ }).click();
+  await page.getByRole("button", { name: "Create connection key" }).click();
+  await page.getByText("Copy this connection key now").waitFor();
+  await page.getByText(/Bevro · …/).waitFor();
+  await shot("11b-agents");
+}
 await page.getByRole("link", { name: "Settings" }).first().click();
 await page.getByRole("link", { name: /Phone or computer calendar/ }).click();
-await page.getByRole("switch", { name: "Share bookings with my calendar" }).click();
-const icsUrl = (await page.locator("code").first().innerText()).trim();
-const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
-if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
-const google = await page.getByRole("link", { name: "Google Calendar" }).getAttribute("href");
-if (!google?.startsWith("https://calendar.google.com/calendar/render?cid=webcal")) await fail("Google subscribe link");
+if (POCKET) {
+  await page.getByText(/A calendar subscription needs a Locuvi that's always on/).waitFor();
+} else {
+  await page.getByRole("switch", { name: "Share bookings with my calendar" }).click();
+  const icsUrl = (await page.locator("code").first().innerText()).trim();
+  const ics = await (await fetch(icsUrl)).text(); // no cookie, like a calendar app
+  if (!ics.startsWith("BEGIN:VCALENDAR") || !ics.includes("Example Medical Practice")) await fail("calendar feed");
+  const google = await page.getByRole("link", { name: "Google Calendar" }).getAttribute("href");
+  if (!google?.startsWith("https://calendar.google.com/calendar/render?cid=webcal")) await fail("Google subscribe link");
+}
 const [csv] = await Promise.all([
   page.waitForEvent("download"),
   page.getByRole("button", { name: "Spreadsheet (.csv)" }).click(),
@@ -413,16 +423,31 @@ await page.getByRole("status").getByText("Refund saved").waitFor();
 await page.locator(".inv-hero .pill", { hasText: "Paid" }).waitFor();
 
 step("mobile layout");
-const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-await mobile.addCookies(await ctx.cookies());
-const mp = await mobile.newPage();
+let mp = page;
+if (POCKET) {
+  await page.setViewportSize({ width: 390, height: 844 }); // the records live in this tab's storage
+} else {
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await mobile.addCookies(await ctx.cookies());
+  mp = await mobile.newPage();
+}
 for (const [path, name] of [["/", "12-mobile-today"], ["/diary", "13-mobile-diary"], ["/invoices", "14-mobile-invoices"], ["/inbox", "15-mobile-inbox"], ["/bank", "16-mobile-bank"], ["/settings/mailbox", "17-mobile-mailbox"]]) {
-  await mp.goto(`${BASE}${path}`);
+  await mp.goto(at(path));
   await mp.locator(".tabbar").waitFor();
   await mp.waitForTimeout(300);
   const overflow = await mp.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   if (overflow) await fail(`horizontal overflow on mobile ${path}`);
   await shot(name, mp);
+}
+
+if (POCKET) {
+  await browser.close();
+  if (errors.length) {
+    console.error("Browser errors:\n" + errors.join("\n"));
+    process.exit(1);
+  }
+  console.log("UI smoke test passed (phone app)");
+  process.exit(0);
 }
 
 step("household profiles: add one, sign in as them, separate data");

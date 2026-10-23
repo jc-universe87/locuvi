@@ -14,6 +14,10 @@ on:
     paths:
       - "desktop/**"
       - "mobile/**"
+      - "frontend/pocket/**"
+      - "frontend/src/pocket/**"
+      - "frontend/src/lib/pocket.ts"
+      - "backend/locuvi/pocket.py"
       - ".github/workflows/release.yml"
   push:
     tags: ["v*"]
@@ -146,6 +150,30 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pocket/pyodide
+          key: pyodide-${{ hashFiles('frontend/pocket/deps.py') }}
+      # The whole of Locuvi, to run on the phone itself (records kept on the phone)
+      - name: Build the phone app into the APK
+        run: |
+          python frontend/pocket/deps.py "$RUNNER_TEMP/pocket"
+          (cd frontend && npm ci && PYODIDE_DIR="$RUNNER_TEMP/pocket/pyodide" POCKET_WHEELS="$RUNNER_TEMP/pocket/wheels" npm run build:pocket)
+          rm -rf mobile/android/app/src/main/assets/www
+          mkdir -p mobile/android/app/src/main/assets
+          cp -R frontend/dist-pocket mobile/android/app/src/main/assets/www
+          rm -f mobile/android/app/src/main/assets/www/sw.js
       - name: Build the APK
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -165,19 +193,10 @@ jobs:
           mkdir -p dist
           cp mobile/android/app/build/outputs/apk/release/app-release.apk dist/Locuvi-Android.apk
           "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --print-certs dist/Locuvi-Android.apk
-      # The emulator talks to a Locuvi running on this machine, as a phone would to yours.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.12"
-          enable-cache: true
+      # For the "connect to a computer" check: a Locuvi on this machine, as a phone would see yours.
       - name: Start a Locuvi for the phone to use
         run: |
-          (cd frontend && npm ci && npm run build)
+          (cd frontend && npm run build)
           (cd backend && uv sync --locked)
           S="$RUNNER_TEMP/srv"; mkdir -p "$S"; printf "e2e-pass" > "$S/pw"
           cd backend
@@ -194,7 +213,8 @@ jobs:
       - name: Test the APK on an Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          # a current Android: the phone app needs a recent WebView (phones update it themselves)
+          api-level: 34
           arch: x86_64
           target: google_apis
           disable-animations: true

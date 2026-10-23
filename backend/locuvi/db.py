@@ -8,6 +8,7 @@ profile's data only. Profile 1 (the original installation) is the default.
 
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -34,7 +35,10 @@ def make_engine(db_path: Path) -> Engine:
         # Take over transaction control from pysqlite so BEGIN IMMEDIATE works.
         dbapi_conn.isolation_level = None
         cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA journal_mode=WAL")
+        # In the phone app the database is copied to the phone's storage after each change,
+        # so it must be one self-contained file (no -wal beside it).
+        pocket = os.environ.get("LOCUVI_POCKET") == "1"  # the phone app (locuvi/pocket.py)
+        cur.execute("PRAGMA journal_mode=DELETE" if pocket else "PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=FULL")
         cur.execute("PRAGMA foreign_keys=ON")
         cur.execute("PRAGMA busy_timeout=15000")

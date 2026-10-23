@@ -8,6 +8,7 @@ import type { MessageKey } from "../i18n/en";
 import { api, downloadBlob, openPendingTab, setCsrf } from "../lib/api";
 import { APPS_GUIDE, DOWNLOADS } from "../lib/apps";
 import { nativeApp } from "../lib/native";
+import { POCKET } from "../lib/pocket";
 import { dateTime, pct, todayLondon, ukDate } from "../lib/format";
 import { suggestYearPrefix } from "../lib/numbering";
 import type { AssistantConfig, Branding, HouseholdProfile, EmailConfig, MailboxConfig, ScanResult, Numbering, Policy, Practice, Profile, WebDavConfig } from "../lib/types";
@@ -16,6 +17,9 @@ import { scanSummary } from "./Inbox";
 
 const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "email", "storage", "calendar", "apps", "sync", "mailbox", "assistant", "agents", "trash", "password", "profiles"] as const;
 type Section = (typeof SECTIONS)[number];
+// The phone app can't open email or Nextcloud connections, or be reached by other apps: these
+// are set up on a computer (or server), and what they bring in syncs to the phone.
+const ON_A_COMPUTER = new Set<Section>(["email", "storage", "mailbox", "agents"]);
 const ICON: Record<Section, string> = {
   you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", apps: "today", sync: "cloud", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
 };
@@ -24,7 +28,8 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
   const { t, locale, setLocale } = useT();
   const { section } = useParams();
   // Password: always for a signed-in profile (a gateway admin sets one before adding profiles).
-  const visible = (s: Section) => (s !== "password" || !!onSignOut || !!profile) && (s !== "profiles" || !!profile?.is_admin);
+  const visible = (s: Section) =>
+    (s !== "password" || !!onSignOut || !!profile) && (s !== "profiles" || !!profile?.is_admin) && !(POCKET && ON_A_COMPUTER.has(s));
   if (section && (SECTIONS as readonly string[]).includes(section) && visible(section as Section)) {
     return (
       <>
@@ -86,6 +91,25 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
       </p>
     </>
   );
+}
+
+/** An image from the API, fetched like any other request (so it also works in the phone app). */
+function ApiImage({ url, alt, className }: { url: string; alt: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let gone = false;
+    let made: string | null = null;
+    api.blob("GET", url).then((b) => {
+      if (gone) return;
+      made = URL.createObjectURL(b);
+      setSrc(made);
+    }, () => undefined);
+    return () => {
+      gone = true;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [url]);
+  return src ? <img className={className} src={src} alt={alt} /> : null;
 }
 
 function Row({ id, label, children, stacked, hint }: { id?: string; label: string; children: ReactNode; stacked?: boolean; hint?: string }) {
@@ -267,7 +291,7 @@ function LookSection() {
       <div className="form-list">
         <div className="form-row stacked">
           {b.has_logo ? (
-            <img className="logo-preview" src={`/api/v1/settings/branding/logo?v=${b.logo_sha256 ?? ""}`} alt={t("look.logo_alt")} />
+            <ApiImage className="logo-preview" url={`/settings/branding/logo?v=${b.logo_sha256 ?? ""}`} alt={t("look.logo_alt")} />
           ) : (
             <span className="hint">{t("look.no_logo")}</span>
           )}
@@ -1347,6 +1371,10 @@ function CalendarSection() {
     <>
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("calendar.intro")}</p>
       <ErrorAlert error={error} />
+      {POCKET ? (
+        <div className="alert info">{t("pocket.calendar_note")}</div>
+      ) : (
+      <>
       <h3>{t("calendar.live_title")}</h3>
       <p className="hint" style={{ marginTop: 0 }}>{t("calendar.live_hint")}</p>
       <div className="form-list">
@@ -1377,6 +1405,8 @@ function CalendarSection() {
           </div>
           <p className="form-foot">{t("calendar.private")}</p>
         </>
+      )}
+      </>
       )}
       <h3>{t("calendar.export_title")}</h3>
       <p className="hint" style={{ marginTop: 0 }}>{t("calendar.export_hint")}</p>
@@ -1413,7 +1443,18 @@ function AppsSection() {
     <>
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("apps.intro")}</p>
       <ErrorAlert error={error} />
-      {native && (
+      {POCKET && (
+        <>
+          <h3>{t("apps.this_app")}</h3>
+          <p className="hint" style={{ marginTop: 0 }}>{t("pocket.on_this_phone")} <Link to="/settings/sync">{t("settings.s_sync")}</Link></p>
+          {native && (
+            <div className="actions" style={{ marginTop: "0.5rem" }}>
+              <button className="btn secondary" onClick={() => native.changeServer()}>{t("pocket.use_computer")}</button>
+            </div>
+          )}
+        </>
+      )}
+      {native && !POCKET && (
         <>
           <h3>{t("apps.this_app")}</h3>
           <div className="form-list">
@@ -1445,7 +1486,7 @@ function AppsSection() {
           )}
         </>
       )}
-      {!desk?.available && !native && (
+      {!desk?.available && !native && !POCKET && (
         <>
           <h3>{t("apps.address_title")}</h3>
           <div className="form-list">
@@ -1460,9 +1501,10 @@ function AppsSection() {
           <span className="list-main"><span className="list-title">{t("apps.android")}</span><span className="list-sub">{t("apps.android_sub")}</span></span>
           <span className="chev"><Icon name="download" size={18} /></span>
         </a>
-        <div className="list-row">
+        <a className="list-row" href={DOWNLOADS.iphone} target="_blank" rel="noreferrer noopener">
           <span className="list-main"><span className="list-title">{t("apps.iphone")}</span><span className="list-sub">{t("apps.iphone_sub")}</span></span>
-        </div>
+          <span className="chev"><Icon name="chevron" size={18} /></span>
+        </a>
         <a className="list-row" href={DOWNLOADS.windows} target="_blank" rel="noreferrer noopener">
           <span className="list-main"><span className="list-title">{t("apps.windows")}</span><span className="list-sub">{t("apps.windows_sub")}</span></span>
           <span className="chev"><Icon name="download" size={18} /></span>

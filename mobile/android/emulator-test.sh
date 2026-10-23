@@ -3,10 +3,11 @@
 #
 #   emulator-test.sh Locuvi-Android.apk server-access.log out-dir
 #
-# A Locuvi is already running on the host at :8000 with its access log in server-access.log;
-# the emulator reaches the host as 10.0.2.2. Passes when the app, opened with a connect link,
-# loads Locuvi (page, scripts and the sign-in check reach the server) and, opened again from
-# the launcher, still remembers the address.
+# 1. Opened from the launcher, the app runs the whole of Locuvi on the phone (no server):
+#    the engine starts and the web app reports it is ready.
+# 2. A Locuvi is also running on the host at :8000 with its access log in server-access.log
+#    (the emulator reaches the host as 10.0.2.2). Opened with a connect link, the app loads
+#    that Locuvi instead, and opened again from the launcher, still remembers the address.
 set -euo pipefail
 APK=$1
 LOG=$2
@@ -22,6 +23,31 @@ wait_for() { # pattern, minimum count
 }
 
 adb install -r "$APK"
+served=$(grep -c 'GET /' "$LOG" || true)
+adb logcat -c
+adb shell monkey -p uk.locuvi.app -c android.intent.category.LAUNCHER 1 >/dev/null
+for _ in $(seq 120); do
+  if adb logcat -d -s Locuvi | grep -q "Locuvi is ready on this device"; then break; fi
+  sleep 2
+done
+adb logcat -d -s Locuvi > "$OUT/phone-log.txt" || true
+if ! grep -q "Locuvi is ready on this device" "$OUT/phone-log.txt"; then
+  adb exec-out screencap -p > "$OUT/android-on-phone.png" || true
+  adb logcat -d > "$OUT/logcat.txt" || true
+  echo "FAIL Locuvi did not start on the phone"; tail -40 "$OUT/phone-log.txt"
+  grep -iE "chromium|webview|console|locuvi|AndroidRuntime" "$OUT/logcat.txt" | tail -60
+  adb shell dumpsys package com.google.android.webview | grep -m2 versionName || true
+  exit 1
+fi
+grep -Eq "Locuvi [0-9.]+ started" "$OUT/phone-log.txt" || { echo "FAIL the engine did not report its start"; exit 1; }
+sleep 4
+adb exec-out screencap -p > "$OUT/android-on-phone.png"
+if [ "$(grep -c 'GET /' "$LOG" || true)" -ne "$served" ]; then
+  echo "FAIL the phone app reached the server, it should run on its own"; exit 1
+fi
+echo "PASS Locuvi runs on the phone by itself"
+
+adb shell am force-stop uk.locuvi.app
 adb shell am start -W -a android.intent.action.VIEW -d "locuvi://connect?server=10.0.2.2:8000" uk.locuvi.app
 wait_for 'GET /assets/.*\.js' 1
 wait_for 'GET /api/v1/auth/session' 1

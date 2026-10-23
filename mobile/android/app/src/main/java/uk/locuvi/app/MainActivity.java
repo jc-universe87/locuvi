@@ -14,12 +14,15 @@ import android.util.Base64;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.util.Log;
+import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -28,19 +31,31 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
- * Locuvi for Android: shows the owner's own Locuvi (their computer or server) full screen.
+ * Locuvi for Android.
  *
- * The web app does everything; this adds what a WebView can't do by itself: choosing files to
- * upload, saving downloads (through window.LocuviNative.saveFile), opening other websites and
- * calendar links in the right app, and the back button. The address is kept on the phone.
+ * Normally the whole of Locuvi runs on the phone: the phone app build (frontend
+ * npm run build:pocket, with the Python backend in Pyodide) ships in assets/www and is served
+ * from {@link #LOCAL}, and the records stay on the phone (synced through Settings › Sync).
+ * The owner can instead connect to their computer or server, whose address is kept here.
+ *
+ * Around the web app this adds what a WebView can't do by itself: choosing files to upload,
+ * saving downloads (window.LocuviNative.saveFile), opening other websites and calendar links
+ * in the right app, and the back button.
  */
 public class MainActivity extends Activity {
     private static final String PREFS = "locuvi";
     private static final String KEY_SERVER = "server";
     private static final int PICK_FILES = 1;
+    /** Where the bundled app is served from (never a real site; requests stay on the phone). */
+    static final String LOCAL = "https://app.locuvi.local";
 
     private WebView web;
     private View setup;
@@ -59,6 +74,7 @@ public class MainActivity extends Activity {
         address = findViewById(R.id.address);
         message = findViewById(R.id.message);
         Button connect = findViewById(R.id.connect);
+        findViewById(R.id.use_phone).setOnClickListener(v -> usePhone());
         connect.setOnClickListener(v -> connectTo(address.getText().toString()));
         address.setOnEditorActionListener((v, actionId, event) -> {
             boolean enter = event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
@@ -75,7 +91,7 @@ public class MainActivity extends Activity {
             if (saved != null) {
                 load(saved);
             } else {
-                showSetup(null);
+                usePhone();
             }
         }
     }
@@ -140,11 +156,24 @@ public class MainActivity extends Activity {
         web.loadUrl(url + "/");
     }
 
+    /** Locuvi on this phone: the bundled app, records kept here. */
+    private void usePhone() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_SERVER).apply();
+        load(LOCAL);
+    }
+
+    private boolean onPhone() {
+        return LOCAL.equals(server);
+    }
+
     private void showSetup(String error) {
         web.setVisibility(View.GONE);
         setup.setVisibility(View.VISIBLE);
         String current = server != null ? server
                 : getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_SERVER, "");
+        if (LOCAL.equals(current)) {
+            current = "";
+        }
         if (current != null && address.getText().length() == 0) {
             address.setText(current.replaceFirst("^http://", ""));
         }
@@ -192,6 +221,16 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view,
+                                                              WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if ("https".equals(uri.getScheme()) && "app.locuvi.local".equals(uri.getHost())) {
+                    return asset(uri);
+                }
+                return null;
+            }
+
+            @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 pageUrl = url;
                 message.setVisibility(View.GONE);
@@ -200,13 +239,19 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         WebResourceError error) {
-                if (request.isForMainFrame()) {
+                if (request.isForMainFrame() && !onPhone()) {
                     showSetup(getString(R.string.cant_reach, server));
                 }
             }
         });
 
         web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage m) {
+                Log.i("Locuvi", m.message()); // the phone app's own log (adb logcat -s Locuvi)
+                return true;
+            }
+
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
                                              FileChooserParams params) {
@@ -267,6 +312,41 @@ public class MainActivity extends Activity {
         }
         pendingFiles.onReceiveValue(picked);
         pendingFiles = null;
+    }
+
+    /** A file of the bundled phone app, from assets/www. */
+    private WebResourceResponse asset(Uri uri) {
+        String path = uri.getPath();
+        if (path == null || path.equals("/") || path.isEmpty()) {
+            path = "/index.html";
+        }
+        if (path.contains("..")) {
+            return new WebResourceResponse("text/plain", "utf-8", 404, "Not found", null, null);
+        }
+        try {
+            InputStream in = getAssets().open("www" + path);
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Cache-Control", "no-cache");
+            return new WebResourceResponse(mime(path), null, 200, "OK", headers, in);
+        } catch (IOException e) {
+            return new WebResourceResponse("text/plain", "utf-8", 404, "Not found", null, null);
+        }
+    }
+
+    static String mime(String path) {
+        String p = path.toLowerCase(Locale.ROOT);
+        if (p.endsWith(".html")) return "text/html";
+        if (p.endsWith(".js") || p.endsWith(".mjs")) return "text/javascript";
+        if (p.endsWith(".css")) return "text/css";
+        if (p.endsWith(".wasm")) return "application/wasm";
+        if (p.endsWith(".json")) return "application/json";
+        if (p.endsWith(".webmanifest")) return "application/manifest+json";
+        if (p.endsWith(".svg")) return "image/svg+xml";
+        if (p.endsWith(".png")) return "image/png";
+        if (p.endsWith(".woff2")) return "font/woff2";
+        if (p.endsWith(".woff")) return "font/woff";
+        if (p.endsWith(".zip") || p.endsWith(".whl")) return "application/zip";
+        return "application/octet-stream";
     }
 
     private void openElsewhere(Uri uri) {
@@ -368,7 +448,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String serverUrl() {
-            return server == null ? "" : server;
+            return server == null || onPhone() ? "" : server;
         }
     }
 }
