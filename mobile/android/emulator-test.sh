@@ -32,7 +32,12 @@ for _ in $(seq 120); do
 done
 adb logcat -d -s Locuvi > "$OUT/phone-log.txt" || true
 if ! grep -q "Locuvi is ready on this device" "$OUT/phone-log.txt"; then
-  echo "FAIL Locuvi did not start on the phone"; tail -40 "$OUT/phone-log.txt"; exit 1
+  adb exec-out screencap -p > "$OUT/android-on-phone.png" || true
+  adb logcat -d > "$OUT/logcat.txt" || true
+  echo "FAIL Locuvi did not start on the phone"; tail -40 "$OUT/phone-log.txt"
+  grep -iE "chromium|webview|console|locuvi|AndroidRuntime" "$OUT/logcat.txt" | tail -60
+  adb shell dumpsys package com.google.android.webview | grep -m2 versionName || true
+  exit 1
 fi
 grep -Eq "Locuvi [0-9.]+ started" "$OUT/phone-log.txt" || { echo "FAIL the engine did not report its start"; exit 1; }
 sleep 4

@@ -24,14 +24,28 @@ export function onPocketProgress(fn: (step: string) => void): () => void {
 function boot(): Promise<void> {
   if (ready) return ready;
   ready = new Promise((resolve, reject) => {
-    worker = new Worker(new URL("../pocket/engine.worker.ts", import.meta.url), { type: "module" });
+    try {
+      worker = new Worker(new URL("../pocket/engine.worker.ts", import.meta.url), { type: "module" });
+    } catch (err) {
+      progressListeners.forEach((fn) => fn("failed"));
+      return reject(err);
+    }
+    worker.onerror = (ev) => {
+      console.error("Locuvi could not start on this device:", ev.message);
+      progressListeners.forEach((fn) => fn("failed"));
+      reject(new Error(ev.message || "worker failed"));
+    };
     worker.onmessage = (e: MessageEvent<Reply | Progress | { type: "ready" } | { type: "failed"; error: string }>) => {
       const m = e.data as { type?: string };
       if (m.type === "ready") {
         console.info("Locuvi is ready on this device");
         return resolve();
       }
-      if (m.type === "failed") return reject(new Error((e.data as { error: string }).error));
+      if (m.type === "failed") {
+        console.error("Locuvi could not start on this device:", (e.data as { error: string }).error);
+        progressListeners.forEach((fn) => fn("failed"));
+        return reject(new Error((e.data as { error: string }).error));
+      }
       if (m.type === "progress") return progressListeners.forEach((fn) => fn((e.data as Progress).step));
       const r = e.data as Reply;
       waiting.get(r.id)?.(r);

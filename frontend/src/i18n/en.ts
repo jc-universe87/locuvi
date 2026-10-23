@@ -1130,6 +1130,7 @@ const en = {
   "pocket.step_runtime": "Getting ready",
   "pocket.step_packages": "Loading Locuvi",
   "pocket.step_records": "Opening your records",
+  "pocket.step_failed": "Locuvi can't start on this device. Update your phone's browser: on Android, update “Android System WebView” and “Chrome” in the Play Store; on an iPhone or iPad, update iOS. Then open Locuvi again.",
   "sync.intro": "Sync keeps the same records on all your devices: your phone, tablet and computers. Each device keeps its own copy, so it works without the internet. The copies meet in a folder in your cloud storage, locked with a code only your devices know.",
   "sync.start": "Start syncing from this device",
   "sync.join": "Join from another device",

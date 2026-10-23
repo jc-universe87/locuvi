@@ -213,7 +213,8 @@ jobs:
       - name: Test the APK on an Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          # a current Android: the phone app needs a recent WebView (phones update it themselves)
+          api-level: 34
           arch: x86_64
           target: google_apis
           disable-animations: true

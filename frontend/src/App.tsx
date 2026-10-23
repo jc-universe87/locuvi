@@ -48,8 +48,14 @@ function PocketOpening() {
   return (
     <main className="pocket-opening" aria-busy="true">
       <Logo />
-      <p>{t("pocket.opening")}</p>
-      <p className="muted">{t(`pocket.step_${step}` as MessageKey)}</p>
+      {step === "failed" ? (
+        <p role="alert">{t("pocket.step_failed")}</p>
+      ) : (
+        <>
+          <p>{t("pocket.opening")}</p>
+          <p className="muted">{t(`pocket.step_${step}` as MessageKey)}</p>
+        </>
+      )}
     </main>
   );
 }
@@ -82,7 +88,8 @@ export default function App() {
       setCsrf(s.csrf_token);
       setSession(s);
     } catch {
-      setSession({ authenticated: false, auth_mode: "password", csrf_token: null });
+      // Phone app: the opening screen stays and explains (no sign-in page on a phone)
+      if (!POCKET) setSession({ authenticated: false, auth_mode: "password", csrf_token: null });
     }
   }, []);
 
