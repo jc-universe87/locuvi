@@ -107,11 +107,22 @@ public class MainActivity extends Activity {
         handleLink(intent);
     }
 
-    /** locuvi://connect?server=… connects straight away. */
+    /** locuvi://connect?server=… connects straight away; locuvi://oauth?… finishes signing
+     * in to a cloud account for sync, in Locuvi on this phone (CloudReturn in the web app). */
     private boolean handleLink(Intent intent) {
         Uri data = intent == null ? null : intent.getData();
         if (data == null || !"locuvi".equals(data.getScheme())) {
             return false;
+        }
+        if ("oauth".equals(data.getHost())) {
+            String query = data.getEncodedQuery();
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_SERVER).apply();
+            server = LOCAL;
+            message.setVisibility(View.GONE);
+            setup.setVisibility(View.GONE);
+            web.setVisibility(View.VISIBLE);
+            web.loadUrl(LOCAL + "/#/oauth" + (query == null ? "" : "?" + query));
+            return true;
         }
         String target = data.getQueryParameter("server");
         if (target == null || target.trim().isEmpty()) {

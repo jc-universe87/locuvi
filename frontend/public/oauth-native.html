@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- (oauth-native.html is the same page under the address OneDrive uses for the computer and Android app.)
+     Where Dropbox, Google and Microsoft send people back after signing in to sync
+     (backend locuvi/sync/cloud.py). It only passes the one-time code on to the Locuvi that
+     asked, named at the end of "state": this site (web), the Android app (app) or the
+     Locuvi app on this computer (local:<port>). The code alone is useless without the
+     secret that Locuvi kept back (PKCE). -->
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Back to Locuvi</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; color: #1d2b36; line-height: 1.5; }
+    a { display: inline-block; margin-top: 0.5rem; padding: 0.7rem 1.2rem; background: #264653; color: #fff; border-radius: 0.6rem; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Back to Locuvi</h1>
+  <p id="msg">Taking you back to Locuvi…</p>
+  <p><a id="go" hidden>Back to Locuvi</a></p>
+  <script>
+    (function () {
+      var query = location.search.slice(1);
+      var state = new URLSearchParams(query).get("state") || "";
+      var to = state.slice(state.indexOf(".") + 1);
+      var target = null;
+      if (to === "web") target = "./#/oauth?" + query;
+      else if (to === "app") target = "locuvi://oauth?" + query;
+      else if (/^local:\d{1,5}$/.test(to)) target = "http://127.0.0.1:" + to.slice(6) + "/oauth?" + query;
+      if (!target) {
+        document.getElementById("msg").textContent = "This page didn't come from Locuvi. Close it and start again in Locuvi.";
+        return;
+      }
+      var a = document.getElementById("go");
+      a.href = target;
+      a.hidden = false;
+      document.getElementById("msg").textContent = "If Locuvi doesn't open by itself, tap the button.";
+      location.replace(target);
+    })();
+  </script>
+</body>
+</html>

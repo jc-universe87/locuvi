@@ -21,6 +21,7 @@ import ReportsPage from "./pages/Reports";
 import SettingsPage from "./pages/Settings";
 import TodayPage from "./pages/Today";
 import WelcomePage from "./pages/Welcome";
+import CloudReturn from "./pages/CloudReturn";
 
 interface SessionInfo {
   authenticated: boolean;
@@ -150,6 +151,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<TodayPage />} />
             <Route path="/welcome" element={<WelcomePage />} />
+            <Route path="/oauth" element={<CloudReturn />} />
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/invoices/new" element={<InvoiceEditor />} />

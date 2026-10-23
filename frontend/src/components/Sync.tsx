@@ -4,12 +4,13 @@ import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
 import { dateTime, todayLondon } from "../lib/format";
 import { POCKET } from "../lib/pocket";
+import { signIn, type CloudProvider } from "../lib/cloud";
 
-type Where = { kind: "folder" | "nextcloud"; path?: string };
+type Where = { kind: "folder" | "nextcloud" | "cloud"; path?: string; provider?: CloudProvider };
 type Nextcloud = { url: string; home_url: string; username: string; password: string };
 type SyncState = {
   enabled: boolean;
-  kind: "folder" | "nextcloud" | null;
+  kind: "folder" | "nextcloud" | "cloud" | null;
   folder: string | null;
   device_name: string;
   last_ok: string | null;
@@ -17,6 +18,8 @@ type SyncState = {
   last_changes: number;
   nextcloud: { url: string; home_url: string | null; username: string; reached: "url" | "home_url" | null } | null;
   nextcloud_saved: { url: string; username: string } | null;
+  cloud: { provider: CloudProvider; account: string | null } | null;
+  cloud_accounts: CloudProvider[];
   cloud_folders: { name: string; path: string }[];
   can_choose_folder: boolean;
 };
@@ -48,7 +51,7 @@ export function SyncSection() {
       if (s.nextcloud_saved) setNc((n) => ({ ...n, url: s.nextcloud_saved!.url, username: s.nextcloud_saved!.username }));
     }, setError);
   }, []);
-  const onlyNextcloud = !!st && st.cloud_folders.length === 0 && !st.can_choose_folder;
+  const onlyNextcloud = !!st && st.cloud_folders.length === 0 && !st.can_choose_folder && st.cloud_accounts.length === 0;
   useEffect(() => {
     if (mode && onlyNextcloud) setWhere({ kind: "nextcloud" });
   }, [mode, onlyNextcloud]);
@@ -72,6 +75,7 @@ export function SyncSection() {
     run(async () => {
       const w = target();
       if (!w) return;
+      if (w.kind === "cloud" && w.provider) return signIn(w.provider, mode ?? "start", device, code);
       const body = { ...w, device_name: device };
       if (mode === "start") {
         const r = await api.post<SyncState & { code: string }>("/sync/start", body);
@@ -99,7 +103,8 @@ export function SyncSection() {
           <div className="form-list">
             <div className="form-row stacked">
               <span>{t("sync.syncing_with")}</span>
-              <strong>{st.kind === "nextcloud" ? t("sync.nextcloud") : folderName(st)}</strong>
+              <strong>{st.kind === "nextcloud" ? t("sync.nextcloud") : st.cloud ? t(`sync.cloud_${st.cloud.provider}`) : folderName(st)}</strong>
+              {st.cloud?.account && <span className="hint">{st.cloud.account}</span>}
               {st.kind === "folder" && <span className="hint" style={{ wordBreak: "break-all" }}>{st.folder}</span>}
               {st.nextcloud && (
                 <span className="hint" style={{ wordBreak: "break-all" }}>
@@ -129,7 +134,7 @@ export function SyncSection() {
         </>
       ) : mode === null ? (
         <>
-        {POCKET && <p className="hint">{t("pocket.sync_note")}</p>}
+        {POCKET && <p className="hint">{t(st.cloud_accounts.length ? "pocket.sync_note_accounts" : "pocket.sync_note")}</p>}
         <div className="actions">
           <button className="btn" onClick={() => setMode("start")}>{t("sync.start")}</button>
           <button className="btn secondary" onClick={() => setMode("join")}>{t("sync.join")}</button>
@@ -153,6 +158,13 @@ export function SyncSection() {
                 <span className="list-main"><span className="list-title">{t("sync.other_folder")}</span></span>
               </label>
             )}
+            {st.cloud_accounts.map((p) => (
+              <label key={p} className="list-row">
+                <input type="radio" name="sync-where" checked={where?.kind === "cloud" && where.provider === p}
+                  onChange={() => setWhere({ kind: "cloud", provider: p })} />
+                <span className="list-main"><span className="list-title">{t(`sync.cloud_${p}`)}</span><span className="list-sub">{t("sync.cloud_sub")}</span></span>
+              </label>
+            ))}
             <label className="list-row">
               <input type="radio" name="sync-where" checked={where?.kind === "nextcloud"} onChange={() => setWhere({ kind: "nextcloud" })} />
               <span className="list-main"><span className="list-title">{t("sync.nextcloud")}</span><span className="list-sub">{t("sync.nextcloud_sub")}</span></span>
@@ -183,7 +195,9 @@ export function SyncSection() {
           </div>
           <div className="actions" style={{ marginTop: "0.75rem" }}>
             <button className="btn" disabled={busy || !target() || (mode === "join" && code.trim().length < 20)} onClick={() => void begin()}>
-              {busy ? t("sync.syncing") : mode === "start" ? t("sync.start_go") : t("sync.join_go")}
+              {busy ? t("sync.syncing") : where?.kind === "cloud" && where.provider
+                ? t(mode === "start" ? "sync.cloud_start_go" : "sync.cloud_join_go", { name: t(`sync.cloud_${where.provider}`) })
+                : mode === "start" ? t("sync.start_go") : t("sync.join_go")}
             </button>
             <button className="btn ghost" onClick={() => setMode(null)}>{t("common.cancel")}</button>
           </div>

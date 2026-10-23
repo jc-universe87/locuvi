@@ -486,7 +486,7 @@ class ReadDocumentIn(Strict):
 
 
 class SyncWhereIn(Strict):
-    kind: Literal["folder", "nextcloud"]
+    kind: Literal["folder", "nextcloud", "cloud"]
     path: Annotated[str, StringConstraints(max_length=1000)] | None = None
     device_name: Annotated[str, StringConstraints(max_length=60)] = ""
     # Nextcloud: its address, an optional home network address, user and app password
@@ -494,6 +494,8 @@ class SyncWhereIn(Strict):
     home_url: Annotated[str, StringConstraints(max_length=500)] | None = None
     username: Annotated[str, StringConstraints(max_length=200)] | None = None
     password: Annotated[str, StringConstraints(max_length=500)] | None = None
+    # Dropbox, Google Drive, OneDrive: the sign-in from /sync/cloud/finish
+    connection: Annotated[str, StringConstraints(max_length=100)] | None = None
 
 
 class SyncJoinIn(SyncWhereIn):
@@ -502,3 +504,13 @@ class SyncJoinIn(SyncWhereIn):
 
 class SyncExportIn(Strict):
     passphrase: Annotated[str, StringConstraints(min_length=12, max_length=200)]
+
+
+class CloudBeginIn(Strict):
+    provider: Literal["dropbox", "google", "onedrive"]
+    return_to: Annotated[str, StringConstraints(max_length=20)]
+
+
+class CloudFinishIn(CloudBeginIn):
+    code: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    verifier: Annotated[str, StringConstraints(min_length=43, max_length=128)]
