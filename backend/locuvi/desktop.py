@@ -31,6 +31,7 @@ def read_config(path: Path | None) -> dict[str, Any]:
     port = data.get("port")
     return {
         "phone_access": bool(data.get("phone_access", False)),
+        "update_check": bool(data.get("update_check", True)),
         "port": port if isinstance(port, int) and 1024 <= port <= 65535 else DEFAULT_PORT,
     }
 

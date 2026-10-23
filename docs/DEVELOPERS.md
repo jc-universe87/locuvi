@@ -154,6 +154,21 @@ cd .. && PHONE_URL=http://127.0.0.1:8790 DESKTOP_URL=http://127.0.0.1:8793 NC_DE
 The release workflow runs the same script inside the Android app (a debug build, whose
 WebView can be driven; `ANDROID=1`, see `mobile/android/emulator-test.sh`).
 
+## Updates
+
+The release workflow writes `backend/locuvi/_release.py` (`VERSION = "1.1.N"`, not in git)
+before building the Windows and Mac app; `locuvi/updates.py` compares it with GitHub's latest
+release (`LOCUVI_UPDATE_URL` overrides the address, for tests), downloads that release's
+installer, checks it against the SHA-256 GitHub lists for the asset, and starts a detached
+command that waits for Locuvi to exit, installs (Inno Setup silently; on a Mac, replaces the
+`.app` from the disk image) and opens Locuvi again. `desktop/update-test.py` does exactly
+that in the release workflow, offering the just-built installer as version 99.0.0.
+
+The Android app does its own check (`Updates.java`) and hands the verified APK to Android's
+installer through `ApkProvider`; it refuses an APK signed with a different key. Releases are
+signed with the key in the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets
+(alias `locuvi`); keep a copy of it, since a new key means everyone reinstalls once.
+
 ## Database changes
 
 Edit `backend/locuvi/models.py`, then `uv run python -m locuvi.migrate "message"`, rename the

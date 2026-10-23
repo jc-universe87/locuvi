@@ -18,6 +18,7 @@ on:
       - "frontend/src/pocket/**"
       - "frontend/src/lib/pocket.ts"
       - "backend/locuvi/pocket.py"
+      - "backend/locuvi/updates.py"
       - "backend/locuvi/webdav/**"
       - "backend/locuvi/sync/**"
       - "e2e/pocket-sync.mjs"
@@ -60,7 +61,10 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
       - name: Install Locuvi and PyInstaller
-        run: python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
+        run: |
+          # the version this app is released as: it compares it with newer releases (updates.py)
+          echo "VERSION = \"${LOCUVI_VERSION#v}\"" > backend/locuvi/_release.py
+          python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
       - name: Build the desktop app
         working-directory: desktop
         run: pyinstaller --noconfirm locuvi.spec
@@ -81,6 +85,8 @@ jobs:
           APP="$LOCALAPPDATA/Programs/Locuvi/Locuvi.exe"
           test -f "$APP"
           desktop/ci-test.sh "$APP" "$RUNNER_TEMP/installed"
+      - name: Update the installed app as a user would (Update now)
+        run: python desktop/update-test.py "$LOCALAPPDATA/Programs/Locuvi/Locuvi.exe" desktop/dist/Locuvi-Windows-Setup.exe "$RUNNER_TEMP/update"
       - name: Keep test screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -111,7 +117,10 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
       - name: Install Locuvi and PyInstaller
-        run: python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
+        run: |
+          # the version this app is released as: it compares it with newer releases (updates.py)
+          echo "VERSION = \"${LOCUVI_VERSION#v}\"" > backend/locuvi/_release.py
+          python -m pip install --upgrade pip && python -m pip install ./backend pyinstaller
       - name: Build the desktop app
         working-directory: desktop
         run: pyinstaller --noconfirm locuvi.spec
@@ -129,6 +138,14 @@ jobs:
           codesign --verify --deep "$RUNNER_TEMP/mnt/Locuvi.app" && echo "signature (ad hoc) is intact"
           desktop/ci-test.sh "$RUNNER_TEMP/mnt/Locuvi.app/Contents/MacOS/Locuvi" "$RUNNER_TEMP/installed"
           hdiutil detach "$RUNNER_TEMP/mnt"
+      - name: Update the app as a user would (Update now)
+        run: |
+          # as if dragged into Applications: a copy the app may replace
+          hdiutil attach desktop/dist/Locuvi-macOS.dmg -mountpoint "$RUNNER_TEMP/mnt" -nobrowse
+          mkdir -p "$RUNNER_TEMP/Applications"
+          ditto "$RUNNER_TEMP/mnt/Locuvi.app" "$RUNNER_TEMP/Applications/Locuvi.app"
+          hdiutil detach "$RUNNER_TEMP/mnt"
+          python desktop/update-test.py "$RUNNER_TEMP/Applications/Locuvi.app/Contents/MacOS/Locuvi" desktop/dist/Locuvi-macOS.dmg "$RUNNER_TEMP/update"
       - name: Keep test screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -173,7 +190,7 @@ jobs:
       - name: Build the phone app into the APK
         run: |
           python frontend/pocket/deps.py "$RUNNER_TEMP/pocket"
-          (cd frontend && npm ci && PYODIDE_DIR="$RUNNER_TEMP/pocket/pyodide" POCKET_WHEELS="$RUNNER_TEMP/pocket/wheels" npm run build:pocket)
+          (cd frontend && npm ci && VITE_LOCUVI_VERSION="${LOCUVI_VERSION#v}" PYODIDE_DIR="$RUNNER_TEMP/pocket/pyodide" POCKET_WHEELS="$RUNNER_TEMP/pocket/wheels" npm run build:pocket)
           rm -rf mobile/android/app/src/main/assets/www
           mkdir -p mobile/android/app/src/main/assets
           cp -R frontend/dist-pocket mobile/android/app/src/main/assets/www

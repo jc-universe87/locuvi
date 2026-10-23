@@ -342,7 +342,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     try:
         if args.headless:
-            while app.thread and app.thread.is_alive():
+            from locuvi import desktop
+
+            # runs until stopped from outside, or Quit (also when an update installs)
+            while app.thread and app.thread.is_alive() and not desktop.should_stop(0, 0, True):
                 time.sleep(0.5)
         else:
             open_window(app.open_url)

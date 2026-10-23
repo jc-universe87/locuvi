@@ -409,3 +409,13 @@ export function PageHead({ title, children }: { title: string; children?: ReactN
     </div>
   );
 }
+
+/** A setting that is on or off, with its label and an optional hint. */
+export function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="form-row" style={{ gridTemplateColumns: "1fr auto" }}>
+      <span><span style={{ fontWeight: 500 }}>{label}</span>{hint && <span className="hint" style={{ display: "block" }}>{hint}</span>}</span>
+      <Toggle checked={checked} onChange={onChange} label={label} />
+    </div>
+  );
+}

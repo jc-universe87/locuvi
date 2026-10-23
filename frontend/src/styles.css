@@ -358,3 +358,7 @@ button.list-row:first-of-type { border-top: none; }
 /* Phone app: first start */
 .pocket-opening { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; text-align: center; padding: 1rem; }
 .pocket-opening p { margin: 0; }
+
+/* A new version is ready (components/Updates.tsx) */
+.update-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; justify-content: space-between; margin-bottom: 1rem; }
+.update-banner .actions { margin: 0; }

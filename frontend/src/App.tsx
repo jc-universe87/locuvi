@@ -6,6 +6,7 @@ import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
 import { POCKET, onPocketProgress } from "./lib/pocket";
 import { useDesktopHeartbeat } from "./lib/desktop";
+import { UpdateBanner } from "./components/Updates";
 import type { HouseholdProfile } from "./lib/types";
 import DiaryPage from "./pages/Diary";
 import AskPage from "./pages/Ask";
@@ -145,6 +146,7 @@ export default function App() {
           </div>
         </header>
         <main id="main">
+          <UpdateBanner />
           <Routes>
             <Route path="/" element={<TodayPage />} />
             <Route path="/welcome" element={<WelcomePage />} />

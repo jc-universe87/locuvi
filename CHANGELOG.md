@@ -6,6 +6,15 @@ releases.
 
 ## Unreleased
 
+- **Locuvi updates itself.** The Windows and Mac app checks for a new version every few
+  hours and installs it with **Update now** (it closes, installs and opens again). The Android
+  app asks once a day and installs it with one tap. iPhone and iPad offer **Restart Locuvi**
+  once a new version has arrived. **Settings › Phones, tablets and computers › Updates** shows
+  the version and has **Check for updates**. Every download is checked against the released
+  file before it's installed.
+- Android releases are now signed with one permanent key, so new versions install over old
+  ones. Coming from an earlier version, reinstall once ([how](docs/APPS.md#your-records-backups-and-updates)).
+
 - **Phones and tablets sync through Nextcloud.** On Android it works with any Nextcloud,
   including one from work; on iPhone and iPad the Nextcloud must allow Locuvi's address
   ([how](docs/SYNC.md#let-iphones-and-ipads-connect)). Sync now asks for the Nextcloud

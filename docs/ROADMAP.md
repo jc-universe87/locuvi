@@ -395,5 +395,11 @@ before enabling a cloud model.
   makes the connection natively, `Net.java`; iPhone/iPad through the browser, which needs the
   Nextcloud to allow `https://locuvi.pistio.co.uk` by CORS). Tested end to end in CI against a
   stand-in Nextcloud, in a browser and in the Android app on an emulator.
+- ✅ Updates (owner request, 23 Oct 2026): Windows/Mac app checks GitHub's latest release
+  (`locuvi/updates.py`, version baked in as `locuvi/_release.py`), verifies the installer's
+  SHA-256 and installs it after Locuvi stops, then reopens; Android checks daily and installs
+  through the system installer (`Updates.java`, same-signer check); iPhone/iPad offer a restart
+  once the service worker has the new version. The release workflow updates the installed app
+  end to end (`desktop/update-test.py`). Android signed with a permanent key from secrets.
 - 🔜 Dropbox, OneDrive and Google Drive accounts directly (needed on phones, which have no
   synced folder), with step-by-step app registration for the owner.

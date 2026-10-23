@@ -11,4 +11,16 @@
     <string name="saved_to">Saved to Downloads: %1$s</string>
     <string name="save_failed">Couldn\'t save the file.</string>
     <string name="no_viewer">Saved to Downloads. Open it from the Files app.</string>
+    <string name="update_title">Locuvi %1$s is available</string>
+    <string name="update_message">Install the new version now? Your records stay on this phone.</string>
+    <string name="update_now">Update</string>
+    <string name="update_later">Not now</string>
+    <string name="update_latest">You have the latest version of Locuvi.</string>
+    <string name="update_offline">Couldn\'t check for updates. Check your internet connection.</string>
+    <string name="update_downloading">Downloading the update…</string>
+    <string name="update_failed">The update couldn\'t be downloaded or didn\'t look right, so it wasn\'t installed. Try again later.</string>
+    <string name="update_allow">Switch on \"Allow from this source\" for Locuvi, then go back. This is needed once.</string>
+    <string name="update_resign_title">Install this update by hand, once</string>
+    <string name="update_resign_message">This version is signed with Locuvi\'s new permanent key, so Android can\'t install it over the one you have. First sync, or save Everything in one file (Settings › Sync and backup file). Then uninstall Locuvi, install the new version from the website, and join sync again. After that, updates install with one tap.</string>
+    <string name="update_open_page">How to install</string>
 </resources>
