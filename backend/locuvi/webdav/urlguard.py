@@ -3,6 +3,11 @@
 Default policy: HTTPS only, public addresses only. Deliberately private targets
 (Tailscale/LAN Nextcloud) must be allowlisted by the administrator via
 ``WEBDAV_ALLOWED_PRIVATE_HOSTS``; protections are never disabled globally.
+
+One exception, for sync: the owner may give their Nextcloud's *home network* address
+(``home=True``). That address may be on the local network (private ranges, Tailscale, names
+like ``nas.local``), and may use http:// when it is. Loopback, link-local (cloud metadata)
+and other special addresses stay blocked.
 """
 
 from __future__ import annotations
@@ -31,9 +36,11 @@ class ValidatedUrl:
     host: str
     port: int | None
     allowlisted: bool
+    home: bool = False  # a home network address: private addresses are expected
 
 
 _METADATA_HOSTS = {"metadata.google.internal", "metadata", "instance-data"}
+_HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".ts.net")
 
 
 def _ip_is_public(ip: IPAddress) -> bool:
@@ -50,7 +57,24 @@ def _ip_is_public(ip: IPAddress) -> bool:
     )
 
 
-def validate_base_url(raw: str, settings: Settings) -> ValidatedUrl:
+def _ip_is_home(ip: IPAddress) -> bool:
+    """A home or office network address (not loopback, link-local or other special ones)."""
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+        return False
+    return ip.is_private or ip in ipaddress.ip_network("100.64.0.0/10")
+
+
+def _host_is_home(host: str, literal: IPAddress | None) -> bool:
+    if literal is not None:
+        return _ip_is_home(literal)
+    if host == "localhost" or host.endswith(".localhost") or host in _METADATA_HOSTS:
+        return False
+    return "." not in host or host.endswith(_HOME_SUFFIXES)
+
+
+def validate_base_url(raw: str, settings: Settings, *, home: bool = False) -> ValidatedUrl:
     raw = (raw or "").strip()
     if not raw or len(raw) > 500:
         raise UrlBlocked("invalid", "Enter the full WebDAV URL.")
@@ -79,10 +103,13 @@ def validate_base_url(raw: str, settings: Settings) -> ValidatedUrl:
     except ValueError:
         literal = None
     allowlisted = allow.allows_host(host) or (literal is not None and allow.allows_ip(literal))
+    on_home_network = home and _host_is_home(host, literal)
 
-    if scheme == "http" and not (allowlisted and settings.webdav_allow_http_for_allowlisted):
+    if scheme == "http" and not (
+        on_home_network or (allowlisted and settings.webdav_allow_http_for_allowlisted)
+    ):
         raise UrlBlocked("scheme", "Only https:// WebDAV URLs are allowed.")
-    if not allowlisted:
+    if not (allowlisted or on_home_network):
         if host == "localhost" or host.endswith(".localhost") or host in _METADATA_HOSTS:
             raise UrlBlocked("private", "Local and internal addresses are blocked.")
         if literal is not None and not _ip_is_public(literal):
@@ -98,11 +125,15 @@ def validate_base_url(raw: str, settings: Settings) -> ValidatedUrl:
     # Re-encode the path conservatively without double-encoding existing escapes.
     path = quote(path, safe="/%@:+~-._!$&'()*,;=")
     netloc = parts.netloc.lower() if not literal else parts.netloc
-    return ValidatedUrl(f"{scheme}://{netloc}{path}", scheme, host, port, allowlisted)
+    return ValidatedUrl(f"{scheme}://{netloc}{path}", scheme, host, port, allowlisted, home)
 
 
-def resolve_and_check(host: str, port: int | None, settings: Settings) -> None:
-    """Resolve at request time and reject non-public addresses (unless allowlisted)."""
+def resolve_and_check(
+    host: str, port: int | None, settings: Settings, *, home: bool = False
+) -> None:
+    """Resolve at request time and reject non-public addresses (unless allowlisted).
+
+    For a home network address (``home``), addresses on the local network are fine too."""
     host = host.lower().rstrip(".")
     allow = settings.webdav_allowlist
     if allow.allows_host(host):
@@ -113,7 +144,7 @@ def resolve_and_check(host: str, port: int | None, settings: Settings) -> None:
         raise UrlBlocked("dns", "The WebDAV host name could not be resolved.") from exc
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if allow.allows_ip(ip):
+        if allow.allows_ip(ip) or (home and _ip_is_home(ip)):
             continue
         if not _ip_is_public(ip):
             raise UrlBlocked(

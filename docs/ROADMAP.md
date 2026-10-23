@@ -389,5 +389,11 @@ before enabling a cloud model.
   (`locuvi/pocket.py`, `frontend/src/pocket/`), bundled in the Android app and published for
   the iPhone/iPad Home Screen on GitHub Pages; CI runs the full UI smoke test on it. Email,
   Nextcloud copies, calendar subscriptions and agent connections stay on a computer.
+- ✅ Nextcloud sync on phones and tablets (owner request, 23 Oct 2026): sync keeps its own
+  Nextcloud details (address, optional home network address with failover, user, app
+  password); the phone engine connects through `locuvi/webdav/browser.py` (the Android app
+  makes the connection natively, `Net.java`; iPhone/iPad through the browser, which needs the
+  Nextcloud to allow `https://locuvi.pistio.co.uk` by CORS). Tested end to end in CI against a
+  stand-in Nextcloud, in a browser and in the Android app on an emulator.
 - 🔜 Dropbox, OneDrive and Google Drive accounts directly (needed on phones, which have no
   synced folder), with step-by-step app registration for the owner.

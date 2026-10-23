@@ -6,12 +6,13 @@ const pocket = process.env.VITE_POCKET === "1";
 
 // The phone app is served as plain files (GitHub Pages for iPhone and iPad, the Android app's
 // own files), with no server to send security headers, so its page carries them itself: it
-// may only load and contact its own address (Pyodide needs WebAssembly compiled in place).
+// may only load code from its own address (Pyodide needs WebAssembly compiled in place), and
+// connect only to that address and, over https://, to the owner's Nextcloud for sync.
 const POCKET_CSP = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
   "worker-src 'self'",
-  "connect-src 'self'",
+  "connect-src 'self' https:",
   "img-src 'self' blob: data:",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",

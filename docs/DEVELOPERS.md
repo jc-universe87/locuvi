@@ -128,6 +128,32 @@ HOME=/tmp/s/home python desktop/locuvi_desktop.py --headless --data-dir /tmp/s/b
 OPEN_A=… OPEN_B=… node e2e/sync.mjs    # the "open" links from the two info files
 ```
 
+Nextcloud from the phone app: Pyodide has no sockets, so `WebDavClient` uses
+`locuvi/webdav/browser.py`, which calls `locuviNet` in the Web Worker. In the Android app the
+worker hands the request to the page, the page to `LocuviNative.netStash`, and the worker
+loads `https://app.locuvi.local/__net/<id>`, answered by `Net.java` (OkHttp: no CORS, http://
+on the home network works). Elsewhere it's a synchronous XHR, so the Nextcloud must allow the
+origin (CORS) and, if it doesn't expose `ETag`, `WebDavClient.get` reads the version from a
+PROPFIND. A sync's own Nextcloud details (`engine.nextcloud_spec`) may have a home network
+address (`urlguard.validate_base_url(home=True)`: private ranges and local names allowed,
+http:// there, loopback and link-local still blocked); `build_target` uses whichever answers.
+End to end, with a stand-in Nextcloud (`e2e/fake_nextcloud.py`, CORS like docs/SYNC.md says):
+
+```bash
+cd backend
+.venv/bin/python ../e2e/fake_nextcloud.py --root /tmp/nc --http 8791 --https 8792 --allow-origin http://127.0.0.1:8790 &
+.venv/bin/python ../e2e/fake_nextcloud.py --root /tmp/nc --http 8794 --https 8795 &   # no CORS
+APP_ENV=production DATA_DIR=/tmp/desk/data KEY_DIR=/tmp/desk/keys LOCUVI_AUTH_MODE=gateway COOKIE_SECURE=false \
+  WEBDAV_ALLOWED_PRIVATE_HOSTS=127.0.0.1 WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED=true \
+  .venv/bin/uvicorn locuvi.main:create_app --factory --port 8793 &
+cd .. && PHONE_URL=http://127.0.0.1:8790 DESKTOP_URL=http://127.0.0.1:8793 NC_DESKTOP=http://127.0.0.1:8791 \
+  NC_PHONE=https://nextcloud.example.invalid:8792 NC_NO_CORS=https://nextcloud.example.invalid:8795 \
+  node e2e/pocket-sync.mjs   # with the phone build served on :8790, as above
+```
+
+The release workflow runs the same script inside the Android app (a debug build, whose
+WebView can be driven; `ANDROID=1`, see `mobile/android/emulator-test.sh`).
+
 ## Database changes
 
 Edit `backend/locuvi/models.py`, then `uv run python -m locuvi.migrate "message"`, rename the

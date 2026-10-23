@@ -89,6 +89,29 @@ jobs:
           export NODE_PATH=$(npm root -g) BASE_URL=http://127.0.0.1:8790
           POCKET=1 SHOTS="$RUNNER_TEMP/shots" node e2e/smoke.mjs
           node e2e/pocket-keeps.mjs
+      # iPhone and iPad: the browser connects to Nextcloud itself, so the Nextcloud must allow
+      # the phone app's address (CORS). A stand-in Nextcloud that does (and one that doesn't),
+      # and a Locuvi on a "computer" syncing with it.
+      - name: Test sync through Nextcloud, as on an iPhone
+        run: |
+          (cd backend && uv sync --locked)
+          S="$RUNNER_TEMP/nc"; mkdir -p "$S"
+          cd backend
+          nohup .venv/bin/python ../e2e/fake_nextcloud.py --root "$S/files" --http 8791 --https 8792 \
+            --allow-origin http://127.0.0.1:8790 > "$S/nc.log" 2>&1 &
+          nohup .venv/bin/python ../e2e/fake_nextcloud.py --root "$S/files" --http 8794 --https 8795 \
+            > "$S/nc2.log" 2>&1 &
+          APP_ENV=production DATA_DIR="$S/desk/data" KEY_DIR="$S/desk/keys" LOCUVI_AUTH_MODE=gateway \
+            COOKIE_SECURE=false ARCHIVE_WORKER_ENABLED=false \
+            WEBDAV_ALLOWED_PRIVATE_HOSTS=127.0.0.1 WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED=true \
+            nohup .venv/bin/uvicorn locuvi.main:create_app --factory --host 127.0.0.1 --port 8793 \
+            > "$S/desk.log" 2>&1 &
+          for _ in $(seq 60); do curl -fs http://127.0.0.1:8793/api/v1/health/ready && break; sleep 1; done
+          cd ..
+          export NODE_PATH=$(npm root -g)
+          PHONE_URL=http://127.0.0.1:8790 DESKTOP_URL=http://127.0.0.1:8793 NC_DESKTOP=http://127.0.0.1:8791 \
+            NC_PHONE=https://nextcloud.example.invalid:8792 NC_NO_CORS=https://nextcloud.example.invalid:8795 \
+            SHOTS="$RUNNER_TEMP/shots" node e2e/pocket-sync.mjs
       - name: Keep test screenshots
         if: always()
         uses: actions/upload-artifact@v4

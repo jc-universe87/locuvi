@@ -23,7 +23,17 @@ def _ctx(request: Request) -> tuple[Any, Any]:
 
 def _where(request: Request, body: S.SyncWhereIn) -> dict[str, Any]:
     if body.kind == "nextcloud":
-        return {"kind": "nextcloud"}
+        settings, secrets = _ctx(request)
+        if not body.url:
+            raise DomainError("sync.nextcloud_url", "Type your Nextcloud's address.")
+        return engine.nextcloud_spec(
+            settings,
+            secrets,
+            url=body.url,
+            home_url=body.home_url,
+            username=body.username or "",
+            password=body.password,
+        )
     path = Path((body.path or "").strip()).expanduser()
     if not body.path or not path.is_absolute() or not path.is_dir():
         raise DomainError("sync.folder_missing", "Choose a folder that exists on this computer.")
@@ -32,8 +42,9 @@ def _where(request: Request, body: S.SyncWhereIn) -> dict[str, Any]:
 
 @api.get("/sync")
 def sync_status(request: Request) -> dict[str, Any]:
-    settings, _ = _ctx(request)
+    settings, secrets = _ctx(request)
     out = engine.status(settings)
+    out["nextcloud_saved"] = engine.saved_nextcloud_hint(settings, secrets)
     out["cloud_folders"] = service.cloud_folders() if request.app.state.settings.desktop else []
     out["can_choose_folder"] = bool(request.app.state.settings.desktop)
     return out

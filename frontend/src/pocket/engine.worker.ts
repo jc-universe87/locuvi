@@ -20,6 +20,81 @@ let queue: Promise<unknown> = Promise.resolve();
 
 const say = (step: string) => postMessage({ type: "progress", step });
 
+// ---------------------------------------------------------------- connections (Nextcloud)
+// Python has no network of its own here; locuvi.webdav.browser calls locuviNet and waits.
+// In the Android app the app connects (LocuviNative.netStash, then /__net/<id> answered by
+// the app), so any Nextcloud works, http:// at home too. Elsewhere the browser connects,
+// which needs the Nextcloud to allow this address (CORS) and https://.
+type NetAnswer = { status: number; headers: string; body: Uint8Array | null; error: string };
+let nativeNet = false;
+let netId = 0;
+
+function bytesOf(body: unknown): Uint8Array | null {
+  if (body == null) return null;
+  if (body instanceof Uint8Array) return body;
+  // a Python bytes object (PyProxy): copy its buffer
+  const proxy = body as { getBuffer?: (t: string) => { data: Uint8Array; release: () => void } };
+  if (proxy.getBuffer) {
+    const buf = proxy.getBuffer("u8");
+    try {
+      return buf.data.slice();
+    } finally {
+      buf.release();
+    }
+  }
+  return null;
+}
+
+function headerPairs(raw: string): [string, string][] {
+  return raw
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const i = line.indexOf(":");
+      return [line.slice(0, i).trim(), line.slice(i + 1).trim()] as [string, string];
+    });
+}
+
+function locuviNet(method: string, url: string, headersJson: string, body: unknown, timeoutMs: number): NetAnswer {
+  const headers: [string, string][] = JSON.parse(headersJson);
+  const data = bytesOf(body);
+  const x = new XMLHttpRequest();
+  try {
+    if (nativeNet) {
+      const id = `${Date.now()}-${++netId}`;
+      let b64 = "";
+      if (data) {
+        let bin = "";
+        for (let i = 0; i < data.length; i += 0x8000) bin += String.fromCharCode(...data.subarray(i, i + 0x8000));
+        b64 = btoa(bin);
+      }
+      postMessage({ type: "net", id, request: JSON.stringify({ method, url, headers, body: b64, timeout: timeoutMs }) });
+      x.open("GET", `${self.location.origin}/__net/${id}`, false);
+      x.responseType = "arraybuffer";
+      x.send();
+      const meta = JSON.parse(atob(x.getResponseHeader("X-Locuvi-Net") ?? "") || "{}");
+      if (meta.error) return { status: 0, headers: "[]", body: null, error: meta.error };
+      return { status: meta.status, headers: JSON.stringify(meta.headers), body: new Uint8Array(x.response), error: "" };
+    }
+    x.open(method, url, false);
+    x.responseType = "arraybuffer";
+    x.timeout = timeoutMs;
+    for (const [k, v] of headers) x.setRequestHeader(k, v);
+    x.send(data as XMLHttpRequestBodyInit | null);
+  } catch (e) {
+    return { status: 0, headers: "[]", body: null, error: (e as Error)?.name === "TimeoutError" ? "timeout" : "unreachable" };
+  }
+  if (x.status === 0) return { status: 0, headers: "[]", body: null, error: "unreachable" };
+  return {
+    status: x.status,
+    headers: JSON.stringify(headerPairs(x.getAllResponseHeaders())),
+    body: new Uint8Array(x.response as ArrayBuffer),
+    error: "",
+  };
+}
+(self as unknown as { locuviNet: typeof locuviNet }).locuviNet = locuviNet;
+
 function syncfs(populate: boolean): Promise<void> {
   return new Promise((resolve, reject) => py.FS.syncfs(populate, (err: unknown) => (err ? reject(err) : resolve())));
 }
@@ -76,7 +151,11 @@ const started = start().then(
   (e) => postMessage({ type: "failed", error: String(e?.message ?? e) }),
 );
 
-self.onmessage = (e: MessageEvent<Req | { type: "flush" }>) => {
+self.onmessage = (e: MessageEvent<Req | { type: "flush" } | { type: "config"; nativeNet: boolean }>) => {
+  if ("type" in e.data && e.data.type === "config") {
+    nativeNet = e.data.nativeNet;
+    return;
+  }
   if ("type" in e.data) {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;

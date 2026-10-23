@@ -18,6 +18,10 @@ on:
       - "frontend/src/pocket/**"
       - "frontend/src/lib/pocket.ts"
       - "backend/locuvi/pocket.py"
+      - "backend/locuvi/webdav/**"
+      - "backend/locuvi/sync/**"
+      - "e2e/pocket-sync.mjs"
+      - "e2e/fake_nextcloud.py"
       - ".github/workflows/release.yml"
   push:
     tags: ["v*"]
@@ -193,6 +197,9 @@ jobs:
           mkdir -p dist
           cp mobile/android/app/build/outputs/apk/release/app-release.apk dist/Locuvi-Android.apk
           "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --print-certs dist/Locuvi-Android.apk
+          # the same app as a test build, whose screens the sync test can drive (never published)
+          gradle -p mobile/android --no-daemon assembleDebug
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/Locuvi-test.apk"
       # For the "connect to a computer" check: a Locuvi on this machine, as a phone would see yours.
       - name: Start a Locuvi for the phone to use
         run: |
@@ -207,6 +214,20 @@ jobs:
             nohup .venv/bin/uvicorn locuvi.main:create_app --factory --host 127.0.0.1 --port 8000 \
             > "$S/access.log" 2>&1 &
           for _ in $(seq 60); do curl -fs http://127.0.0.1:8000/api/v1/health/ready && break; sleep 1; done
+      # For the sync check: a stand-in Nextcloud with no CORS at all (the Android app connects
+      # itself, so it needn't allow anything), and a Locuvi on a "computer" syncing with it.
+      - name: Start a stand-in Nextcloud and a computer that syncs with it
+        run: |
+          S="$RUNNER_TEMP/nc"; mkdir -p "$S"
+          cd backend
+          nohup .venv/bin/python ../e2e/fake_nextcloud.py --root "$S/files" --http 8791 > "$S/nc.log" 2>&1 &
+          APP_ENV=production DATA_DIR="$S/desk/data" KEY_DIR="$S/desk/keys" LOCUVI_AUTH_MODE=gateway \
+            COOKIE_SECURE=false ARCHIVE_WORKER_ENABLED=false \
+            WEBDAV_ALLOWED_PRIVATE_HOSTS=127.0.0.1 WEBDAV_ALLOW_HTTP_FOR_ALLOWLISTED=true \
+            nohup .venv/bin/uvicorn locuvi.main:create_app --factory --host 127.0.0.1 --port 8793 \
+            > "$S/desk.log" 2>&1 &
+          for _ in $(seq 60); do curl -fs http://127.0.0.1:8793/api/v1/health/ready && break; sleep 1; done
+          npm i -g playwright@$PLAYWRIGHT_VERSION
       - name: Enable KVM for the emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -221,7 +242,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash mobile/android/emulator-test.sh dist/Locuvi-Android.apk "$RUNNER_TEMP/srv/access.log" "$RUNNER_TEMP/android-test"
+          script: TEST_APK="$RUNNER_TEMP/Locuvi-test.apk" bash mobile/android/emulator-test.sh dist/Locuvi-Android.apk "$RUNNER_TEMP/srv/access.log" "$RUNNER_TEMP/android-test"
       - name: Keep test screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -230,6 +251,7 @@ jobs:
           path: |
             ${{ runner.temp }}/android-test
             ${{ runner.temp }}/srv/access.log
+            ${{ runner.temp }}/nc/*.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:

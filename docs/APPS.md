@@ -122,7 +122,8 @@ statements, pension forms, reports, the Inbox, Recently deleted) **except**:
 - **connecting another AI assistant** to Locuvi;
 - **copies of your invoices in Nextcloud**;
 - **a calendar subscription**: you can still download your sessions as a calendar file;
-- **automatic sync with your computer**: for now, move records with
+- **sync through Google Drive, OneDrive or Dropbox**: sync through Nextcloud works
+  ([how](SYNC.md#phones-and-tablets)); for the others, move records with
   [Everything in one file](SYNC.md#everything-in-one-file).
 
 A phone app can't open these connections the way a computer can, so they work in the Locuvi
@@ -134,8 +135,9 @@ Locuvi shows this same list in **Settings** on a phone.
 - Only the app itself comes from `locuvi.pistio.co.uk`, the same files for everyone. Your
   records are kept on your iPhone or iPad and never sent there, to GitHub or to anyone else.
 - The site has its own address, so no other website can read what Locuvi stores.
-- The page carries strict browser rules: it may only load and contact its own address, so
-  nothing from another site can run inside it.
+- The page carries strict browser rules: it may only load code from its own address, so
+  nothing from another site can run inside it. The only other place it connects to is your
+  Nextcloud, over `https://`, when you [sync](SYNC.md#phones-and-tablets).
 - Because the page updates itself, its safety also depends on the accounts that publish it
   (GitHub and Cloudflare), which are protected with two-step sign-in. If you'd rather have
   updates only when you choose to install them, use the Android or desktop app.

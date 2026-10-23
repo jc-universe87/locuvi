@@ -47,8 +47,9 @@ import java.util.Map;
  * The owner can instead connect to their computer or server, whose address is kept here.
  *
  * Around the web app this adds what a WebView can't do by itself: choosing files to upload,
- * saving downloads (window.LocuviNative.saveFile), opening other websites and calendar links
- * in the right app, and the back button.
+ * saving downloads (window.LocuviNative.saveFile), connecting to Nextcloud for sync
+ * ({@link Net}), opening other websites and calendar links in the right app, and the back
+ * button.
  */
 public class MainActivity extends Activity {
     private static final String PREFS = "locuvi";
@@ -62,6 +63,7 @@ public class MainActivity extends Activity {
     private EditText address;
     private TextView message;
     private ValueCallback<Uri[]> pendingFiles;
+    private final Net net = new Net(); // Nextcloud sync from the phone (Net.java)
     private volatile String server; // e.g. http://192.168.1.20:8765, no trailing slash
     private volatile String pageUrl; // the page showing now; the bridge answers only our own
 
@@ -199,6 +201,9 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------ the web view
 
     private void configureWebView() {
+        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            WebView.setWebContentsDebuggingEnabled(true); // test builds only (emulator-test.sh)
+        }
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setDomStorageEnabled(true);
@@ -225,6 +230,10 @@ public class MainActivity extends Activity {
                                                               WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if ("https".equals(uri.getScheme()) && "app.locuvi.local".equals(uri.getHost())) {
+                    String path = uri.getPath();
+                    if (path != null && path.startsWith("/__net/") && onPhone()) {
+                        return net.answer(path.substring("/__net/".length()));
+                    }
                     return asset(uri);
                 }
                 return null;
@@ -444,6 +453,15 @@ public class MainActivity extends Activity {
                 address.setText("");
                 showSetup(null);
             });
+        }
+
+        /** A connection the engine on this phone asks for (see {@link Net}). */
+        @JavascriptInterface
+        public void netStash(String id, String request) {
+            if (!fromOurs() || !onPhone() || id == null || request == null) {
+                return;
+            }
+            net.stash(id, request);
         }
 
         @JavascriptInterface

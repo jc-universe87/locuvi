@@ -446,9 +446,13 @@ if (POCKET) {
   await mp.getByText("On a phone or tablet, Locuvi has everything except:").waitFor();
   await mp.getByText(/The AI assistant\./).waitFor();
   if (await mp.getByRole("link", { name: /^Assistant|AI assistant/ }).count()) await fail("assistant settings shown on a phone");
-  step("sync on a phone: explains what to use until cloud accounts arrive");
+  step("sync on a phone: through Nextcloud, and what to use for the other clouds");
   await mp.goto(at("/settings/sync"));
-  await mp.getByText(/On a phone or tablet, sync needs a Dropbox, OneDrive or Google Drive account/).waitFor();
+  await mp.getByText(/On a phone or tablet, Locuvi syncs through Nextcloud/).waitFor();
+  await mp.getByRole("button", { name: "Join from another device" }).click();
+  await mp.getByLabel("Nextcloud address").waitFor();
+  await mp.getByText(/your Nextcloud must allow Locuvi to connect/).waitFor(); // iPhone and iPad
+  await mp.getByRole("button", { name: "Cancel" }).click();
   await mp.getByRole("button", { name: "Download everything" }).waitFor();
   await browser.close();
   if (errors.length) {

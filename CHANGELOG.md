@@ -6,6 +6,13 @@ releases.
 
 ## Unreleased
 
+- **Phones and tablets sync through Nextcloud.** On Android it works with any Nextcloud,
+  including one from work; on iPhone and iPad the Nextcloud must allow Locuvi's address
+  ([how](docs/SYNC.md#let-iphones-and-ipads-connect)). Sync now asks for the Nextcloud
+  address, user name and app password itself, and takes an optional **home or work
+  address** (such as `http://192.168.1.20`): each sync uses whichever answers, at home or
+  out. Clearer messages when Nextcloud can't be reached or refuses the app password.
+
 - **Phones and tablets say plainly what they can't do yet** (AI assistant, email, Nextcloud
   copies, calendar subscription, connecting other assistants, automatic sync), in Settings and
   once on Today, with what to use instead. The AI assistant stays off on phones.

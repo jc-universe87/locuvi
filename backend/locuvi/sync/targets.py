@@ -17,16 +17,14 @@ import os
 from pathlib import Path
 from typing import Protocol
 
+from locuvi.errors import DomainError
+
 STATE = "state.lcv"
 FOLDER = "Locuvi Sync"
 
 
-class TargetError(Exception):
+class TargetError(DomainError):
     """The sync folder can't be reached right now (offline, signed out, folder missing)."""
-
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code, self.message = code, message
 
 
 class Target(Protocol):
@@ -93,6 +91,22 @@ class FolderTarget:
         os.replace(tmp, dest)
 
 
+_UNREACHABLE = "Nextcloud can't be reached. Check the address and your connection."
+_UNREACHABLE_PHONE = (
+    "Nextcloud can't be reached from this phone. Check the address and your connection. On "
+    "an iPhone or iPad, your Nextcloud must also allow Locuvi (see the Sync guide)."
+)
+_MESSAGES = {
+    "auth_rejected": "Nextcloud didn't accept the user name or app password.",
+    "permission_denied": "Nextcloud didn't allow Locuvi to use its folder. Check the app "
+    "password has access to files.",
+    "insufficient_storage": "Your Nextcloud is full.",
+    "tls_error": "The Nextcloud's security certificate isn't valid, so Locuvi didn't connect.",
+    "redirect_blocked": "Nextcloud sent Locuvi to another address. Use the full WebDAV "
+    "address from Nextcloud's Files settings.",
+}
+
+
 class WebDavTarget:
     """Nextcloud (or any WebDAV server), using Locuvi's existing Nextcloud connection."""
 
@@ -115,7 +129,9 @@ class WebDavTarget:
             return fn(*a)
         except WebDavError as exc:
             code = f"sync.webdav_{exc.error_class}"
-            raise TargetError(code, "Nextcloud can't be reached.") from None
+            phone = os.environ.get("LOCUVI_POCKET") == "1"
+            fallback = _UNREACHABLE_PHONE if phone else _UNREACHABLE
+            raise TargetError(code, _MESSAGES.get(exc.error_class, fallback)) from None
 
     def _ready(self) -> None:
         segs = [*self._base_path, FOLDER, "blobs"]

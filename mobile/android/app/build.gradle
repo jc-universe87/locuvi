@@ -45,3 +45,8 @@ android {
         abortOnError false
     }
 }
+
+dependencies {
+    // Nextcloud sync from the phone app: WebDAV requests made by the app (Net.java)
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+}
