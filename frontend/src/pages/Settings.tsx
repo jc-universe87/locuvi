@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Dialog, ErrorAlert, Icon, SavedIndicator, Toggle, useAutosave, useConfirm, useToast } from "../components/ui";
+import { PhoneLimits } from "../components/PhoneLimits";
 import { SyncSection } from "../components/Sync";
 import { TrashSection } from "../components/Trash";
 import { hasKey, localeNames, useT, type Locale } from "../i18n";
@@ -19,7 +20,7 @@ const SECTIONS = ["you", "look", "bank", "practices", "invoicing", "pension", "e
 type Section = (typeof SECTIONS)[number];
 // The phone app can't open email or Nextcloud connections, or be reached by other apps: these
 // are set up on a computer (or server), and what they bring in syncs to the phone.
-const ON_A_COMPUTER = new Set<Section>(["email", "storage", "mailbox", "agents"]);
+const ON_A_COMPUTER = new Set<Section>(["email", "storage", "mailbox", "agents", "assistant"]);
 const ICON: Record<Section, string> = {
   you: "today", look: "sparkle", bank: "money", practices: "diary", invoicing: "invoices", pension: "pension", email: "send", storage: "cloud", calendar: "diary", apps: "today", sync: "cloud", mailbox: "inbox", assistant: "sparkle", agents: "send", trash: "trash", password: "settings", profiles: "settings",
 };
@@ -60,6 +61,7 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
   return (
     <>
       <h1>{t("nav.settings")}</h1>
+      <PhoneLimits />
       {profile && onSignOut && <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("profiles.signed_in_as", { name: profile.name })}</p>}
       <div className="form-list">
         {SECTIONS.filter(visible).map((s) => (

@@ -111,19 +111,34 @@ the iPhone or iPad, and your records are kept there. Downloads go to the **Files
 If you'd rather use the Locuvi on your computer or server, open its address in Safari instead
 and add that to your Home Screen.
 
-## What the phone leaves to your computer
+## What phones and tablets can't do yet
 
-A phone app can't open email or Nextcloud connections of its own, and other apps can't reach
-it. So these are set up on your computer (or server), and what they do syncs to the phone:
+On an iPhone, iPad or Android phone, Locuvi has everything (diary, invoices, payments, bank
+statements, pension forms, reports, the Inbox, Recently deleted) **except**:
 
-- reading booking emails, and sending invoices by email (on the phone, download the PDF and
-  share it from the Files app or your email app);
-- copies of your invoices in Nextcloud;
-- a calendar subscription (the phone can still download your sessions as a calendar file);
-- connecting another AI assistant.
+- **the AI assistant**: bookings you paste are still read and added, by Locuvi's own rules;
+- **reading booking emails, and sending invoices by email**: download the PDF and share it
+  from the Files app or your email app instead;
+- **connecting another AI assistant** to Locuvi;
+- **copies of your invoices in Nextcloud**;
+- **a calendar subscription**: you can still download your sessions as a calendar file;
+- **automatic sync with your computer**: for now, move records with
+  [Everything in one file](SYNC.md#everything-in-one-file).
 
-Everything else (diary, invoices, payments, bank statements, pension forms, reports, the
-Inbox, Recently deleted) works the same on the phone.
+A phone app can't open these connections the way a computer can, so they work in the Locuvi
+app for Windows and Mac. Some of them may come to phones and tablets in a future update.
+Locuvi shows this same list in **Settings** on a phone.
+
+## How the iPhone and iPad version is kept safe
+
+- Only the app itself comes from `locuvi.pistio.co.uk`, the same files for everyone. Your
+  records are kept on your iPhone or iPad and never sent there, to GitHub or to anyone else.
+- The site has its own address, so no other website can read what Locuvi stores.
+- The page carries strict browser rules: it may only load and contact its own address, so
+  nothing from another site can run inside it.
+- Because the page updates itself, its safety also depends on the accounts that publish it
+  (GitHub and Cloudflare), which are protected with two-step sign-in. If you'd rather have
+  updates only when you choose to install them, use the Android or desktop app.
 
 ## Using your phone with the desktop app
 
