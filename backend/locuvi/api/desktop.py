@@ -51,6 +51,7 @@ def _state(request: Request) -> dict[str, Any]:
     return {
         "available": True,
         "phone_access": cfg["phone_access"],
+        "keeps_running": listening,  # after its window closes, so phones can connect
         "listening": listening,
         "restart_needed": cfg["phone_access"] != listening,
         "own_password": own_password,
@@ -80,3 +81,48 @@ def put_desktop(body: S.DesktopIn, request: Request) -> dict[str, Any]:
     cfg["phone_access"] = body.phone_access
     desktop.write_config(settings.desktop_config, cfg)
     return _state(request)
+
+
+def _desktop_only(request: Request) -> Any:
+    settings = request.app.state.settings
+    if not settings.desktop:
+        raise NotFound("desktop.not_available", "Only the Locuvi app on a computer has this.")
+    return settings
+
+
+@api.post("/desktop/alive")
+def desktop_alive(request: Request) -> dict[str, bool]:
+    """The app's window is still open (see ``desktop.should_stop``)."""
+    import time
+
+    _desktop_only(request)
+    desktop.seen(time.monotonic())
+    return {"ok": True}
+
+
+@api.post("/desktop/quit")
+def desktop_quit(request: Request) -> dict[str, bool]:
+    """Stop Locuvi on this computer (after a last sync)."""
+    _desktop_only(request)
+    desktop.ask_to_quit()
+    return {"ok": True}
+
+
+@api.post("/desktop/open-folder")
+def desktop_open_folder(request: Request) -> dict[str, bool]:
+    """Show the Locuvi folder (records, backups, log) in Explorer or Finder."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    settings = _desktop_only(request)
+    if request.client is None or request.client.host not in ("127.0.0.1", "::1"):
+        raise NotFound("desktop.not_available", "Only on the computer Locuvi runs on.")
+    folder = Path(settings.data_dir).parent
+    if sys.platform == "win32":
+        os.startfile(folder)  # type: ignore[attr-defined]  # noqa: S606
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(folder)])  # noqa: S603, S607
+    else:
+        subprocess.Popen(["xdg-open", str(folder)])  # noqa: S603, S607
+    return {"ok": True}

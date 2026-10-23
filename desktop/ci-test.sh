@@ -16,8 +16,9 @@ printf "e2e-pass" > "$WORK/pw"
 "$APP" --headless --data-dir "$WORK/root" --password-file "$WORK/pw" \
   --info-file "$WORK/info.json" > "$WORK/app.out" 2>&1 &
 PID=$!
+MORE=()
 stop() {
-  kill "$PID" 2>/dev/null || true
+  kill "$PID" "${MORE[@]}" 2>/dev/null || true
   if command -v taskkill >/dev/null; then taskkill //F //IM Locuvi.exe >/dev/null 2>&1 || true; fi
 }
 trap stop EXIT
@@ -35,7 +36,22 @@ URL=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['url'])" "$
 NODE_PATH=$(npm root -g) BASE_URL=$URL LOCUVI_PASSWORD=e2e-pass SHOTS="$WORK/shots" \
   node "$HERE/../e2e/smoke.mjs"
 
-if grep -i traceback "$WORK/root/logs/"*.log; then
+# Sync: two copies of the app on this computer, both seeing a "Dropbox" folder (standing for
+# any folder a cloud app keeps in step), set up through Settings like a person would.
+H="$WORK/home"
+mkdir -p "$H/Dropbox"
+for n in laptop phone; do
+  printf "e2e-pass" > "$WORK/pw-$n"
+  HOME="$H" USERPROFILE="$H" "$APP" --headless --data-dir "$WORK/$n" --password-file "$WORK/pw-$n" \
+    --info-file "$WORK/$n.json" > "$WORK/$n.out" 2>&1 &
+  MORE+=("$!")
+done
+for _ in $(seq 120); do test -s "$WORK/laptop.json" && test -s "$WORK/phone.json" && break; sleep 1; done
+open_link() { python -c "import json,sys; print(json.load(open(sys.argv[1]))['open'])" "$1"; }
+NODE_PATH=$(npm root -g) OPEN_A=$(open_link "$WORK/laptop.json") OPEN_B=$(open_link "$WORK/phone.json") \
+  SHOTS="$WORK/shots" node "$HERE/../e2e/sync.mjs"
+
+if grep -i traceback "$WORK"/*/logs/*.log; then
   echo "FAIL errors in the log"; exit 1
 fi
 echo "PASS desktop app"

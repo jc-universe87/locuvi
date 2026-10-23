@@ -3,6 +3,7 @@ import { ErrorAlert } from "./ui";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
 import { dateTime, todayLondon } from "../lib/format";
+import { POCKET } from "../lib/pocket";
 
 type Where = { kind: "folder" | "nextcloud"; path?: string };
 type SyncState = {
@@ -102,6 +103,8 @@ export function SyncSection() {
           </div>
           <p className="form-foot">{t("sync.issue_note")}</p>
         </>
+      ) : POCKET ? (
+        <div className="alert info">{t("pocket.sync_note")}</div>
       ) : mode === null ? (
         <div className="actions">
           <button className="btn" onClick={() => setMode("start")}>{t("sync.start")}</button>

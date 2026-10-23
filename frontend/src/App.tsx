@@ -5,6 +5,7 @@ import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
 import { POCKET, onPocketProgress } from "./lib/pocket";
+import { useDesktopHeartbeat } from "./lib/desktop";
 import type { HouseholdProfile } from "./lib/types";
 import DiaryPage from "./pages/Diary";
 import AskPage from "./pages/Ask";
@@ -81,6 +82,7 @@ export default function App() {
   const { t } = useT();
   const [session, setSession] = useState<SessionInfo | null>(null);
   usePocketSync(!!session?.authenticated);
+  useDesktopHeartbeat(!POCKET && !!session?.authenticated);
 
   const refresh = useCallback(async () => {
     try {

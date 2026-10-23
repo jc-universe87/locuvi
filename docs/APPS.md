@@ -40,10 +40,10 @@ Each one was built and tested automatically on its own system before it was publ
 4. Locuvi opens in its own window and signs you in by itself. Answer the three welcome
    questions and you're ready.
 
-A small **Locuvi** window also appears. Keep it open while you use Locuvi, because closing it
-stops Locuvi. It has buttons to open Locuvi again and to show your Locuvi folder.
-
-Next time, open Locuvi from the Start menu.
+When you've finished, just close the window. Locuvi sends your latest changes to
+[sync](SYNC.md) and stops by itself a few minutes later. Next time, open Locuvi from the
+Start menu. (**Settings › Phones, tablets and computers** also has **Quit Locuvi**, to stop it
+straight away, and **Show my Locuvi folder**.)
 
 ## Mac
 
@@ -59,7 +59,8 @@ Next time, open Locuvi from the Start menu.
    You only do this once. ([Why?](#why-the-warnings))
 4. Locuvi opens in its own window and signs you in by itself.
 
-The small **Locuvi** window works as on Windows: keep it open while you use Locuvi.
+As on Windows, close the window when you've finished: Locuvi stops by itself a few minutes
+later.
 
 > [!NOTE]
 > The Mac app is for Macs with Apple silicon (M1, M2, M3, M4 and newer). On an older Intel
@@ -133,7 +134,9 @@ home Wi-Fi.
    desktop app signs you in by itself, so you've never needed one. Your phone will ask for it.
 2. Go to **Settings › Phones, tablets and computers** and switch on **Let my phone and tablet
    connect**.
-3. Quit Locuvi from the small Locuvi window and open it again.
+3. Tap **Quit Locuvi** on the same page, then open Locuvi again. From now on Locuvi keeps
+   running after you close its window, so your phone can connect; quit it there when you're
+   done.
 4. On Windows, a **Windows Security** message asks whether Locuvi may use your network. Tick
    **Private networks** and click **Allow**. On a Mac, click **Allow** if asked.
 5. The same settings page now lists your computer's address, for example
@@ -161,7 +164,8 @@ To use Locuvi when you're out, run it on a server with Tailscale
 - **Mac:** `~/Library/Application Support/Locuvi`. In Finder, choose **Go › Go to Folder…**
   and paste it.
 
-You can also click **Show my Locuvi folder** in the small Locuvi window. The folder has your
+You can also click **Show my Locuvi folder** in **Settings › Phones, tablets and computers**.
+The folder has your
 database and PDFs (`data`), the key that protects your saved passwords (`keys`), backups
 (`backups`) and a log for troubleshooting (`logs`).
 

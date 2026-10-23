@@ -6,6 +6,11 @@ releases.
 
 ## Unreleased
 
+- **No more extra "Locuvi is running" window** on Windows and Mac: close Locuvi's window
+  when you've finished, and Locuvi syncs and stops by itself a few minutes later. Quit
+  Locuvi and Show my Locuvi folder are in Settings › Phones, tablets and computers.
+- The iPhone and iPad app lives at <https://locuvi.pistio.co.uk/>.
+
 - **Full Locuvi on phones and tablets.** The Android app and the iPhone/iPad Home Screen app
   now run the whole of Locuvi on the device, with records kept there, and work without the
   internet. [Sync](docs/SYNC.md) keeps them in step with your computer. Email, Nextcloud

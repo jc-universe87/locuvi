@@ -1421,11 +1421,12 @@ function CalendarSection() {
   );
 }
 
-interface DesktopState { available: boolean; phone_access?: boolean; listening?: boolean; restart_needed?: boolean; own_password?: boolean; addresses?: string[] }
+interface DesktopState { available: boolean; phone_access?: boolean; keeps_running?: boolean; listening?: boolean; restart_needed?: boolean; own_password?: boolean; addresses?: string[] }
 
 function AppsSection() {
   const { t } = useT();
   const [desk, setDesk] = useState<DesktopState | null>(null);
+  const [quit, setQuit] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const native = nativeApp();
   useEffect(() => {
@@ -1439,6 +1440,14 @@ function AppsSection() {
       setError(e);
     }
   };
+  if (quit) {
+    return (
+      <div className="pocket-opening" role="status">
+        <p><strong>{t("apps.stopped")}</strong></p>
+        <p className="muted">{t("apps.stopped_hint")}</p>
+      </div>
+    );
+  }
   return (
     <>
       <p className="muted" style={{ marginTop: "-0.5rem" }}>{t("apps.intro")}</p>
@@ -1476,6 +1485,11 @@ function AppsSection() {
             <p className="form-foot">{t("apps.password_first")} <Link to="/settings/password">{t("settings.s_password")}</Link></p>
           )}
           {desk.restart_needed && <div className="alert info" style={{ marginTop: "0.5rem" }}>{t("apps.restart")}</div>}
+          <div className="actions wrap" style={{ marginTop: "0.75rem" }}>
+            <button className="btn secondary" onClick={() => void api.post("/desktop/open-folder").catch(setError)}>{t("apps.open_folder")}</button>
+            <button className="btn ghost" onClick={() => void api.post("/desktop/quit").then(() => setQuit(true), setError)}>{t("apps.quit")}</button>
+          </div>
+          <p className="form-foot">{desk.keeps_running ? t("apps.keeps_running") : t("apps.stops_itself")}</p>
           {desk.listening && desk.addresses && desk.addresses.length > 0 && (
             <>
               <p className="hint">{t("apps.addresses")}</p>

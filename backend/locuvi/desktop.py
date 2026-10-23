@@ -62,3 +62,40 @@ def local_addresses() -> list[str]:
     except OSError:
         pass
     return found
+
+
+# ------------------------------------------------------------ when the app stops by itself
+#
+# There's no extra window to keep open: while Locuvi's window is open, the page says
+# "still here" every 30 seconds (POST /api/v1/desktop/alive). A few minutes after the last
+# one, the app stops by itself, unless phone access is on (then phones still need it).
+# Browsers slow timers in windows you can't see to about once a minute, so the limit allows
+# for that. Quit in Settings stops it straight away.
+
+IDLE_SECONDS = 180  # no sign of the window for this long: stop
+FIRST_SECONDS = 120  # time for the window to open the first time
+
+_state: dict[str, Any] = {"last_seen": None, "quit": False}
+
+
+def seen(now: float) -> None:
+    _state["last_seen"] = now
+
+
+def ask_to_quit() -> None:
+    _state["quit"] = True
+
+
+def should_stop(now: float, started: float, phone_access: bool) -> bool:
+    if _state["quit"]:
+        return True
+    if phone_access:
+        return False
+    last = _state["last_seen"]
+    if last is None:
+        return now - started > FIRST_SECONDS
+    return now - last > IDLE_SECONDS
+
+
+def reset() -> None:
+    _state.update(last_seen=None, quit=False)
