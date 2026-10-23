@@ -101,7 +101,7 @@ jobs:
           path: frontend/dist-pocket
 
   # The iPhone and iPad app: the tested phone build, published at
-  # https://jc-universe87.github.io/locuvi/ (open in Safari, then Add to Home Screen).
+  # https://locuvi.pistio.com/ (open in Safari, then Add to Home Screen).
   pages:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: [backend, frontend, phone]
