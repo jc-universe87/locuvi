@@ -88,6 +88,29 @@ them each build is signed with a fresh debug key. Never commit a keystore.
 The apps aren't signed with Apple or Microsoft certificates, so macOS and Windows warn on
 first run (see `docs/APPS.md`).
 
+## The phone app (Pyodide)
+
+`npm run build:pocket` builds the web app with `VITE_POCKET=1` into `frontend/dist-pocket/`
+and `pocket/assemble.mjs` adds Pyodide, Locuvi's wheel and the pure-Python wheels it needs
+(`python frontend/pocket/deps.py DIR` gathers them: Pyodide's own builds where it has them,
+otherwise the versions in `backend/uv.lock`). In that build `lib/api.ts` sends requests to a
+Web Worker (`src/pocket/engine.worker.ts`) that runs `locuvi.pocket.handle` instead of the
+network; records live in IndexedDB (IDBFS), copied after every change and when the app is
+hidden. No threads and no sockets there: FastAPI's thread hand-offs run inline, background
+workers are off, and email/Nextcloud/feeds are set up on a computer.
+
+```bash
+python frontend/pocket/deps.py /tmp/pocket
+(cd frontend && PYODIDE_DIR=/tmp/pocket/pyodide POCKET_WHEELS=/tmp/pocket/wheels npm run build:pocket)
+(cd frontend/dist-pocket && python -m http.server 8790) &
+POCKET=1 BASE_URL=http://127.0.0.1:8790 node e2e/smoke.mjs && node e2e/pocket-keeps.mjs
+```
+
+The Android app bundles `dist-pocket` in `assets/www` and serves it from
+`https://app.locuvi.local` (`MainActivity.asset`). GitHub Pages serves the same build for
+iPhone and iPad; its service worker keeps it for offline use. Pages sites of one GitHub
+account share an origin, so don't host other untrusted pages on the same account's Pages.
+
 ## Sync
 
 `locuvi/sync/merge.py` merges two SQLite databases row by row against the last agreed copy

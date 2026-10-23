@@ -53,6 +53,73 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  # The phone app (Android, and iPhone/iPad from the Home Screen): the whole backend running in
+  # the browser with Pyodide. Built from this commit and tested with the full UI smoke test.
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pocket/pyodide
+          key: pyodide-${{ hashFiles('frontend/pocket/deps.py') }}
+      - name: Gather Pyodide and Locuvi's packages
+        run: python frontend/pocket/deps.py "$RUNNER_TEMP/pocket"
+      - name: Build the phone app
+        working-directory: frontend
+        run: |
+          npm ci
+          PYODIDE_DIR="$RUNNER_TEMP/pocket/pyodide" POCKET_WHEELS="$RUNNER_TEMP/pocket/wheels" npm run build:pocket
+      - name: Install the test browser
+        run: npm i -g playwright@1.56.1 && npx -y playwright@1.56.1 install --with-deps chromium
+      - name: Test it as a phone would run it (plain files, no server)
+        run: |
+          (cd frontend/dist-pocket && python -m http.server 8790 --bind 127.0.0.1 > /dev/null 2>&1 &)
+          sleep 1
+          export NODE_PATH=$(npm root -g) BASE_URL=http://127.0.0.1:8790
+          POCKET=1 SHOTS="$RUNNER_TEMP/shots" node e2e/smoke.mjs
+          node e2e/pocket-keeps.mjs
+      - name: Keep test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-test
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist-pocket
+
+  # The iPhone and iPad app: the tested phone build, published at
+  # https://jc-universe87.github.io/locuvi/ (open in Safari, then Add to Home Screen).
+  pages:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend, phone]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 20

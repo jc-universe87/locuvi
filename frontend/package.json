@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:pocket": "tsc -b && VITE_POCKET=1 vite build && node pocket/assemble.mjs",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },

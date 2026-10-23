@@ -42,3 +42,5 @@ mobile/android/app/build/
 mobile/android/local.properties
 *.keystore
 *.jks
+frontend/dist-pocket/
+mobile/android/app/src/main/assets/www/

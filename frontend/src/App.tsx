@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, HashRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ConfirmProvider, Icon, Logo, ToastProvider } from "./components/ui";
 import { useT } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { api, setCsrf, setUnauthorizedHandler } from "./lib/api";
+import { POCKET, onPocketProgress } from "./lib/pocket";
 import type { HouseholdProfile } from "./lib/types";
 import DiaryPage from "./pages/Diary";
 import AskPage from "./pages/Ask";
@@ -36,9 +37,44 @@ const TABS: { to: string; icon: string; label: MessageKey; end?: boolean }[] = [
   { to: "/reports", icon: "reports", label: "nav.reports" },
 ];
 
+// The phone app is served from files (Android) or a sub-folder (iPhone), so it uses #/ links.
+const Router = POCKET ? HashRouter : BrowserRouter;
+
+/** Phone app: the first start sets Locuvi up on the phone, which takes a few seconds. */
+function PocketOpening() {
+  const { t } = useT();
+  const [step, setStep] = useState("runtime");
+  useEffect(() => onPocketProgress(setStep), []);
+  return (
+    <main className="pocket-opening" aria-busy="true">
+      <Logo />
+      <p>{t("pocket.opening")}</p>
+      <p className="muted">{t(`pocket.step_${step}` as MessageKey)}</p>
+    </main>
+  );
+}
+
+/** Phone app: sync with the other devices now and then, and when it comes back on screen. */
+function usePocketSync(on: boolean) {
+  useEffect(() => {
+    if (!POCKET || !on) return;
+    const run = () =>
+      api.get<{ enabled: boolean }>("/sync").then((s) => (s.enabled ? api.post("/sync/now") : null)).catch(() => undefined);
+    const every = window.setInterval(run, 5 * 60 * 1000);
+    const back = () => document.visibilityState === "visible" && void run();
+    document.addEventListener("visibilitychange", back);
+    void run();
+    return () => {
+      window.clearInterval(every);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [on]);
+}
+
 export default function App() {
   const { t } = useT();
   const [session, setSession] = useState<SessionInfo | null>(null);
+  usePocketSync(!!session?.authenticated);
 
   const refresh = useCallback(async () => {
     try {
@@ -61,7 +97,7 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  if (!session) return null;
+  if (!session) return POCKET ? <PocketOpening /> : null;
   if (!session.authenticated) return <LoginPage multi={!!session.multi} onSignedIn={refresh} />;
 
   const signOut = async () => {
@@ -72,7 +108,7 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ToastProvider>
       <ConfirmProvider>
         <a className="skip" href="#main">
@@ -129,7 +165,7 @@ export default function App() {
         </nav>
       </ConfirmProvider>
       </ToastProvider>
-    </BrowserRouter>
+    </Router>
   );
 }
 

@@ -6,6 +6,11 @@ releases.
 
 ## Unreleased
 
+- **Full Locuvi on phones and tablets.** The Android app and the iPhone/iPad Home Screen app
+  now run the whole of Locuvi on the device, with records kept there, and work without the
+  internet. [Sync](docs/SYNC.md) keeps them in step with your computer. Email, Nextcloud
+  copies and calendar subscriptions are set up on a computer and sync to the phone.
+
 - **Sync between your devices** (Settings › Sync and backup file): each device keeps its own
   copy and works offline; the copies meet in an encrypted folder in Google Drive, OneDrive,
   Dropbox, iCloud Drive or Nextcloud. Invoice numbers are checked with your other devices

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Locuvi</string>
-    <string name="setup_title">Connect to your Locuvi</string>
-    <string name="setup_intro">This app shows the Locuvi you already run: on your computer (with \"Let my phone and tablet connect\" switched on) or on your own server.\n\nEnter its address. You\'ll find it in Locuvi under Settings › Phones, tablets and computers.</string>
+    <string name="setup_title">Connect to a computer or server</string>
+    <string name="setup_intro">Normally Locuvi keeps your records on this phone, and Settings › Sync keeps them in step with your other devices.\n\nIf you\'d rather use the Locuvi on your computer (with \"Let my phone and tablet connect\" switched on) or on your own server, enter its address. You\'ll find it there under Settings › Phones, tablets and computers.</string>
+    <string name="use_phone">Use Locuvi on this phone instead</string>
     <string name="address_hint">For example 192.168.1.20:8765</string>
     <string name="connect">Connect</string>
     <string name="address_needed">Enter the address of your Locuvi.</string>
