@@ -6,6 +6,11 @@ releases.
 
 ## Unreleased
 
+- **Use your own app key** for Dropbox, Google Drive or OneDrive sync (Settings › Sync and
+  backup file): a practice can register Locuvi with the company itself, so its own limits
+  apply, and OneDrive accounts work that way too. The setup guide now explains how many
+  people can sign in and how to raise each limit.
+
 - **Updates install by themselves.** Windows and Mac download a new version in the
   background and install it when you close Locuvi (or at night, if Locuvi stays on for your
   phone). Android installs it by itself a couple of minutes after you leave Locuvi, once

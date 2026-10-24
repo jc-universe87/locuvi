@@ -156,6 +156,59 @@ def test_phone_joining_keeps_the_sign_in_readable(tmp_path, fake):
     phone.sync()
 
 
+def test_own_app_key_is_used_and_kept_for_renewing(tmp_path, monkeypatch):
+    """Someone's own registered app: Locuvi's isn't needed, and renewals use theirs."""
+    monkeypatch.setenv("LOCUVI_ONEDRIVE_CLIENT_ID", "")  # Locuvi itself has none
+    fc = FakeCloud("onedrive")
+    seen: list[str] = []
+    real = fc._token
+
+    def token(req):  # type: ignore[no-untyped-def]
+        seen.append(parse_qs(req.content.decode())["client_id"][0])
+        return real(req)
+
+    fc._token = token  # type: ignore[method-assign]
+    monkeypatch.setattr(cloud, "_http", fc.client)
+    cloud.Session._cache.clear()
+    own = cloud.own_app("onedrive", " 00000000-0000-0000-0000-000000000000 ", "")
+    b = cloud.begin("onedrive", "local:8765", own)
+    assert "client_id=00000000-0000-0000-0000-000000000000" in b["url"]
+    result = cloud.finish("onedrive", "good-code", b["verifier"], "local:8765", own=own)
+    d = Device(tmp_path, "laptop")
+    spec = engine.cloud_spec(d.settings, engine.cloud_connected(d.settings, d.secrets, result))
+    assert spec["client_id"] == own[0]
+    engine.start(d.settings, d.secrets, spec, "Laptop")
+    cloud.Session._cache.clear()
+    fc.expire_access()
+    d.sync()  # renews with the same app
+    assert seen and set(seen) == {own[0]}
+    assert engine.status(d.settings)["cloud"]["own_app"] is True
+
+
+def test_own_app_key_is_checked():
+    with pytest.raises(DomainError) as e:
+        cloud.own_app("dropbox", "not a key!", "")
+    assert e.value.code == "sync.cloud_own_app"
+    with pytest.raises(DomainError) as e:
+        cloud.own_app("google", "1234-abc.apps.googleusercontent.com", "")
+    assert e.value.code == "sync.cloud_own_secret"
+    assert cloud.own_app("dropbox", "", "") is None
+
+
+def test_own_app_secret_is_kept_encrypted(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCUVI_GOOGLE_CLIENT_ID", "")
+    fc = FakeCloud("google")
+    monkeypatch.setattr(cloud, "_http", fc.client)
+    own = cloud.own_app("google", "1234-abc.apps.googleusercontent.com", "own-test-secret")
+    b = cloud.begin("google", "web", own)
+    result = cloud.finish("google", "good-code", b["verifier"], "web", own=own)
+    d = Device(tmp_path, "laptop")
+    spec = engine.cloud_spec(d.settings, engine.cloud_connected(d.settings, d.secrets, result))
+    engine.start(d.settings, d.secrets, spec, "Laptop")
+    assert "own-test-secret" not in (d.settings.data_dir / "sync" / "config.json").read_text()
+    assert "own-test-secret" not in (d.settings.data_dir / "sync" / "signins.json").read_text()
+
+
 def test_api_offers_only_set_up_accounts(settings, monkeypatch):
     for p in PROVIDERS:
         monkeypatch.setenv(f"LOCUVI_{p.upper()}_CLIENT_ID", "")
@@ -164,7 +217,9 @@ def test_api_offers_only_set_up_accounts(settings, monkeypatch):
         assert Api(c).get("/api/v1/sync").json()["cloud_accounts"] == []
     with client_for(replace(settings, desktop=True)) as c:
         api = Api(c)
-        assert api.get("/api/v1/sync").json()["cloud_accounts"] == ["dropbox"]
+        got = api.get("/api/v1/sync").json()
+        assert got["cloud_accounts"] == ["dropbox"]
+        assert got["cloud_own_apps"] == PROVIDERS  # any of them, with your own app key
         r = api.post("/api/v1/sync/cloud/begin", {"provider": "google", "return_to": "web"})
         assert r.status_code == 400 and r.json()["error"]["code"] == "sync.cloud_unavailable"
         r = api.post("/api/v1/sync/cloud/begin", {"provider": "dropbox", "return_to": "web"})

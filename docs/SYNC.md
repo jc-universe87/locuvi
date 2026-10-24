@@ -69,6 +69,11 @@ again.
 > OneDrive, use the OneDrive folder on a computer ([above](#what-you-need)); on a phone, use
 > a Dropbox or Google Drive account, or Nextcloud.
 
+**Your own app key.** A practice or its IT person can register Locuvi with Dropbox, Google
+or Microsoft themselves ([how](CLOUD_APPS.md#your-own-app-key)) and paste the key under
+**Use your own app key** when starting or joining. That also makes OneDrive accounts
+possible. Use the same key on every device.
+
 ## Nextcloud
 
 Choose **Nextcloud** when you start or join, then fill in:

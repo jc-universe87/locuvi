@@ -53,6 +53,7 @@ def sync_status(request: Request) -> dict[str, Any]:
     # site (cloud._check_return), not to a Locuvi on a server
     on_device = request.app.state.settings.desktop or os.environ.get("LOCUVI_POCKET") == "1"
     out["cloud_accounts"] = cloud.available() if on_device else []
+    out["cloud_own_apps"] = list(cloud.PROVIDERS) if on_device else []  # with your own app key
     out["cloud_folders"] = service.cloud_folders() if request.app.state.settings.desktop else []
     out["can_choose_folder"] = bool(request.app.state.settings.desktop)
     return out
@@ -120,13 +121,15 @@ async def sync_import(
 @api.post("/sync/cloud/begin")
 def cloud_begin(body: S.CloudBeginIn) -> dict[str, str]:
     """Where to sign in to Dropbox, Google Drive or OneDrive (see ``locuvi.sync.cloud``)."""
-    return cloud.begin(body.provider, body.return_to)
+    own = cloud.own_app(body.provider, body.client_id, body.client_secret)
+    return cloud.begin(body.provider, body.return_to, own)
 
 
 @api.post("/sync/cloud/finish")
 def cloud_finish(body: S.CloudFinishIn, request: Request) -> dict[str, str]:
     """Back from signing in: keep the sign-in for Start or Join (``connection``)."""
     settings, secrets = _ctx(request)
-    result = cloud.finish(body.provider, body.code, body.verifier, body.return_to)
+    own = cloud.own_app(body.provider, body.client_id, body.client_secret)
+    result = cloud.finish(body.provider, body.code, body.verifier, body.return_to, own=own)
     connection = engine.cloud_connected(settings, secrets, result)
     return {"connection": connection, "provider": body.provider, "account": result["account"]}

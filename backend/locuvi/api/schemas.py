@@ -509,6 +509,9 @@ class SyncExportIn(Strict):
 class CloudBeginIn(Strict):
     provider: Literal["dropbox", "google", "onedrive"]
     return_to: Annotated[str, StringConstraints(max_length=20)]
+    # someone's own registered app instead of Locuvi's (docs/CLOUD_APPS.md)
+    client_id: Annotated[str, StringConstraints(max_length=200)] | None = None
+    client_secret: Annotated[str, StringConstraints(max_length=200)] | None = None
 
 
 class CloudFinishIn(CloudBeginIn):
