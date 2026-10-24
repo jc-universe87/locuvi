@@ -14,6 +14,12 @@ What it does when you open it:
 
 Opening it again while it's running just opens another Locuvi window.
 
+New versions (Settings › Phones, tablets and computers › Updates, on unless switched off):
+while Locuvi runs it looks for one now and then and downloads it; when Locuvi stops, the
+new version is installed, so it's new the next time it opens. If Locuvi keeps running for
+phones and tablets, it installs at night once nobody has had its window open for a while,
+and starts again without a window (``--no-window``).
+
 ``--headless`` starts Locuvi without any windows and writes its address to ``--info-file``;
 the release workflow uses it to test the packaged app on Windows and macOS.
 """
@@ -259,20 +265,78 @@ class Locuvi:
 # ---------------------------------------------------------------- staying open
 
 
-def run_until_done(app: Locuvi) -> None:
+PREPARE_EVERY = 30 * 60  # look for (and download) a new version this often while running
+
+
+def update_by_itself(app: Locuvi) -> bool:
+    """The owner's choice in Settings › Updates (read each time, so switching it off counts)."""
+    from locuvi import desktop
+
+    return bool(desktop.read_config(app.config_file)["update_check"])
+
+
+class Updater:
+    """Downloads a new version in the background while Locuvi runs (``updates.prepare``)."""
+
+    def __init__(self, app: Locuvi) -> None:
+        self.app = app
+        self.folder = app.root / "updates"
+        self.last = -PREPARE_EVERY
+        self.thread: threading.Thread | None = None
+
+    def _prepare(self) -> None:
+        from locuvi import updates
+
+        try:
+            updates.prepare(self.folder)
+        except Exception as exc:  # noqa: BLE001 - tried again later
+            log.info("looking for a new version failed: %s", type(exc).__name__)
+
+    def tick(self, now: float) -> None:
+        if now - self.last < PREPARE_EVERY or (self.thread and self.thread.is_alive()):
+            return
+        self.last = now
+        if update_by_itself(self.app):
+            self.thread = threading.Thread(target=self._prepare, name="locuvi-update", daemon=True)
+            self.thread.start()
+
+
+def run_until_done(app: Locuvi, updater: Updater | None = None) -> str:
     """Keep Locuvi running while its window is open (or phone access is on), then stop.
 
     There's no extra window to keep open: see ``locuvi.desktop.should_stop``. Opening Locuvi
-    again while it runs just opens another window (``running_instance``).
+    again while it runs just opens another window (``running_instance``). Returns "update"
+    when it stops to install a new version while running for phones, else "closed".
     """
-    from locuvi import desktop
+    from locuvi import desktop, updates
 
     started = time.monotonic()
     while app.thread and app.thread.is_alive():
-        if desktop.should_stop(time.monotonic(), started, app.phone_access):
+        now = time.monotonic()
+        if desktop.should_stop(now, started, app.phone_access):
             log.info("Locuvi's window was closed (or Quit chosen): stopping")
-            return
+            return "closed"
+        if updater is not None:
+            updater.tick(now)
+            idle = now - (desktop.last_seen() or started)
+            if (app.phone_access and updates.ready_file() is not None
+                    and updates.due_while_running(idle, time.localtime().tm_hour)
+                    and update_by_itself(app)):  # fmt: skip
+                log.info("installing a new version while nobody is using Locuvi")
+                return "update"
         time.sleep(2)
+    return "closed"
+
+
+def install_new_version(app: Locuvi, reopen: list[str] | None) -> None:
+    """Locuvi has stopped: install the new version downloaded earlier, if there is one."""
+    from locuvi import updates
+
+    try:
+        if update_by_itself(app) and updates.install_on_exit(reopen):
+            log.info("a new version installs now that Locuvi has stopped")
+    except Exception:  # noqa: BLE001 - it tries again next time
+        log.exception("the new version couldn't be installed")
 
 
 def last_sync() -> None:
@@ -312,6 +376,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--info-file", help="write the address here once Locuvi is running")
     ap.add_argument("--password-file", help="use this password instead of a random one")
     ap.add_argument("--port", type=int)
+    ap.add_argument("--no-window", action="store_true", help="start without opening a window")
+    ap.add_argument(
+        "--update-on-exit",
+        action="store_true",
+        help="with --headless: download a new version, install it on Quit (tests)",
+    )
     args, _unknown = ap.parse_known_args(argv)  # macOS may add -psn_… arguments
 
     root = data_root(args.data_dir)
@@ -323,6 +393,8 @@ def main(argv: list[str] | None = None) -> int:
 
     existing = running_instance(root)
     if existing and not args.headless:
+        if args.no_window:
+            return 0
         open_window(f"http://127.0.0.1:{existing['port']}/desktop/open?token={existing['token']}")
         return 0
 
@@ -340,21 +412,28 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps({"url": app.local_url, "open": app.open_url, "root": str(root)}),
             encoding="utf-8",
         )
+    stopped = None
     try:
         if args.headless:
             from locuvi import desktop
 
+            if args.update_on_exit:
+                Updater(app)._prepare()
             # runs until stopped from outside, or Quit (also when an update installs)
             while app.thread and app.thread.is_alive() and not desktop.should_stop(0, 0, True):
                 time.sleep(0.5)
+            stopped = "closed" if args.update_on_exit else None
         else:
-            open_window(app.open_url)
-            run_until_done(app)
+            if not args.no_window:
+                open_window(app.open_url)
+            stopped = run_until_done(app, Updater(app))
             last_sync()
     except KeyboardInterrupt:
         pass
     finally:
         app.stop()
+    if stopped:
+        install_new_version(app, ["--no-window"] if stopped == "update" else None)
     return 0
 
 

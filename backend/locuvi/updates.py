@@ -5,10 +5,16 @@ without that file (a server, or run from the code) doesn't update itself. The ch
 GitHub for the latest release, at most every few hours, and only ever downloads that
 release's own installer, checked against the SHA-256 GitHub lists for it.
 
+With "Update by itself" on (the default), a new version is downloaded in the background as
+soon as it's found, and installed when Locuvi closes: the next time it opens, it's new. If
+Locuvi keeps running for phones and tablets, it installs once nobody has had its window open
+for a while at night, and starts again in the background. **Update now** installs straight
+away.
+
 Installing waits for Locuvi to stop (after a last sync), then:
 
-- Windows: runs the installer silently over the old version and opens Locuvi again;
-- Mac: replaces Locuvi.app with the one in the new disk image and opens it again.
+- Windows: runs the installer silently over the old version (and opens Locuvi again);
+- Mac: replaces Locuvi.app with the one in the new disk image (and opens it again).
 
 Records live in the Locuvi folder, not in the app, so they're untouched; Locuvi also makes a
 backup before migrating on its next start.
@@ -24,6 +30,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,7 +48,7 @@ CHECK_EVERY = 6 * 3600
 ASSETS = {"win32": "Locuvi-Windows-Setup.exe", "darwin": "Locuvi-macOS.dmg"}
 MAX_SIZE = 400 * 1024 * 1024
 
-_cache: dict[str, Any] = {"at": 0.0, "info": None}
+_cache: dict[str, Any] = {"at": 0.0, "info": None, "file": None, "installing": False}
 _lock = threading.Lock()
 
 
@@ -157,7 +164,32 @@ def download(folder: Path, client: httpx.Client | None = None) -> Path:
         part.unlink(missing_ok=True)
         raise _bad_file()
     os.replace(part, dest)
+    _cache["file"] = (info.version, dest)
     return dest
+
+
+def ready_file() -> Path | None:
+    """The new version's installer, already downloaded and checked, if there is one."""
+    got = _cache["file"]
+    info: Update | None = _cache["info"]
+    if got is None or info is None or got[0] != info.version or not got[1].is_file():
+        return None
+    return got[1] if parse(info.version) > parse(current_version() or "") else None
+
+
+def prepare(folder: Path, client: httpx.Client | None = None) -> bool:
+    """In the background: look for a new version (at most every few hours) and download it,
+    so it can be installed the moment Locuvi closes. True once one is ready."""
+    if ready_file() is not None:
+        return True
+    if not check(client=client).get("available"):
+        return False
+    try:
+        download(folder, client)
+    except DomainError as exc:
+        log.info("update not downloaded yet: %s", exc.code)
+        return False
+    return True
 
 
 def app_bundle() -> Path | None:
@@ -173,16 +205,24 @@ def app_bundle() -> Path | None:
     return exe.parent
 
 
-def _ps(path: Path) -> str:
-    """A path as a PowerShell single-quoted string (spaces and apostrophes are fine)."""
+def _ps(path: Path | str) -> str:
+    """A path or argument as a PowerShell single-quoted string (spaces, apostrophes are fine)."""
     return "'" + str(path).replace("'", "''") + "'"
 
 
-def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
+def install_command(
+    installer: Path, bundle: Path, pid: int, reopen: Sequence[str] | None = ()
+) -> list[str]:
     """The detached command that installs once Locuvi (process ``pid``) has stopped, then
-    opens it again. On Windows it's a small PowerShell script next to the installer, which
-    logs what it did to update.log (and the installer to setup.log)."""
+    opens it again with the arguments ``reopen`` (``None``: leaves it closed). It writes
+    update-done next to the installer when it has finished. On Windows it's a small
+    PowerShell script next to the installer, which logs what it did to update.log (and the
+    installer to setup.log)."""
+    done = installer.with_name("update-done")
     if sys.platform == "win32":
+        start = f"Start-Process -FilePath {_ps(bundle / 'Locuvi.exe')}"
+        if reopen:
+            start += " -ArgumentList @(" + ", ".join(_ps(a) for a in reopen) + ")"
         script = installer.with_name("update.ps1")
         script.write_text(
             "\r\n".join([
@@ -193,7 +233,8 @@ def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
                 "@('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "
                 "('/LOG=\"' + $setupLog + '\"'))",
                 '"installer finished: $($p.ExitCode)"',
-                f"Start-Process -FilePath {_ps(bundle / 'Locuvi.exe')}",
+                *([start] if reopen is not None else []),
+                f"Set-Content -Path {_ps(done)} -Value $p.ExitCode",
                 "Stop-Transcript",
             ]),
             encoding="utf-8-sig",
@@ -201,6 +242,8 @@ def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
         return ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                 "-WindowStyle", "Hidden", "-File", str(script)]  # fmt: skip
     mnt = installer.with_suffix(".mnt")
+    args = "".join(f' "{a}"' for a in reopen or [])
+    again = (f'open "{bundle}"' + (f" --args{args}" if args else "")) if reopen is not None else ":"
     script = (
         f"for i in $(seq 120); do kill -0 {pid} 2>/dev/null || break; sleep 1; done; "
         f'hdiutil attach -nobrowse -noverify -mountpoint "{mnt}" "{installer}" && '
@@ -208,7 +251,7 @@ def install_command(installer: Path, bundle: Path, pid: int) -> list[str]:
         f'ditto "{mnt}/Locuvi.app" "{bundle}" && rm -rf "{bundle}.old"; '
         f'hdiutil detach "{mnt}" -quiet; '
         f'if [ ! -d "{bundle}" ] && [ -d "{bundle}.old" ]; then mv "{bundle}.old" "{bundle}"; fi; '
-        f'open "{bundle}"'
+        f'echo done > "{done}"; {again}'
     )
     return ["/bin/sh", "-c", script]
 
@@ -225,23 +268,11 @@ def clean_environment() -> dict[str, str]:
     return env
 
 
-def start_install(folder: Path) -> None:
-    """Download and check the update, then hand over to the installer and let Locuvi stop."""
-    bundle = app_bundle()
-    if bundle is None:
-        raise DomainError(
-            "updates.not_app", "Only the Locuvi app for Windows and Mac updates itself."
-        )
-    if sys.platform == "darwin" and (
-        str(bundle).startswith("/Volumes/") or not os.access(bundle.parent, os.W_OK)
-    ):
-        raise DomainError(
-            "updates.mac_move",
-            "Move Locuvi into your Applications folder first (drag it from the disk image), "
-            "then open it from there.",
-        )
-    installer = download(folder)
-    cmd = install_command(installer, bundle, os.getpid())
+def _launch(installer: Path, bundle: Path, reopen: Sequence[str] | None) -> None:
+    """Hand over to the installer, which waits for this Locuvi to stop."""
+    folder = installer.parent
+    (folder / "update-done").unlink(missing_ok=True)
+    cmd = install_command(installer, bundle, os.getpid(), reopen)
     out = (folder / "update-start.log").open("wb")  # what the command said, if it failed
     kw: dict[str, Any] = {"stdin": subprocess.DEVNULL, "stdout": out, "stderr": out,
                           "close_fds": True, "env": clean_environment()}  # fmt: skip
@@ -251,7 +282,52 @@ def start_install(folder: Path) -> None:
         kw["start_new_session"] = True
     subprocess.Popen(cmd, **kw)  # noqa: S603 - fixed command, our own verified installer
     out.close()
+    _cache["installing"] = True
     log.info("installing Locuvi %s", _cache["info"].version)
+
+
+def _can_replace(bundle: Path) -> bool:
+    """A Mac app run from the disk image, or from a folder it can't write to, can't be replaced."""
+    return sys.platform != "darwin" or (
+        not str(bundle).startswith("/Volumes/") and os.access(bundle.parent, os.W_OK)
+    )
+
+
+def install_on_exit(reopen: Sequence[str] | None = None) -> bool:
+    """Locuvi is closing: install the update downloaded earlier, if there is one (and Update
+    now isn't already doing it). Never downloads here, so closing stays quick."""
+    bundle = app_bundle()
+    installer = ready_file()
+    if _cache["installing"] or bundle is None or installer is None or not _can_replace(bundle):
+        return False
+    _launch(installer, bundle, reopen)
+    return True
+
+
+QUIET_HOURS = range(2, 5)  # 02:00 to 04:59 on this computer
+QUIET_FOR = 30 * 60  # nobody has had Locuvi's window open for this long
+
+
+def due_while_running(idle_seconds: float | None, hour: int) -> bool:
+    """Locuvi keeps running for phones: is now a good moment to install a ready update?"""
+    return idle_seconds is not None and idle_seconds >= QUIET_FOR and hour in QUIET_HOURS
+
+
+def start_install(folder: Path) -> None:
+    """Download and check the update, then hand over to the installer and let Locuvi stop."""
+    bundle = app_bundle()
+    if bundle is None:
+        raise DomainError(
+            "updates.not_app", "Only the Locuvi app for Windows and Mac updates itself."
+        )
+    if not _can_replace(bundle):
+        raise DomainError(
+            "updates.mac_move",
+            "Move Locuvi into your Applications folder first (drag it from the disk image), "
+            "then open it from there.",
+        )
+    installer = ready_file() or download(folder)
+    _launch(installer, bundle, ())
 
     from locuvi import desktop
 

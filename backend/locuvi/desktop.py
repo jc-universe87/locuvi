@@ -83,6 +83,11 @@ def seen(now: float) -> None:
     _state["last_seen"] = now
 
 
+def last_seen() -> float | None:
+    """When the window last said "still here" (time.monotonic), or None."""
+    return _state["last_seen"]
+
+
 def ask_to_quit() -> None:
     _state["quit"] = True
 

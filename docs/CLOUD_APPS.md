@@ -37,9 +37,11 @@ At [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps):
 3. **Permissions** tab: tick `files.metadata.read`, `files.content.read`, `files.content.write`
    and `account_info.read`, then **Submit**.
 4. Copy the **App key** into `DROPBOX_APP_KEY`. The app secret isn't needed.
+5. **Settings** tab › **Development users**: click **Enable additional users**. Until then only
+   your own Dropbox account can sign in; anyone else sees *"This app has reached its user
+   limit"*.
 
-A new Dropbox app can be used by up to 500 people; for more, use **Apply for production** on
-the same page.
+That lets up to 500 people use it; for more, use **Apply for production** on the same page.
 
 ## Google Drive
 
@@ -50,11 +52,13 @@ At [console.cloud.google.com](https://console.cloud.google.com):
 2. **Google Auth Platform**:
    - **Branding**: app name *Locuvi*, your support email, and the home page
      `https://github.com/jc-universe87/locuvi`.
-   - **Audience**: **External**, then **Publish app**. While it says *Testing*, people have to
-     sign in again every 7 days.
+   - **Audience**: **External**, then **Publish app**, so it says *In production*. While it
+     says *Testing*, only the test users listed there can sign in (everyone else sees *"has
+     not completed the Google verification process"*), and they have to sign in again every 7
+     days.
    - **Data access**: **Add or remove scopes** → `.../auth/drive.file` ("See, edit, create and
-     delete only the specific Google Drive files you use with this app"). It needs no review
-     by Google.
+     delete only the specific Google Drive files you use with this app"), and nothing else. It
+     needs no review by Google; other Drive permissions do.
 3. **Clients** → **Create client** → **Web application**:
    - **Authorised JavaScript origins**: `https://locuvi.pistio.co.uk`
    - **Authorised redirect URIs**: `https://locuvi.pistio.co.uk/oauth.html`

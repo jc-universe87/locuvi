@@ -75,6 +75,8 @@ const fail = async (msg) => {
 };
 
 await page.goto(`${BASE}/`);
+// wait for the first screen to draw: Sign in, or the welcome straight away
+await page.getByRole("heading", { name: /^(Sign in|Let's set up your invoices)$/ }).first().waitFor();
 if (await page.getByRole("heading", { name: "Sign in" }).isVisible().catch(() => false)) {
   step("sign in");
   await page.getByLabel("Password").fill(PASSWORD ?? "");

@@ -21,6 +21,7 @@
     <string name="update_failed">The update couldn\'t be downloaded or didn\'t look right, so it wasn\'t installed. Try again later.</string>
     <string name="update_allow">Switch on \"Allow from this source\" for Locuvi, then go back. This is needed once.</string>
     <string name="update_resign_title">Install this update by hand, once</string>
-    <string name="update_resign_message">This version is signed with Locuvi\'s new permanent key, so Android can\'t install it over the one you have. First sync, or save Everything in one file (Settings › Sync and backup file). Then uninstall Locuvi, install the new version from the website, and join sync again. After that, updates install with one tap.</string>
+    <string name="update_resign_message">This version is signed with Locuvi\'s new permanent key, so Android can\'t install it over the one you have. First sync, or save Everything in one file (Settings › Sync and backup file). Then uninstall Locuvi, install the new version from the website, and join sync again. After that, updates install by themselves.</string>
     <string name="update_open_page">How to install</string>
+    <string name="update_closing">Locuvi closes to update. Open it again in a moment.</string>
 </resources>

@@ -2,22 +2,32 @@ package uk.locuvi.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.InstallSourceInfo;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
+import android.util.Log;
 import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Locale;
@@ -30,16 +40,24 @@ import okhttp3.ResponseBody;
 
 /**
  * New versions of the Android app: once a day (and when the owner taps Check for updates in
- * Settings), ask GitHub for the latest release. If it's newer, offer to install it: download
- * Locuvi-Android.apk, check it is exactly the released file (SHA-256 from GitHub) and signed
- * like this app, then hand it to Android's installer. Records on the phone are kept.
+ * Settings), ask GitHub for the latest release. A newer Locuvi-Android.apk is downloaded and
+ * checked: exactly the released file (SHA-256 from GitHub) and signed like this app. Then it
+ * goes to Android's package installer. Records on the phone are kept.
+ *
+ * Android 12 and newer let an app update itself without asking, once it installed the copy
+ * that's there. So the first update asks (one tap on Update, then Android's Install), and
+ * every one after that installs by itself once Locuvi has been out of sight for a couple of
+ * minutes; the next time it's opened, it's new.
  */
 final class Updates {
     static final String LATEST = "https://api.github.com/repos/jc-universe87/locuvi/releases/latest";
     private static final String ASSET = "Locuvi-Android.apk";
-    private static final String KEY_LAST = "update_checked_at";
+    static final String KEY_LAST = "update_checked_at";
+    static final String KEY_ASK = "update_ask_next"; // a quiet install needed the owner's OK
     private static final long DAY_MS = 24L * 3600 * 1000;
     private static final long MAX_BYTES = 200L * 1024 * 1024;
+    private static final long QUIET_MS = 2L * 60 * 1000; // out of sight this long: install
+    private static final String TAG = "Locuvi";
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -49,6 +67,9 @@ final class Updates {
     private final SharedPreferences prefs;
     private volatile boolean busy;
     private boolean waitingForPermission;
+    private volatile boolean readyToInstall; // downloaded and checked, waiting for a quiet moment
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Runnable installQuietly = this::installNow;
 
     Updates(Activity activity, SharedPreferences prefs) {
         this.activity = activity;
@@ -86,6 +107,25 @@ final class Updates {
         }
     }
 
+    static File file(Context c) {
+        return new File(new File(c.getCacheDir(), "updates"), "Locuvi.apk");
+    }
+
+    /** Can this update install without asking? Android 12+, and Locuvi installed this copy. */
+    private boolean bySelf() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return false;
+        }
+        try {
+            InstallSourceInfo src = activity.getPackageManager()
+                    .getInstallSourceInfo(activity.getPackageName());
+            return activity.getPackageName().equals(src.getInstallingPackageName())
+                    && activity.getPackageManager().canRequestPackageInstalls();
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
     /** On opening the app: at most once a day, quietly. */
     void maybeCheck() {
         long last = prefs.getLong(KEY_LAST, 0);
@@ -107,7 +147,11 @@ final class Updates {
                 String latest = rel.optString("tag_name", "").replaceFirst("^v", "");
                 JSONObject asset = asset(rel);
                 if (asset != null && compare(latest, version()) > 0) {
-                    activity.runOnUiThread(() -> offer(latest, asset));
+                    if (!manual && bySelf() && !prefs.getBoolean(KEY_ASK, false)) {
+                        download(asset, false); // installs by itself once out of sight
+                    } else {
+                        activity.runOnUiThread(() -> offer(latest, asset));
+                    }
                 } else if (manual) {
                     toast(R.string.update_latest);
                 }
@@ -152,18 +196,22 @@ final class Updates {
         if (activity.isFinishing()) {
             return;
         }
+        prefs.edit().remove(KEY_ASK).apply();
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.update_title, latest))
                 .setMessage(R.string.update_message)
-                .setPositiveButton(R.string.update_now, (d, w) -> download(asset))
+                .setPositiveButton(R.string.update_now, (d, w) -> download(asset, true))
                 .setNegativeButton(R.string.update_later, null)
                 .show();
     }
 
-    private void download(JSONObject asset) {
-        toast(R.string.update_downloading);
+    /** {@code now}: the owner tapped Update, so install straight away (else when quiet). */
+    private void download(JSONObject asset, boolean now) {
+        if (now) {
+            toast(R.string.update_downloading);
+        }
         new Thread(() -> {
-            File f = ApkProvider.file(activity);
+            File f = file(activity);
             try {
                 String want = asset.getString("digest").substring("sha256:".length())
                         .toLowerCase(Locale.ROOT);
@@ -173,10 +221,17 @@ final class Updates {
                     activity.runOnUiThread(this::signedDifferently);
                     return;
                 }
-                activity.runOnUiThread(this::install);
+                if (now) {
+                    activity.runOnUiThread(this::install);
+                } else {
+                    readyToInstall = true;
+                    Log.i(TAG, "a new version is ready: it installs when Locuvi is out of sight");
+                }
             } catch (Exception e) {
                 f.delete();
-                toast(R.string.update_failed);
+                if (now) {
+                    toast(R.string.update_failed);
+                }
             }
         }, "locuvi-update-download").start();
     }
@@ -248,10 +303,26 @@ final class Updates {
 
     /** Back from Android's "Allow from this source" screen: carry on installing. */
     void resumed() {
+        main.removeCallbacks(installQuietly);
         if (waitingForPermission && activity.getPackageManager().canRequestPackageInstalls()
-                && ApkProvider.file(activity).isFile()) {
+                && file(activity).isFile()) {
             waitingForPermission = false;
             install();
+        }
+    }
+
+    /** Locuvi went out of sight: a ready update installs if it stays that way for a bit. */
+    void stopped() {
+        if (readyToInstall) {
+            main.postDelayed(installQuietly, QUIET_MS);
+        }
+    }
+
+    private void installNow() {
+        if (readyToInstall && file(activity).isFile()) {
+            readyToInstall = false;
+            Log.i(TAG, "installing the new version while Locuvi is out of sight");
+            commit(false);
         }
     }
 
@@ -264,10 +335,49 @@ final class Updates {
                     Uri.parse("package:" + activity.getPackageName())));
             return;
         }
-        Intent i = new Intent(Intent.ACTION_VIEW);
-        i.setDataAndType(ApkProvider.uri(), "application/vnd.android.package-archive");
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-        activity.startActivity(i);
+        if (bySelf()) {
+            toast(R.string.update_closing);
+        }
+        commit(true);
+    }
+
+    /**
+     * Hand the checked APK to Android's package installer. If Android needs the owner's OK
+     * (the first time), it says so to {@link InstallResult}, which shows Android's screen.
+     */
+    private void commit(boolean ownerWaiting) {
+        File f = file(activity);
+        PackageInstaller pi = activity.getPackageManager().getPackageInstaller();
+        PackageInstaller.SessionParams params =
+                new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        params.setAppPackageName(activity.getPackageName());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        }
+        try {
+            int id = pi.createSession(params);
+            try (PackageInstaller.Session session = pi.openSession(id)) {
+                try (InputStream in = new FileInputStream(f);
+                     OutputStream out = session.openWrite("Locuvi.apk", 0, f.length())) {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                    }
+                    session.fsync(out);
+                }
+                Intent result = new Intent(activity, InstallResult.class)
+                        .putExtra(InstallResult.OWNER_WAITING, ownerWaiting);
+                PendingIntent pending = PendingIntent.getBroadcast(activity, id, result,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+                session.commit(pending.getIntentSender());
+            }
+        } catch (IOException | RuntimeException e) {
+            Log.w(TAG, "the new version couldn't be handed to Android", e);
+            if (ownerWaiting) {
+                toast(R.string.update_failed);
+            }
+        }
     }
 
     private void toast(int text) {

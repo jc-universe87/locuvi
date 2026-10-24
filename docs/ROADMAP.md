@@ -401,6 +401,13 @@ before enabling a cloud model.
   through the system installer (`Updates.java`, same-signer check); iPhone/iPad offer a restart
   once the service worker has the new version. The release workflow updates the installed app
   end to end (`desktop/update-test.py`). Android signed with a permanent key from secrets.
+- ✅ Updates install by themselves (owner request, 24 Oct 2026): Windows/Mac download a found
+  version in the background and install it when Locuvi stops, without reopening (or, kept on
+  for phones, at 02:00–05:00 after 30 minutes with no window, restarting with `--no-window`);
+  Android installs through a PackageInstaller session, silently on Android 12+ once Locuvi is
+  the installer of record (after the first, confirmed update), 2 minutes after the app leaves
+  the screen; iPhone/iPad reload into the new version when the page goes out of sight.
+  `desktop/update-test.py` also checks install-on-close.
 - ✅ Dropbox and Google Drive accounts directly (owner request; OneDrive is written and tested
   but off: Microsoft's app registration needs a work account or Azure subscription): OAuth with PKCE
   through one return page on the iPhone site (`frontend/public/oauth.html`) that hands back to

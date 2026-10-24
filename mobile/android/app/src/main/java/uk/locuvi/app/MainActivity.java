@@ -52,7 +52,7 @@ import java.util.Map;
  * button.
  */
 public class MainActivity extends Activity {
-    private static final String PREFS = "locuvi";
+    static final String PREFS = "locuvi";
     private static final String KEY_SERVER = "server";
     private static final int PICK_FILES = 1;
     /** Where the bundled app is served from (never a real site; requests stay on the phone). */
@@ -394,6 +394,14 @@ public class MainActivity extends Activity {
         super.onResume();
         if (updates != null) {
             updates.resumed();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (updates != null) {
+            updates.stopped(); // a ready update installs if Locuvi stays out of sight
         }
     }
 
