@@ -50,8 +50,11 @@ At [console.cloud.google.com](https://console.cloud.google.com):
 1. Create a project called *Locuvi*. In **APIs & Services › Library**, find **Google Drive API**
    and **Enable** it.
 2. **Google Auth Platform**:
-   - **Branding**: app name *Locuvi*, your support email, and the home page
-     `https://github.com/jc-universe87/locuvi`.
+   - **Branding**: app name *Locuvi*, your support email, no logo (a logo needs Google's
+     review), and under **App domain**: home page `https://locuvi.pistio.co.uk`, privacy
+     policy `https://locuvi.pistio.co.uk/privacy.html`. **Authorised domains**: the site's
+     domain (`pistio.co.uk`). At the bottom, **Developer contact information**: your email.
+     Then **Save**. Google won't publish the app until all of these are filled in.
    - **Audience**: **External**, then **Publish app**, so it says *In production*. While it
      says *Testing*, only the test users listed there can sign in (everyone else sees *"has
      not completed the Google verification process"*), and they have to sign in again every 7
