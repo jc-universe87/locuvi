@@ -401,7 +401,8 @@ before enabling a cloud model.
   through the system installer (`Updates.java`, same-signer check); iPhone/iPad offer a restart
   once the service worker has the new version. The release workflow updates the installed app
   end to end (`desktop/update-test.py`). Android signed with a permanent key from secrets.
-- ✅ Dropbox, OneDrive and Google Drive accounts directly (owner request): OAuth with PKCE
+- ✅ Dropbox and Google Drive accounts directly (owner request; OneDrive is written and tested
+  but off: Microsoft's app registration needs a work account or Azure subscription): OAuth with PKCE
   through one return page on the iPhone site (`frontend/public/oauth.html`) that hands back to
   the computer, the Android app (`locuvi://oauth`) or the site; refresh tokens kept encrypted
   like saved passwords; app-folder / `drive.file` access only (`locuvi/sync/cloud.py`). Tested

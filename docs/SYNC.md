@@ -21,7 +21,7 @@ One of these:
 
 - **Google Drive, OneDrive, Dropbox or iCloud Drive**, with its app installed and signed in
   on your computer. Locuvi keeps its sync folder inside the folder that app looks after.
-- **A Dropbox, Google Drive or OneDrive account**, signed in once on each device. No app
+- **A Dropbox or Google Drive account**, signed in once on each device. No app
   needed, so this works on phones and tablets too ([Cloud accounts](#cloud-accounts)).
 - **Nextcloud**: your own, or one from work ([Nextcloud](#nextcloud)).
 
@@ -54,21 +54,20 @@ Nextcloud, the AI assistant) come too, so you don't type them again.
 
 ## Cloud accounts
 
-Choose **Dropbox account**, **Google Drive account** or **OneDrive account**, then **Sign in to
+Choose **Dropbox account** or **Google Drive account**, then **Sign in to
 … and start** (or **join**). The company's own sign-in page opens; sign in and allow Locuvi.
 You come back to Locuvi and sync starts. On Android the sign-in opens in your browser: when
 it's done, tap **Back to Locuvi** if Locuvi doesn't open by itself.
 
-Locuvi only gets its own folder: **Apps** in Dropbox and OneDrive, **Locuvi Sync** in Google
+Locuvi only gets its own folder: **Apps** in Dropbox, **Locuvi Sync** in Google
 Drive, where it can only see files it made itself. Everything in it is encrypted with your sync
 code. You stay signed in; if the company ever signs Locuvi out, sync says so and you sign in
 again.
 
 > [!NOTE]
-> Dropbox and Google Drive accounts work in the Locuvi apps for Windows, Mac and Android and
-> on iPhone and iPad. OneDrive accounts are coming: Locuvi still has to be registered with
-> Microsoft ([how](CLOUD_APPS.md)). Once it is, OneDrive on an iPhone or iPad will ask you to
-> sign in again once a day.
+> Accounts work in the Locuvi apps for Windows, Mac and Android and on iPhone and iPad. For
+> OneDrive, use the OneDrive folder on a computer ([above](#what-you-need)); on a phone, use
+> a Dropbox or Google Drive account, or Nextcloud.
 
 ## Nextcloud
 
@@ -91,7 +90,7 @@ with your sync code, so even the Nextcloud's owner can't read your records.
 ## Phones and tablets
 
 On a phone or tablet, Locuvi syncs through a [cloud account](#cloud-accounts) (Dropbox or
-Google Drive; OneDrive is coming) or Nextcloud. A cloud *folder* on a computer (from the Dropbox or
+Google Drive) or Nextcloud. A cloud *folder* on a computer (from the Dropbox or
 Google Drive app) is the same sync folder, so a computer using the Dropbox app and a phone
 signed in to the same Dropbox account don't meet: use the account on both, or Nextcloud.
 
