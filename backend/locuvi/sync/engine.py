@@ -479,6 +479,11 @@ def cloud_connected(settings: Settings, secrets: SecretBox, result: dict[str, An
         "refresh_ciphertext": secrets.encrypt(result["refresh"]),
         "at": now,
     }
+    own = result.get("own")
+    if own:  # the person's own app: renewing the sign-in needs it (docs/CLOUD_APPS.md)
+        pending[cid]["client_id"] = own[0]
+        if own[1]:
+            pending[cid]["client_secret_ciphertext"] = secrets.encrypt(own[1])
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(pending), encoding="utf-8")
     from locuvi.sync import cloud
@@ -497,8 +502,9 @@ def cloud_spec(settings: Settings, connection: str) -> dict[str, Any]:
     got = pending.get(connection)
     if not got or got.get("at", 0) < time.time() - 3600:
         raise DomainError("sync.cloud_signin", "Please sign in again.")
-    return {"kind": "cloud", **{k: got[k] for k in
-            ("provider", "account", "return_to", "refresh_ciphertext")}}  # fmt: skip
+    keep = ("provider", "account", "return_to", "refresh_ciphertext",
+            "client_id", "client_secret_ciphertext")  # fmt: skip
+    return {"kind": "cloud", **{k: got[k] for k in keep if k in got}}
 
 
 def _cloud_target(settings: Settings, secrets: SecretBox, t: dict[str, Any]) -> Target:
@@ -512,8 +518,12 @@ def _cloud_target(settings: Settings, secrets: SecretBox, t: dict[str, Any]) -> 
             c.target["refresh_ciphertext"] = enc
             save_config(settings, c)
 
+    own = None
+    if t.get("client_id"):
+        secret = t.get("client_secret_ciphertext")
+        own = (t["client_id"], secrets.decrypt(secret) if secret else "")
     session = cloud.Session(t["provider"], secrets.decrypt(t["refresh_ciphertext"]),
-                            t["return_to"], on_refresh=keep)  # fmt: skip
+                            t["return_to"], on_refresh=keep, own=own)  # fmt: skip
     label = cloud.NAMES[t["provider"]] + (f" ({t['account']})" if t.get("account") else "")
     return cloud.TARGETS[t["provider"]](session, label)
 
@@ -789,6 +799,8 @@ def status(settings: Settings) -> dict[str, Any]:
     cloud = None
     if t.get("kind") == "cloud":
         cloud = {"provider": t.get("provider"), "account": t.get("account")}
+        if t.get("client_id"):
+            cloud["own_app"] = True
     return {
         "enabled": cfg.enabled,
         "kind": t.get("kind"),

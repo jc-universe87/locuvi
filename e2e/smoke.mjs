@@ -461,7 +461,12 @@ if (POCKET) {
   await mp.getByRole("button", { name: "Join from another device" }).click();
   if (accounts) {
     await mp.getByRole("radio", { name: /Dropbox account/ }).check();
-    await mp.getByRole("button", { name: "Sign in to Dropbox account and join" }).waitFor();
+    await mp.getByRole("button", { name: "Sign in to Dropbox and join" }).waitFor();
+    // your own app key (docs/CLOUD_APPS.md): OneDrive too, with the key you registered
+    await mp.getByRole("button", { name: "Use your own app key" }).click();
+    await mp.getByRole("button", { name: "OneDrive", exact: true }).click();
+    await mp.getByLabel("App key or client ID").fill("00000000-0000-0000-0000-000000000000");
+    await mp.getByRole("button", { name: "Sign in to OneDrive and join" }).waitFor();
     await mp.getByRole("radio", { name: /^Nextcloud/ }).check();
   }
   await mp.getByLabel("Nextcloud address").waitFor();

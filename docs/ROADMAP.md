@@ -415,3 +415,7 @@ before enabling a cloud model.
   like saved passwords; app-folder / `drive.file` access only (`locuvi/sync/cloud.py`). Tested
   against stand-ins of each service; switched on when the owner registers the apps
   ([CLOUD_APPS.md](CLOUD_APPS.md)).
+- ✅ Own app keys for cloud sync (owner request, 25 Oct 2026): Settings › Sync takes a
+  practice's own Dropbox/Google/Microsoft registration (`cloud.own_app`), kept with the
+  sign-in (secret encrypted) so renewals use it; lifts the shared user limits and enables
+  OneDrive. CLOUD_APPS.md explains each company's limits and how to raise them.

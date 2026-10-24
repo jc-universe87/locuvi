@@ -5,11 +5,15 @@
  * they were doing (start or join, the device name, the sync code) for 15 minutes. The
  * company sends them back through Locuvi's return page to /oauth here, where the sign-in is
  * finished and sync started or joined.
+ *
+ * ``own``: someone's own registered app (docs/CLOUD_APPS.md) instead of Locuvi's. It is
+ * kept with the sign-in on this device, which only renews with the app that made it.
  */
 import { api } from "./api";
 import { POCKET } from "./pocket";
 
 export type CloudProvider = "dropbox" | "google" | "onedrive";
+export type OwnApp = { client_id: string; client_secret?: string };
 type Pending = {
   provider: CloudProvider;
   mode: "start" | "join";
@@ -18,6 +22,7 @@ type Pending = {
   verifier: string;
   state: string;
   returnTo: string;
+  own?: OwnApp;
   at: number;
 };
 const KEY = "locuvi.cloud-signin";
@@ -29,10 +34,10 @@ function returnTo(): string {
   return `local:${location.port || "80"}`;
 }
 
-export async function signIn(provider: CloudProvider, mode: "start" | "join", device: string, code: string) {
+export async function signIn(provider: CloudProvider, mode: "start" | "join", device: string, code: string, own?: OwnApp) {
   const to = returnTo();
-  const b = await api.post<{ url: string; state: string; verifier: string }>("/sync/cloud/begin", { provider, return_to: to });
-  const pending: Pending = { provider, mode, device, code, verifier: b.verifier, state: b.state, returnTo: to, at: Date.now() };
+  const b = await api.post<{ url: string; state: string; verifier: string }>("/sync/cloud/begin", { provider, return_to: to, ...own });
+  const pending: Pending = { provider, mode, device, code, verifier: b.verifier, state: b.state, returnTo: to, own, at: Date.now() };
   try {
     localStorage.setItem(KEY, JSON.stringify(pending));
   } catch {
@@ -58,6 +63,7 @@ export async function finishSignIn(query: URLSearchParams): Promise<CloudResult>
   if (query.get("error") || !query.get("code")) throw new Error("declined");
   const f = await api.post<{ connection: string; account: string }>("/sync/cloud/finish", {
     provider: pending.provider, code: query.get("code"), verifier: pending.verifier, return_to: pending.returnTo,
+    ...pending.own,
   });
   const body = { kind: "cloud", connection: f.connection, device_name: pending.device };
   if (pending.mode === "start") {

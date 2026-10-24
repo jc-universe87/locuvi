@@ -21,7 +21,9 @@ https://locuvi.pistio.co.uk/oauth.html
 
 **Contents**
 [Dropbox](#dropbox) · [Google Drive](#google-drive) · [OneDrive](#onedrive) ·
-[What each company gets](#what-each-company-gets) · [Limits](#limits)
+[How many people can sign in](#how-many-people-can-sign-in) ·
+[Your own app key](#your-own-app-key) · [What each company gets](#what-each-company-gets) ·
+[Limits](#limits)
 
 ---
 
@@ -92,6 +94,44 @@ registration** (with a personal Microsoft account you may first need a free Azur
 
 Two addresses, because Microsoft keeps a browser sign-in (the iPhone and iPad site) for 24 hours
 only; the computer and Android app use the second one and stay signed in.
+
+## How many people can sign in
+
+People who are already signed in keep syncing whatever happens below; a limit only stops
+*new* people signing in, and they can still use a cloud folder on a computer, Nextcloud or
+Everything in one file meanwhile.
+
+- **Google Drive:** no limit once the app is **In production**, because Locuvi only asks for
+  `drive.file`. (While it's in *Testing*, only up to 100 listed test users can sign in. If
+  Google ever shows a user cap after publishing, something other than `drive.file` is listed
+  under **Data access**: remove it.) Google also limits how many requests all of Locuvi can
+  make per minute; that's far above what Locuvi uses, and **APIs & Services › Google Drive
+  API › Quotas** can raise it for free.
+- **Dropbox:** after **Enable additional users**, up to **500** people. Once **50** people
+  have signed in, Dropbox gives you **two weeks to apply for production**, or it stops new
+  people signing in until you do. Use **Apply for production** on the app's **Settings** page
+  (it shows how many have signed in): Dropbox reviews the app (free, usually days to a couple
+  of weeks), and after that there's no limit. Applying before 50 is fine. If they ask for
+  changes, make them and apply again.
+- **OneDrive:** not offered by Locuvi's own app (see above), only with
+  [your own app key](#your-own-app-key).
+
+## Your own app key
+
+Anyone can register Locuvi with Dropbox, Google or Microsoft themselves (a practice, its IT
+person, or someone who wants OneDrive) and use that instead of Locuvi's own registration.
+Their limits are then their own, separate from everyone else's.
+
+1. Register the app exactly as above ([Dropbox](#dropbox), [Google Drive](#google-drive) or
+   [OneDrive](#onedrive)), with the same addresses (`https://locuvi.pistio.co.uk/oauth.html`,
+   and for OneDrive also `oauth-native.html`).
+2. In Locuvi: **Settings › Sync and backup file › Start syncing** (or **Join**) › **Use your
+   own app key**. Choose the service and paste the **App key** (Dropbox), **Client ID** and
+   **Client secret** (Google) or **Application (client) ID** (OneDrive).
+3. Do the same, with the same key, on each device that joins.
+
+The key is kept with the sign-in on that device (the Google secret encrypted), because a
+sign-in only renews with the app that made it.
 
 ## What each company gets
 

@@ -22,6 +22,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets as pysecrets
 import threading
 import time
@@ -44,6 +45,24 @@ CHUNK = 16 * 327_680  # 5 MiB, a multiple of OneDrive's 320 KiB
 def available() -> list[str]:
     """The providers this copy of Locuvi is set up for (cloud_apps)."""
     return [p for p in PROVIDERS if cloud_apps.client(p)[0]]
+
+
+# Someone's own registered app (docs/CLOUD_APPS.md), used instead of Locuvi's: (id, secret).
+OwnApp = tuple[str, str]
+_OWN_ID = re.compile(r"[A-Za-z0-9._-]{8,200}")
+_OWN_SECRET = re.compile(r"[A-Za-z0-9._~-]{0,200}")
+
+
+def own_app(provider: str, client_id: str | None, secret: str | None) -> OwnApp | None:
+    """Check an app key typed in Settings: None when none was given."""
+    cid, sec = (client_id or "").strip(), (secret or "").strip()
+    if not cid:
+        return None
+    if not _OWN_ID.fullmatch(cid) or not _OWN_SECRET.fullmatch(sec):
+        raise DomainError("sync.cloud_own_app", "That app key doesn't look right. Copy it again.")
+    if provider == "google" and not sec:
+        raise DomainError("sync.cloud_own_secret", "Google also needs the app's client secret.")
+    return cid, sec
 
 
 def _http() -> httpx.Client:
@@ -74,7 +93,9 @@ SCOPE = {
 }
 
 
-def _check(provider: str) -> tuple[str, str]:
+def _check(provider: str, own: OwnApp | None = None) -> tuple[str, str]:
+    if provider in PROVIDERS and own:
+        return own
     if provider not in PROVIDERS or not cloud_apps.client(provider)[0]:
         raise DomainError("sync.cloud_unavailable", "That cloud storage isn't available here.")
     return cloud_apps.client(provider)
@@ -95,9 +116,10 @@ def redirect_uri(provider: str, return_to: str) -> str:
     return cloud_apps.RETURN_PAGE
 
 
-def begin(provider: str, return_to: str) -> dict[str, str]:
-    """The company's sign-in address, and what to keep until the person comes back."""
-    cid, _ = _check(provider)
+def begin(provider: str, return_to: str, own: OwnApp | None = None) -> dict[str, str]:
+    """The company's sign-in address, and what to keep until the person comes back.
+    ``own``: the person's own registered app instead of Locuvi's."""
+    cid, _ = _check(provider, own)
     _check_return(return_to)
     verifier = pysecrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
@@ -121,8 +143,8 @@ def begin(provider: str, return_to: str) -> dict[str, str]:
 
 
 def _token_request(provider: str, form: dict[str, str], return_to: str,
-                   http: httpx.Client) -> dict[str, Any]:  # fmt: skip
-    cid, secret = _check(provider)
+                   http: httpx.Client, own: OwnApp | None = None) -> dict[str, Any]:  # fmt: skip
+    cid, secret = _check(provider, own)
     form = {**form, "client_id": cid}
     if secret:
         form["client_secret"] = secret
@@ -141,16 +163,17 @@ def _token_request(provider: str, form: dict[str, str], return_to: str,
 
 
 def finish(provider: str, code: str, verifier: str, return_to: str,
-           http: httpx.Client | None = None) -> dict[str, Any]:  # fmt: skip
+           http: httpx.Client | None = None,
+           own: OwnApp | None = None) -> dict[str, Any]:  # fmt: skip
     """Swap the one-time code for lasting access; returns the account and refresh token."""
     _check_return(return_to)
-    own = http is None
+    opened = http is None
     http = http or _http()
     try:
         tok = _token_request(provider, {
             "grant_type": "authorization_code", "code": code, "code_verifier": verifier,
             "redirect_uri": redirect_uri(provider, return_to),
-        }, return_to, http)  # fmt: skip
+        }, return_to, http, own)  # fmt: skip
         refresh = tok.get("refresh_token")
         if not refresh:
             raise TargetError(
@@ -158,10 +181,10 @@ def finish(provider: str, code: str, verifier: str, return_to: str,
             )
         account = _account(provider, tok["access_token"], http)
     finally:
-        if own:
+        if opened:
             http.close()
     return {"provider": provider, "refresh": refresh, "return_to": return_to,
-            "account": account, "access": tok["access_token"],
+            "account": account, "access": tok["access_token"], "own": own,
             "expires": time.time() + float(tok.get("expires_in", 3600)) - 60}  # fmt: skip
 
 
@@ -188,14 +211,17 @@ def _account(provider: str, access: str, http: httpx.Client) -> str:
 class Session:
     """An access token for one account, renewed from the refresh token when it runs out.
 
-    ``on_refresh`` saves a new refresh token when the company replaces it (Microsoft does)."""
+    ``on_refresh`` saves a new refresh token when the company replaces it (Microsoft does).
+    ``own``: the app it was signed in with, when it's the person's own (a sign-in only
+    renews with the app that made it)."""
 
     _cache: dict[str, tuple[str, float]] = {}
     _lock = threading.Lock()
 
     def __init__(self, provider: str, refresh: str, return_to: str, *, on_refresh=None,
-                 http: httpx.Client | None = None) -> None:  # type: ignore[no-untyped-def]  # fmt: skip
+                 http: httpx.Client | None = None, own: OwnApp | None = None) -> None:  # type: ignore[no-untyped-def]  # fmt: skip
         self.provider, self.refresh, self.return_to = provider, refresh, return_to
+        self.own = own
         self.on_refresh = on_refresh
         self.http = http or _http()
         self._key = hashlib.sha256(refresh.encode()).hexdigest()
@@ -207,7 +233,7 @@ class Session:
                 return hit[0]
             tok = _token_request(self.provider, {
                 "grant_type": "refresh_token", "refresh_token": self.refresh,
-            }, self.return_to, self.http)  # fmt: skip
+            }, self.return_to, self.http, self.own)  # fmt: skip
             new_refresh = tok.get("refresh_token")
             if new_refresh and new_refresh != self.refresh:
                 self.refresh = new_refresh

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { ErrorAlert } from "./ui";
+import { ErrorAlert, Segmented } from "./ui";
 import { useT } from "../i18n";
 import { api, downloadBlob } from "../lib/api";
 import { dateTime, todayLondon } from "../lib/format";
 import { POCKET } from "../lib/pocket";
 import { signIn, type CloudProvider } from "../lib/cloud";
 
-type Where = { kind: "folder" | "nextcloud" | "cloud"; path?: string; provider?: CloudProvider };
+type Where = { kind: "folder" | "nextcloud" | "cloud"; path?: string; provider?: CloudProvider; own?: boolean };
+type Own = { provider: CloudProvider; client_id: string; client_secret: string };
 type Nextcloud = { url: string; home_url: string; username: string; password: string };
 type SyncState = {
   enabled: boolean;
@@ -18,8 +19,9 @@ type SyncState = {
   last_changes: number;
   nextcloud: { url: string; home_url: string | null; username: string; reached: "url" | "home_url" | null } | null;
   nextcloud_saved: { url: string; username: string } | null;
-  cloud: { provider: CloudProvider; account: string | null } | null;
+  cloud: { provider: CloudProvider; account: string | null; own_app?: boolean } | null;
   cloud_accounts: CloudProvider[];
+  cloud_own_apps: CloudProvider[];
   cloud_folders: { name: string; path: string }[];
   can_choose_folder: boolean;
 };
@@ -43,6 +45,7 @@ export function SyncSection() {
   const [device, setDevice] = useState("");
   const [code, setCode] = useState("");
   const [nc, setNc] = useState<Nextcloud>({ url: "", home_url: "", username: "", password: "" });
+  const [own, setOwn] = useState<Own>({ provider: "dropbox", client_id: "", client_secret: "" });
   const [shownCode, setShownCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -69,13 +72,17 @@ export function SyncSection() {
   const target = (): (Where & Partial<Nextcloud>) | null => {
     if (where?.kind === "folder" && where.path === "") return { kind: "folder", path };
     if (where?.kind === "nextcloud") return nc.url.trim() && nc.username.trim() ? { ...where, ...nc } : null;
+    if (where?.own) return own.client_id.trim() && (own.provider !== "google" || own.client_secret.trim()) ? { kind: "cloud", provider: own.provider, own: true } : null;
     return where;
   };
   const begin = () =>
     run(async () => {
       const w = target();
       if (!w) return;
-      if (w.kind === "cloud" && w.provider) return signIn(w.provider, mode ?? "start", device, code);
+      if (w.kind === "cloud" && w.provider) {
+        const app = w.own ? { client_id: own.client_id.trim(), client_secret: own.client_secret.trim() || undefined } : undefined;
+        return signIn(w.provider, mode ?? "start", device, code, app);
+      }
       const body = { ...w, device_name: device };
       if (mode === "start") {
         const r = await api.post<SyncState & { code: string }>("/sync/start", body);
@@ -180,6 +187,31 @@ export function SyncSection() {
           )}
           {st.cloud_folders.length === 0 && st.can_choose_folder && <p className="form-foot">{t("sync.no_cloud_app")}</p>}
           {where?.kind === "nextcloud" && <NextcloudFields nc={nc} saved={st.nextcloud_saved} onChange={setNc} />}
+          {st.cloud_own_apps.length > 0 && !where?.own && (
+            <p className="form-foot">
+              <button className="btn ghost small" type="button" onClick={() => setWhere({ kind: "cloud", own: true })}>{t("sync.own_open")}</button>
+            </p>
+          )}
+          {where?.own && (
+            <div className="form-list" style={{ marginTop: "0.5rem" }}>
+              <div className="form-row stacked">
+                <span>{t("sync.own_title")}</span>
+                <span className="hint">{t("sync.own_hint")}</span>
+                <Segmented label={t("sync.own_service")} value={own.provider} onChange={(p) => setOwn({ ...own, provider: p })}
+                  options={st.cloud_own_apps.map((p) => ({ value: p, label: t(`sync.own_${p}`) }))} />
+              </div>
+              <div className="form-row stacked">
+                <label htmlFor="sync-own-id">{t("sync.own_key")}</label>
+                <input id="sync-own-id" value={own.client_id} autoComplete="off" spellCheck={false} onChange={(e) => setOwn({ ...own, client_id: e.target.value })} />
+              </div>
+              {own.provider === "google" && (
+                <div className="form-row stacked">
+                  <label htmlFor="sync-own-secret">{t("sync.own_secret")}</label>
+                  <input id="sync-own-secret" value={own.client_secret} autoComplete="off" spellCheck={false} onChange={(e) => setOwn({ ...own, client_secret: e.target.value })} />
+                </div>
+              )}
+            </div>
+          )}
           <div className="form-list" style={{ marginTop: "0.5rem" }}>
             <div className="form-row stacked">
               <label htmlFor="sync-device">{t("sync.device_name")}</label>
@@ -195,8 +227,8 @@ export function SyncSection() {
           </div>
           <div className="actions" style={{ marginTop: "0.75rem" }}>
             <button className="btn" disabled={busy || !target() || (mode === "join" && code.trim().length < 20)} onClick={() => void begin()}>
-              {busy ? t("sync.syncing") : where?.kind === "cloud" && where.provider
-                ? t(mode === "start" ? "sync.cloud_start_go" : "sync.cloud_join_go", { name: t(`sync.cloud_${where.provider}`) })
+              {busy ? t("sync.syncing") : where?.kind === "cloud" && (where.provider || where.own)
+                ? t(mode === "start" ? "sync.cloud_start_go" : "sync.cloud_join_go", { name: t(`sync.own_${where.own ? own.provider : where.provider!}`) })
                 : mode === "start" ? t("sync.start_go") : t("sync.join_go")}
             </button>
             <button className="btn ghost" onClick={() => setMode(null)}>{t("common.cancel")}</button>
