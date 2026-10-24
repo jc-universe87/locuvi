@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- Locuvi's privacy policy as a plain page on its site, for the sign-in pages of Dropbox and
+     Google (their app settings link here). The full guide is docs/PRIVACY.md. -->
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Locuvi privacy policy</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 42rem; margin: 2.5rem auto; padding: 0 1rem; color: #1d2b36; line-height: 1.55; }
+    h1 { margin-bottom: 0.25rem; }
+    h2 { margin-top: 2rem; font-size: 1.2rem; }
+    a { color: #264653; }
+    .small { color: #5b6b75; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Locuvi privacy policy</h1>
+  <p class="small">Locuvi is free, open-source software for GP locums to keep their diary,
+    invoices, payments and pension forms. Last updated 24 October 2026.</p>
+
+  <h2>Your records stay with you</h2>
+  <p>Locuvi runs on your own devices: your computer, phone or tablet, or a server you
+    control. There is no Locuvi account and no Locuvi company that receives, stores or sees
+    your records. Locuvi has no analytics, advertising or tracking.</p>
+
+  <h2>What leaves your device</h2>
+  <p>Nothing, unless you switch a feature on, and then only what that feature needs:</p>
+  <ul>
+    <li><b>Sync</b> sends your records and files, encrypted on your device with your sync
+      code, to the place you choose: a cloud folder, your Nextcloud, or your Dropbox or Google
+      Drive account.</li>
+    <li><b>Email</b> sends an invoice through your own email provider when you tap Send.</li>
+    <li><b>The AI assistant</b> (optional) sends booking text, with personal details removed,
+      to the AI company you choose.</li>
+    <li><b>Updates</b>: the apps ask GitHub whether there is a new version. Nothing about you
+      is sent.</li>
+  </ul>
+
+  <h2>Dropbox and Google Drive</h2>
+  <p>If you choose to sync through your Dropbox or Google Drive account, Locuvi asks for the
+    smallest access those services offer:</p>
+  <ul>
+    <li><b>Dropbox</b>: only Locuvi's own folder inside Dropbox's Apps folder, and your account's email
+      address to show which account is connected.</li>
+    <li><b>Google Drive</b>: only the files Locuvi itself creates, in a folder called
+      <i>Locuvi Sync</i> (the <code>drive.file</code> permission). Locuvi can't see your other
+      files. Your email address is shown to say which account is connected.</li>
+  </ul>
+  <p>Everything Locuvi puts there is encrypted first, so Dropbox and Google see only file
+    names and sizes, never your records. The sign-in is kept encrypted on your device and is
+    never sent anywhere else.</p>
+  <p>Locuvi's use and transfer of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API
+    Services User Data Policy</a>, including the Limited Use requirements. That information
+    is used only to sync your own records between your own devices. It is not used for
+    advertising, not sold, not used to train AI models, and not shared with anyone.</p>
+  <p>You can disconnect at any time: switch sync off in Locuvi, and remove Locuvi's access in
+    your <a href="https://www.dropbox.com/account/connected_apps">Dropbox</a> or
+    <a href="https://myaccount.google.com/connections">Google</a> account settings. Deleting
+    the Locuvi Sync folder deletes everything Locuvi put there.</p>
+
+  <h2>Questions</h2>
+  <p>The full privacy guide is in
+    <a href="https://github.com/jc-universe87/locuvi/blob/main/docs/PRIVACY.md">Locuvi's
+    documentation</a>. Questions or concerns: open an issue on
+    <a href="https://github.com/jc-universe87/locuvi/issues">GitHub</a>.</p>
+</body>
+</html>
