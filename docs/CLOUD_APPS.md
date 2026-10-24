@@ -67,6 +67,9 @@ own it opens nobody's files. If it is ever abused, make a new one in the same pl
 
 ## OneDrive
 
+*Not offered at the moment:* Microsoft only lets an app be registered from a work or school
+account, or after an Azure sign-up. The code is ready; these steps switch it on.
+
 At [entra.microsoft.com](https://entra.microsoft.com) → **App registrations** → **New
 registration** (with a personal Microsoft account you may first need a free Azure sign-up):
 
