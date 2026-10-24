@@ -6,6 +6,13 @@ releases.
 
 ## Unreleased
 
+- **Updates install by themselves.** Windows and Mac download a new version in the
+  background and install it when you close Locuvi (or at night, if Locuvi stays on for your
+  phone). Android installs it by itself a couple of minutes after you leave Locuvi, once
+  you've said yes to the first update (Android 12 and newer). iPhone and iPad start the new
+  version the next time you come back to Locuvi. **Update now** still installs straight away;
+  **Update by itself** in Settings switches it off.
+
 - **Sync through a Dropbox or Google Drive account** (Settings › Sync and backup file): sign
   in once on each device, no app needed, so it works on phones and tablets too. Locuvi only
   gets its own folder, and everything in it stays encrypted with your sync code. OneDrive

@@ -41,9 +41,9 @@ def released(monkeypatch):
     """Pretend to be the Windows app, released as 1.1.16."""
     monkeypatch.setitem(sys.modules, "locuvi._release", types.SimpleNamespace(VERSION="1.1.16"))
     monkeypatch.setattr(sys, "platform", "win32")
-    updates._cache.update(at=0.0, info=None)
+    updates._cache.update(at=0.0, info=None, file=None, installing=False)
     yield
-    updates._cache.update(at=0.0, info=None)
+    updates._cache.update(at=0.0, info=None, file=None, installing=False)
 
 
 def test_versions_compare_by_number():
@@ -102,11 +102,54 @@ def test_install_waits_for_locuvi_then_reopens_it(released, tmp_path):
     assert script.index("Start-Process -Wait") < script.index("Locuvi.exe")
 
 
+def test_found_update_is_downloaded_once_in_the_background(released, tmp_path):
+    assert updates.prepare(tmp_path, client=fake_github())
+    f = updates.ready_file()
+    assert f is not None and f.read_bytes() == INSTALLER
+    gh = httpx.Client(transport=httpx.MockTransport(lambda r: pytest.fail("downloaded again")))
+    assert updates.prepare(tmp_path, client=gh)
+
+
+def test_nothing_new_nothing_downloaded(released, tmp_path):
+    assert not updates.prepare(tmp_path, client=fake_github("v1.1.16"))
+    assert updates.ready_file() is None and not list(tmp_path.glob("*"))
+
+
+def test_closing_locuvi_installs_the_ready_update_and_leaves_it_closed(
+    released, tmp_path, monkeypatch
+):
+    started = []
+    monkeypatch.setattr(updates.subprocess, "Popen", lambda cmd, **kw: started.append(cmd))
+    monkeypatch.setattr(updates, "app_bundle", lambda: tmp_path / "app")
+    assert not updates.install_on_exit()  # nothing downloaded yet: closes as usual
+    updates.prepare(tmp_path / "updates", client=fake_github())
+    assert updates.install_on_exit()
+    script = (tmp_path / "updates" / "update.ps1").read_text(encoding="utf-8-sig")
+    assert "/VERYSILENT" in script and "update-done" in script
+    assert "Locuvi.exe" not in script  # stays closed: it's new the next time it's opened
+    assert len(started) == 1
+    assert not updates.install_on_exit()  # once is enough
+
+
+def test_running_for_phones_installs_with_no_window_open_at_night(released, tmp_path):
+    cmd = updates.install_command(tmp_path / "setup.exe", tmp_path / "app", 1, ["--no-window"])
+    script = (tmp_path / "update.ps1").read_text(encoding="utf-8-sig")
+    assert cmd[0] == "powershell" and "-ArgumentList @('--no-window')" in script
+    assert updates.due_while_running(45 * 60, 3)
+    assert not updates.due_while_running(45 * 60, 14)  # daytime: wait
+    assert not updates.due_while_running(5 * 60, 3)  # someone used it just now
+    assert not updates.due_while_running(None, 3)
+
+
 def test_mac_install_replaces_the_app_and_keeps_the_old_one_on_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "platform", "darwin")
     cmd = updates.install_command(tmp_path / "Locuvi-macOS.dmg", tmp_path / "Locuvi.app", 7)[-1]
     assert "kill -0 7" in cmd and "ditto" in cmd and 'open "' in cmd
     assert 'mv "' + str(tmp_path / "Locuvi.app") + '.old" "' in cmd  # put back if copy failed
+    quiet = updates.install_command(tmp_path / "L.dmg", tmp_path / "Locuvi.app", 7, None)[-1]
+    assert "update-done" in quiet and 'open "' not in quiet
+    bg = updates.install_command(tmp_path / "L.dmg", tmp_path / "Locuvi.app", 7, ["--no-window"])
+    assert '--args "--no-window"' in bg[-1]
 
 
 def test_server_has_no_updates(settings):

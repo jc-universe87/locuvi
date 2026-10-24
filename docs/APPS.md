@@ -192,18 +192,22 @@ somewhere else: now and then, copy the `backups` folder to a USB stick, or to a 
 Google Drive, OneDrive, Dropbox or iCloud Drive keeps in step. A computer can be lost, stolen
 or broken.
 
-**Updates.** Locuvi looks for a new version by itself and tells you when one is ready:
+**Updates.** Locuvi updates itself. There's nothing to do:
 
-- **Windows and Mac:** a note at the top says *"Locuvi 1.2.3 is ready to install"*. Tap
-  **Update now**: Locuvi closes, installs the new version and opens again in about a minute.
-  It checks every few hours; **Settings › Phones, tablets and computers › Updates** has
-  **Check for updates**, and a switch if you'd rather it didn't check by itself. On a Mac,
-  Locuvi must be in your **Applications** folder to update itself.
-- **Android:** once a day the app asks whether you'd like the new version. Tap **Update**,
-  then **Install**. The first time, Android asks you to allow installs from Locuvi: switch on
-  **Allow from this source** and go back.
-- **iPhone and iPad:** nothing to do. The new version downloads in the background; Locuvi
-  then shows **Restart Locuvi**.
+- **Windows and Mac:** every few hours Locuvi looks for a new version and downloads it. It
+  installs when you close Locuvi, so it's new the next time you open it. If you can't wait,
+  the note at the top has **Update now**: Locuvi closes, installs the new version and opens
+  again in about a minute. If Locuvi stays on for your phone, it installs at night once
+  nobody has had its window open for half an hour, and carries on. **Settings › Phones,
+  tablets and computers › Updates** has **Check for updates**, and the **Update by itself**
+  switch. On a Mac, Locuvi must be in your **Applications** folder to update itself.
+- **Android:** the app looks for a new version once a day. The first time, it asks: tap
+  **Update**, then **Install** (and, if Android asks, switch on **Allow from this source** for
+  Locuvi and go back). After that, updates install by themselves a couple of minutes after
+  you leave Locuvi; the next time you open it, it's new. This needs Android 12 or newer; on
+  older phones Locuvi asks each time.
+- **iPhone and iPad:** the new version downloads in the background and starts the next time
+  you come back to Locuvi. **Restart Locuvi** at the top starts it straight away.
 
 Each update is the exact file published on the [releases page](https://github.com/jc-universe87/locuvi/releases),
 checked before it's installed. Your records stay where they are, and Locuvi makes a backup

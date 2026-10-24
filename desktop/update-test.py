@@ -7,6 +7,10 @@ version 99.0.0. The app is started (headless, its own records), asked to update 
 /api/v1/updates/install like the Update now button, and must then: stop, install the new
 version over itself, and open again by itself (seen by its instance.json in the usual Locuvi
 folder). The reopened app is then stopped.
+
+Then the automatic way: the app is started again (headless, ``--update-on-exit``), finds and
+downloads the new version by itself, and is quit like closing its window. It must install
+the new version as it stops (update-done appears) and stay closed.
 """
 
 from __future__ import annotations
@@ -110,7 +114,58 @@ def main(app: str, installer: str, work: str) -> int:
         base + "/api/v1/desktop/quit", data=b"", method="POST", headers={"X-CSRF-Token": csrf2}
     )
     op2.open(quit_req, timeout=30).read()
-    print("PASS updated by itself")
+    print("PASS updated with Update now")
+    for _ in range(60):
+        if not (usual / "instance.json").is_file():
+            break
+        time.sleep(1)
+    return on_exit(app, w, env)
+
+
+def on_exit(app: str, w: Path, env: dict[str, str]) -> int:
+    """Update by itself: downloaded while running, installed when Locuvi stops."""
+    info = w / "info2.json"
+    root = w / "root2"
+    proc = subprocess.Popen([app, "--headless", "--update-on-exit", "--data-dir", str(root),
+                             "--password-file", str(w / "pw"), "--info-file", str(info)],
+                            env=env)  # fmt: skip
+    for _ in range(120):
+        if info.is_file() and info.stat().st_size:
+            break
+        time.sleep(1)
+    i = json.loads(info.read_text())
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                     urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))  # fmt: skip
+    op.open(i["open"], timeout=30).read()
+    csrf = json.loads(op.open(i["url"] + "/api/v1/auth/session", timeout=30).read())["csrf_token"]
+    quit_req = urllib.request.Request(i["url"] + "/api/v1/desktop/quit", data=b"", method="POST",
+                                      headers={"X-CSRF-Token": csrf})  # fmt: skip
+    op.open(quit_req, timeout=30).read()
+    try:
+        proc.wait(timeout=120)
+    except subprocess.TimeoutExpired:
+        print("FAIL the app didn't stop when quit")
+        proc.kill()
+        return 1
+    done = root / "updates" / "update-done"
+    for _ in range(240):
+        if done.is_file():
+            break
+        time.sleep(1)
+    else:
+        print("FAIL the new version wasn't installed when Locuvi stopped")
+        up = root / "updates"
+        for f in [up / "update-start.log", up / "update.ps1", up / "update.log",
+                  up / "setup.log", root / "logs" / "locuvi.log"]:  # fmt: skip
+            if f.is_file():
+                print(f"--- {f}\n" + f.read_text(errors="replace")[-4000:])
+        return 1
+    print("PASS installed the new version when Locuvi stopped:", done.read_text().strip())
+    time.sleep(10)
+    if (usual_root() / "instance.json").is_file() or (root / "instance.json").is_file():
+        print("FAIL Locuvi opened again after installing on close")
+        return 1
+    print("PASS stayed closed: it's new the next time it's opened")
     return 0
 
 

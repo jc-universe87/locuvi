@@ -1,11 +1,13 @@
 /**
  * New versions of Locuvi.
  *
- * - Windows and Mac app: the Locuvi on the computer asks GitHub now and then
- *   (GET /updates) and installs a new version when the owner taps Update now.
- * - Android app: the app itself checks and installs (LocuviNative.checkUpdate, MainActivity).
- * - iPhone and iPad: the page updates itself in the background (service worker); once the new
- *   version is ready, the owner restarts it with one tap.
+ * - Windows and Mac app: the Locuvi on the computer looks for one now and then, downloads it
+ *   and installs it when Locuvi closes (locuvi/updates.py); Update now installs it at once.
+ * - Android app: the app itself checks and installs, by itself after the first time
+ *   (Updates.java; LocuviNative.checkUpdate for Check for updates).
+ * - iPhone and iPad: the page updates itself in the background (service worker). The new
+ *   version is used once Locuvi has been out of sight (the next time it's opened), or at
+ *   once with Restart Locuvi.
  */
 import { useEffect, useState } from "react";
 import { api } from "./api";
@@ -41,6 +43,11 @@ export function registerServiceWorker() {
     if (!hadOne) return; // the very first install: nothing to restart
     swReady = true;
     swListeners.forEach((fn) => fn());
+    // start the new version while nobody is looking: now, or when Locuvi next goes out of sight
+    if (document.visibilityState === "hidden") location.reload();
+    else document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") location.reload();
+    });
   });
   void navigator.serviceWorker.register("./sw.js").then((reg) => {
     // Home Screen apps stay open for days: look for a new version each time Locuvi comes back

@@ -47,7 +47,7 @@ export function UpdateBanner() {
   };
   return (
     <div className="alert info update-banner" role="status">
-      <span>{t("updates.ready", { v: st.latest ?? "" })}</span>
+      <span>{t(st.automatic ? "updates.ready_auto" : "updates.ready", { v: st.latest ?? "" })}</span>
       <span className="actions">
         <button className="btn small" onClick={() => void api.post("/updates/install").then(() => setInstalling(true), setError)}>
           {t("updates.update_now")}
@@ -124,7 +124,7 @@ export function UpdatesSection({ computer }: { computer: { update_check?: boolea
         <div className="alert info" role="status" style={{ marginTop: "0.5rem" }}>{t("updates.installing")}</div>
       ) : s?.available ? (
         <div className="alert info" style={{ marginTop: "0.5rem" }}>
-          <p style={{ marginTop: 0 }}>{t("updates.ready", { v: s.latest ?? "" })}</p>
+          <p style={{ marginTop: 0 }}>{t(auto ? "updates.ready_auto" : "updates.ready", { v: s.latest ?? "" })}</p>
           <button className="btn" onClick={() => void api.post("/updates/install").then(() => setInstalling(true), setError)}>
             {t("updates.update_now")}
           </button>
