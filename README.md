@@ -9,7 +9,7 @@
 **Calm, private admin for UK GP locums.** Your diary, invoices, payments, NHS pension forms
 and tax-year reports in one place, running on your own computer.
 
-[![CI](https://github.com/jc-universe87/locuvi/actions/workflows/ci.yml/badge.svg)](https://github.com/jc-universe87/locuvi/actions/workflows/ci.yml)
+[![CI](https://github.com/pistio/locuvi/actions/workflows/ci.yml/badge.svg)](https://github.com/pistio/locuvi/actions/workflows/ci.yml)
 [![Licence: AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-294d63)](LICENSE)
 ![Self-hosted](https://img.shields.io/badge/self--hosted-your%20data%20stays%20yours-294d63)
 ![Made for](https://img.shields.io/badge/made%20for-UK%20GP%20locums-294d63)
@@ -130,15 +130,15 @@ Every version has the same features and shows the same Locuvi.
 
 | | Download | |
 | --- | --- | --- |
-| 🪟 **Windows** 10 and 11 | [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Runs Locuvi on your PC. Nothing else to install. |
-| 🍎 **Mac** with Apple silicon (M1 or newer) | [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Runs Locuvi on your Mac. Nothing else to install. |
-| 🤖 **Android** phones and tablets | [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk) | The whole of Locuvi on the phone, works offline. |
+| 🪟 **Windows** 10 and 11 | [**Locuvi-Windows-Setup.exe**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Runs Locuvi on your PC. Nothing else to install. |
+| 🍎 **Mac** with Apple silicon (M1 or newer) | [**Locuvi-macOS.dmg**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Runs Locuvi on your Mac. Nothing else to install. |
+| 🤖 **Android** phones and tablets | [**Locuvi-Android.apk**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-Android.apk) | The whole of Locuvi on the phone, works offline. |
 | 📱 **iPhone and iPad** | [**Open in Safari**](https://locuvi.pistio.co.uk/) | Then Share › Add to Home Screen. Works offline. |
 | 🖥 **Server** (home PC, Raspberry Pi, NAS) | [Docker](docs/SETUP.md) | Always on, so you can reach it from anywhere. |
 
 Windows, macOS and Android show a warning the first time, because Locuvi is a free project
 that isn't registered with Microsoft, Apple or Google.
-👉 [How to install each one](docs/APPS.md) · [All releases](https://github.com/jc-universe87/locuvi/releases)
+👉 [How to install each one](docs/APPS.md) · [All releases](https://github.com/pistio/locuvi/releases)
 
 ## Get started
 
@@ -190,7 +190,7 @@ Locuvi is built and maintained by one person in their spare time, and it's free.
 you an evening of invoices and pension forms each month, consider saying thanks:
 
 <p>
-  <a href="https://github.com/sponsors/jc-universe87"><img src="https://img.shields.io/badge/GitHub%20Sponsors-♥-ea4aaa?logo=github" alt="GitHub Sponsors"></a>
+  <a href="https://github.com/sponsors/pistio"><img src="https://img.shields.io/badge/GitHub%20Sponsors-♥-ea4aaa?logo=github" alt="GitHub Sponsors"></a>
   <a href="https://ko-fi.com/pistio"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
 

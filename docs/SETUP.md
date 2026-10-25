@@ -57,7 +57,7 @@ Open a terminal on the server and run these commands one block at a time.
 **1. Download Locuvi**
 
 ```bash
-git clone https://github.com/jc-universe87/locuvi.git locuvi
+git clone https://github.com/pistio/locuvi.git locuvi
 cd locuvi
 cp .env.example .env
 ```

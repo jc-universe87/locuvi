@@ -90,7 +90,7 @@ export default function SettingsPage({ onSignOut, profile = null }: { onSignOut?
         </div>
       )}
       <p className="form-foot" style={{ textAlign: "center", marginTop: "1.5rem" }}>
-        Locuvi · {t("app.tagline")} · <a href="https://github.com/jc-universe87/locuvi" target="_blank" rel="noreferrer noopener">{t("app.source")}</a>
+        Locuvi · {t("app.tagline")} · <a href="https://github.com/pistio/locuvi" target="_blank" rel="noreferrer noopener">{t("app.source")}</a>
       </p>
     </>
   );
@@ -775,7 +775,7 @@ type Folder = { name: string; label: string };
 type MailKind = "gmail" | "outlook" | "nhsmail" | "other";
 type SignIn = { user_code: string; verification_uri: string; interval: number };
 
-const GUIDE = "https://github.com/jc-universe87/GP-Locum-Manager/blob/main/docs/EMAIL_SETUP.md";
+const GUIDE = "https://github.com/pistio/GP-Locum-Manager/blob/main/docs/EMAIL_SETUP.md";
 
 function mailKind(c: MailboxConfig): MailKind {
   if (c.provider === "microsoft") return c.ms_tenant === "organizations" ? "nhsmail" : "outlook";

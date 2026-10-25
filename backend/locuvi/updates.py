@@ -42,7 +42,7 @@ from locuvi.errors import DomainError
 log = logging.getLogger("locuvi.updates")
 
 LATEST = os.environ.get(
-    "LOCUVI_UPDATE_URL", "https://api.github.com/repos/jc-universe87/locuvi/releases/latest"
+    "LOCUVI_UPDATE_URL", "https://api.github.com/repos/pistio/locuvi/releases/latest"
 )
 CHECK_EVERY = 6 * 3600
 ASSETS = {"win32": "Locuvi-Windows-Setup.exe", "darwin": "Locuvi-macOS.dmg"}

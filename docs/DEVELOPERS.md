@@ -109,7 +109,7 @@ POCKET=1 BASE_URL=http://127.0.0.1:8790 node e2e/smoke.mjs && node e2e/pocket-ke
 The Android app bundles `dist-pocket` in `assets/www` and serves it from
 `https://app.locuvi.local` (`MainActivity.asset`). GitHub Pages serves the same build for
 iPhone and iPad at `https://locuvi.pistio.co.uk/` (custom domain set in the repository's Pages
-settings; DNS: a CNAME `locuvi` → `jc-universe87.github.io`, DNS only). Its own subdomain
+settings; DNS: a CNAME `locuvi` → `pistio.github.io`, DNS only). Its own subdomain
 gives the app its own browser storage, separate from any other site. The service worker
 keeps it for offline use.
 

@@ -9,7 +9,7 @@ name: locuvi
 # builds: `docker compose up -d --build`.
 services:
   locuvi:
-    image: ghcr.io/jc-universe87/gp-locum-manager:${LOCUVI_TAG:-latest}
+    image: ghcr.io/pistio/gp-locum-manager:${LOCUVI_TAG:-latest}
     build: .
     restart: unless-stopped
     # Lets the optional AI assistant reach a model running on this same computer (for example

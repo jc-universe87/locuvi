@@ -22,7 +22,7 @@ def fake_github(version: str = "v1.1.20", data: bytes = INSTALLER, digest: str |
         if request.url.path.endswith("/releases/latest"):
             return httpx.Response(200, json={
                 "tag_name": version,
-                "html_url": "https://github.com/jc-universe87/locuvi/releases/tag/" + version,
+                "html_url": "https://github.com/pistio/locuvi/releases/tag/" + version,
                 "assets": [{
                     "name": name, "size": len(data),
                     "digest": "sha256:" + (digest or hashlib.sha256(data).hexdigest()),

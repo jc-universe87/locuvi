@@ -379,7 +379,7 @@ running.
   your passwords or keys.
 - 🛠 `docker compose exec locuvi python -m locuvi.cli verify` checks every invoice PDF and the
   database.
-- Report a problem on the project's [GitHub issues page](https://github.com/jc-universe87/locuvi/issues).
+- Report a problem on the project's [GitHub issues page](https://github.com/pistio/locuvi/issues).
   **Never include real names, bank details, invoices or log lines with personal details.** Use
   made-up examples.
 - Found a security problem? Please follow [SECURITY.md](../SECURITY.md) instead of opening a

@@ -14,12 +14,12 @@ use it in three ways:
 
 | Device | Download | Needs |
 | --- | --- | --- |
-| 🪟 Windows PC | [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Windows 10 or 11 (64-bit) |
-| 🍎 Mac | [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Apple silicon (M1 or newer), macOS 12 or newer |
-| 🤖 Android phone or tablet | [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk) | Android 10 or newer |
+| 🪟 Windows PC | [**Locuvi-Windows-Setup.exe**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe) | Windows 10 or 11 (64-bit) |
+| 🍎 Mac | [**Locuvi-macOS.dmg**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-macOS.dmg) | Apple silicon (M1 or newer), macOS 12 or newer |
+| 🤖 Android phone or tablet | [**Locuvi-Android.apk**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-Android.apk) | Android 10 or newer |
 | 📱 iPhone or iPad | [**Open in Safari**](https://locuvi.pistio.co.uk/), then [Add to Home Screen](#iphone-and-ipad) | iOS or iPadOS 16.4 or newer |
 
-All the versions are listed on the [releases page](https://github.com/jc-universe87/locuvi/releases).
+All the versions are listed on the [releases page](https://github.com/pistio/locuvi/releases).
 Each one was built and tested automatically on its own system before it was published.
 
 **Contents**
@@ -32,7 +32,7 @@ Each one was built and tested automatically on its own system before it was publ
 
 ## Windows
 
-1. Download [**Locuvi-Windows-Setup.exe**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe)
+1. Download [**Locuvi-Windows-Setup.exe**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-Windows-Setup.exe)
    and open it.
 2. Windows may say **"Windows protected your PC"**. Click **More info**, then **Run anyway**.
    ([Why?](#why-the-warnings))
@@ -47,7 +47,7 @@ straight away, and **Show my Locuvi folder**.)
 
 ## Mac
 
-1. Download [**Locuvi-macOS.dmg**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-macOS.dmg)
+1. Download [**Locuvi-macOS.dmg**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-macOS.dmg)
    and open it.
 2. Drag **Locuvi** onto **Applications**.
 3. Open Locuvi from your Applications folder. The first time, your Mac says it can't check
@@ -70,7 +70,7 @@ later.
 
 The Android app has the whole of Locuvi inside it. Your records are kept on the phone.
 
-1. On your phone or tablet, download [**Locuvi-Android.apk**](https://github.com/jc-universe87/locuvi/releases/latest/download/Locuvi-Android.apk)
+1. On your phone or tablet, download [**Locuvi-Android.apk**](https://github.com/pistio/locuvi/releases/latest/download/Locuvi-Android.apk)
    and open it from your notifications or the **Files** app.
 2. Android asks whether to allow installs from this source (Chrome or Files). Tap
    **Settings**, switch on **Allow from this source**, and go back.
@@ -209,7 +209,7 @@ or broken.
 - **iPhone and iPad:** the new version downloads in the background and starts the next time
   you come back to Locuvi. **Restart Locuvi** at the top starts it straight away.
 
-Each update is the exact file published on the [releases page](https://github.com/jc-universe87/locuvi/releases),
+Each update is the exact file published on the [releases page](https://github.com/pistio/locuvi/releases),
 checked before it's installed. Your records stay where they are, and Locuvi makes a backup
 before it changes anything. You can still download and install a new version by hand, over
 the old one.

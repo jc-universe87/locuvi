@@ -33,7 +33,7 @@ def main(app: str, installer: str, work: str) -> int:
     data = inst.read_bytes()
     release = {
         "tag_name": "v99.0.0",
-        "html_url": "https://github.com/jc-universe87/locuvi/releases",
+        "html_url": "https://github.com/pistio/locuvi/releases",
         "assets": [{
             "name": inst.name, "size": len(data),
             "digest": "sha256:" + hashlib.sha256(data).hexdigest(),

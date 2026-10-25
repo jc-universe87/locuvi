@@ -50,7 +50,7 @@ every language.
 ## Other ways to help
 
 Not a coder? Clearer wording, translations and bug reports all help. You can also support
-the project on [GitHub Sponsors](https://github.com/sponsors/jc-universe87) or
+the project on [GitHub Sponsors](https://github.com/sponsors/pistio) or
 [Ko-fi](https://ko-fi.com/pistio).
 
 ## Licence

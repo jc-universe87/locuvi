@@ -50,7 +50,7 @@ import okhttp3.ResponseBody;
  * minutes; the next time it's opened, it's new.
  */
 final class Updates {
-    static final String LATEST = "https://api.github.com/repos/jc-universe87/locuvi/releases/latest";
+    static final String LATEST = "https://api.github.com/repos/pistio/locuvi/releases/latest";
     private static final String ASSET = "Locuvi-Android.apk";
     static final String KEY_LAST = "update_checked_at";
     static final String KEY_ASK = "update_ask_next"; // a quiet install needed the owner's OK
@@ -296,7 +296,7 @@ final class Updates {
                 .setMessage(R.string.update_resign_message)
                 .setPositiveButton(R.string.update_open_page, (d, w) -> activity.startActivity(
                         new Intent(Intent.ACTION_VIEW, Uri.parse(
-                                "https://github.com/jc-universe87/locuvi/blob/main/docs/APPS.md#android"))))
+                                "https://github.com/pistio/locuvi/blob/main/docs/APPS.md#android"))))
                 .setNegativeButton(R.string.update_later, null)
                 .show();
     }
