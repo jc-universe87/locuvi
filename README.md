@@ -187,11 +187,11 @@ figures in the pictures are made up.
 ## 💛 Support the project
 
 Locuvi is built and maintained by one person in their spare time, and it's free. If it saves
-you an evening of invoices and pension forms each month, consider saying thanks:
+you time with invoices and pension forms, you can support its continued development. Donations are optional and do not change access to the free software:
 
 <p>
-  <a href="https://github.com/sponsors/jc-universe87"><img src="https://img.shields.io/badge/GitHub%20Sponsors-♥-ea4aaa?logo=github" alt="GitHub Sponsors"></a>
-  <a href="https://ko-fi.com/pistio"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://github.com/sponsors/pistio"><img src="https://img.shields.io/badge/GitHub%20Sponsors-Support-0E2D5B?logo=githubsponsors&logoColor=white" alt="Support via GitHub Sponsors"></a>
+  <a href="https://ko-fi.com/pistio"><img src="https://img.shields.io/badge/Ko--fi-Buy%20a%20coffee-0E2D5B?logo=kofi&logoColor=white" alt="Support via Ko-fi"></a>
 </p>
 
 ## Licence
